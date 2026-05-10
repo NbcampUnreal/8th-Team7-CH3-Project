@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -16,6 +16,7 @@ class UPDMarketComponent;
 class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
+class UUserWidget;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 
@@ -101,6 +102,9 @@ private:
 	void ToggleInventory();
 	void TryInteract();
 
+	bool IsGameplayInputBlockedByModalUI() const;
+	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryWidget> InventoryWidgetInstance;
 
@@ -116,6 +120,9 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
 
+	bool bIsGameplayInputBlockedByModalUI = false;
+	bool bMouseCursorVisibleBeforeModalUI = false;
+
 	void OnInteract();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
@@ -124,6 +131,7 @@ private:
 	void OnToggleFireMode();
 	void OnDropWeapon();
 
-	bool bShowMouseCursor=true;
+	bool bMouseClickEventsEnabledBeforeModalUI = false;
+	bool bMouseOverEventsEnabledBeforeModalUI = false;
 
 };
