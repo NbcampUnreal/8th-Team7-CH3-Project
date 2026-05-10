@@ -10,7 +10,9 @@ public class ProjectD : ModuleRules
 			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"AIModule", "NavigationSystem",
-			"UMG", "Niagara"
+			"StateTreeModule", "GameplayStateTreeModule",
+			"UMG", "Slate", "SlateCore", "Niagara", "CommonUI", "CommonInput",
+			"PhysicsCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

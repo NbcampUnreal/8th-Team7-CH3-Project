@@ -2,26 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Engine/DataTable.h"
 #include "Interfaces/PDInteractable.h"
+#include "Type/Types.h"
 #include "PDItemBase.generated.h"
 
-USTRUCT(BlueprintType)
-struct FPDItemData : public FTableRowBase
-{
-	GENERATED_BODY()
+class UDataTable;
+class USphereComponent;
+class UStaticMeshComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FName ItemID;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FText DisplayName;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	UTexture2D* Icon = nullptr;
-};
-
-UCLASS(Abstract, Blueprintable)
+UCLASS(Blueprintable)
 class PROJECTD_API APDItemBase : public AActor, public IPDInteractable
 {
 	GENERATED_BODY()
@@ -30,17 +19,27 @@ public:
 	APDItemBase();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Item")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Item")
+	TObjectPtr<USphereComponent> PickupCollision;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Item")
+	TObjectPtr<UStaticMeshComponent> ItemMesh;
+
+protected:
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Item")
 	UDataTable* ItemDataTable = nullptr;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Item")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Item")
 	FName ItemRowName;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Item")
 	FPDItemData CachedItemData;
 
 public:
-	virtual void Interact_Implementation(AActor* Interactor) override {}
+	virtual void Interact_Implementation(AActor* Interactor) override;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Item", meta = (ClampMin = "1"))
+	int32 Quantity = 1;
 
 	FORCEINLINE const FPDItemData& GetItemData() const { return CachedItemData; }
 
@@ -49,6 +48,12 @@ protected:
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Item")
 	void OnItemDataLoaded();
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Item")
+	void OnPickupSucceeded(int32 AddedQuantity, int32 RemainingQuantity);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Item")
+	void OnPickupFailed();
 
 private:
 	void LoadItemData();

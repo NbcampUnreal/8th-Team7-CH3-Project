@@ -21,7 +21,10 @@ class PROJECTD_API UPDVisionComponent : public UActorComponent
 
 public:
 	UPDVisionComponent();
-	
+
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType,
+		FActorComponentTickFunction* ThisTickFunction) override;
+
 	UFUNCTION(BlueprintCallable, Category="PD|Vision")
 	void BindToAttributeSet(UAbilitySystemComponent* ASC);
 
@@ -64,13 +67,12 @@ private:
 	void OnVisionRangeChanged(const FOnAttributeChangeData& Data);
 	void OnVisionAngleChanged(const FOnAttributeChangeData& Data);
 	void OnVisionUpdateIntervalChanged(const FOnAttributeChangeData& Data);
-
-	void UpdateFogOfWarMPC();
+	
+	void UpdateFogOfWarMPC_Transform(float DeltaTime);
+	void UpdateFogOfWarMPC_Vision();
 
 	float StaminaScale=1.f;
 
-	
-	
 private:
 	TSet<AActor*> VisibleActors;
 	FTimerHandle TimerHandle;
@@ -83,4 +85,7 @@ private:
 	//Threshold
 	float LocationThreshold=5.f;
 	float YawThreshold=5.f;
+	
+	float ForwardSmoothSpeed=10.f;
+	FVector SmoothedForward=FVector::ForwardVector;
 };

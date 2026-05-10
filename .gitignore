@@ -1,4 +1,9 @@
 .vs/
+.idea/
+.claude/
+CLAUDE.MD
+Content/Developers/LCW/ExternalAsset/
+Content/Developers/yunseong/ExternalAssets/
 
 # Compiled Object files
 *.slo
@@ -39,6 +44,7 @@
 *.sdf
 *.VC.db
 *.VC.opendb
+*.vcxproj
 
 # Precompiled Assets
 SourceArt/**/*.png
@@ -89,3 +95,7 @@ Plugins/**/Binaries/*
 Plugins/**/Intermediate/*
 
 # End of https://www.toptal.com/developers/gitignore/api/unrealengine
+/Content/Asset/FogArea
+/Content/Asset/PrivateAsset/AnimStarterPack
+/Content/Asset/PrivateAsset
+/Content/FogArea
