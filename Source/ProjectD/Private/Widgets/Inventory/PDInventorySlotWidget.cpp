@@ -31,16 +31,26 @@ FReply UPDInventorySlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeomet
 	{
 		bLastClickWithControl = InMouseEvent.IsControlDown();
 		OnSlotRightClicked.Broadcast(this, SlotIndex);
-
-		if (!SlotData.IsEmpty())
-		{
-			OpenUseDropMenu();
-		}
-
 		return FReply::Handled();
 	}
 
 	return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+void UPDInventorySlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
+
+	if (!SlotData.IsEmpty())
+	{
+		OnSlotHovered.Broadcast(this, SlotIndex);
+	}
+}
+
+void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
+{
+	Super::NativeOnMouseLeave(InMouseEvent);
+	OnSlotUnhovered.Broadcast(this, SlotIndex);
 }
 
 void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int32 InSlotIndex)
@@ -88,6 +98,8 @@ void UPDInventorySlotWidget::RefreshVisuals()
 
 	if (SlotData.IsEmpty())
 	{
+		CachedTooltipDisplayName = FText::GetEmpty();
+		CachedTooltipDescription = FText::GetEmpty();
 		ClearTooltip();
 
 		if (TextItemNameWidget)
@@ -112,6 +124,8 @@ void UPDInventorySlotWidget::RefreshVisuals()
 
 	const FText DisplayName = SlotData.ItemData.DisplayName.IsEmpty() ? FText::FromName(SlotData.ItemData.ItemID) : SlotData.ItemData.DisplayName;
 	const FText Description = SlotData.ItemData.Description;
+	CachedTooltipDisplayName = DisplayName;
+	CachedTooltipDescription = Description;
 
 	if (TextItemNameWidget)
 	{
@@ -135,40 +149,42 @@ void UPDInventorySlotWidget::RefreshVisuals()
 
 void UPDInventorySlotWidget::ApplyTooltip(const FText& DisplayName, const FText& Description)
 {
-	if (!TooltipWidgetClass)
+	CachedTooltipDisplayName = DisplayName;
+	CachedTooltipDescription = Description;
+	ClearTooltip();
+}
+
+UUserWidget* UPDInventorySlotWidget::CreateItemTooltipWidget()
+{
+	if (SlotData.IsEmpty() || !TooltipWidgetClass)
 	{
-		SetToolTipText(Description.IsEmpty()
-			? DisplayName
-			: FText::Format(NSLOCTEXT("PDInventory", "ItemTooltipNameDescription", "{0}\n{1}"), DisplayName, Description));
-		return;
+		return nullptr;
 	}
 
 	UUserWidget* TooltipWidget = GetOwningPlayer()
 		? CreateWidget<UUserWidget>(GetOwningPlayer(), TooltipWidgetClass)
 		: CreateWidget<UUserWidget>(GetWorld(), TooltipWidgetClass);
 
-	if (!TooltipWidget)
+	ApplyTooltipTextToWidget(TooltipWidget, CachedTooltipDisplayName, CachedTooltipDescription);
+	return TooltipWidget;
+}
+
+void UPDInventorySlotWidget::ApplyTooltipTextToWidget(UUserWidget* TooltipWidget, const FText& DisplayName, const FText& Description) const
+{
+	if (!TooltipWidget || !TooltipWidget->WidgetTree)
 	{
-		SetToolTipText(Description.IsEmpty()
-			? DisplayName
-			: FText::Format(NSLOCTEXT("PDInventory", "ItemTooltipNameDescription", "{0}\n{1}"), DisplayName, Description));
 		return;
 	}
 
-	if (TooltipWidget->WidgetTree)
+	if (UTextBlock* TooltipNameText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipItemNameWidgetName)))
 	{
-		if (UTextBlock* TooltipNameText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipItemNameWidgetName)))
-		{
-			TooltipNameText->SetText(DisplayName);
-		}
-
-		if (UTextBlock* TooltipDescriptionText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipDescriptionWidgetName)))
-		{
-			TooltipDescriptionText->SetText(Description);
-		}
+		TooltipNameText->SetText(DisplayName);
 	}
 
-	SetToolTip(TooltipWidget);
+	if (UTextBlock* TooltipDescriptionText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipDescriptionWidgetName)))
+	{
+		TooltipDescriptionText->SetText(Description);
+	}
 }
 
 void UPDInventorySlotWidget::ClearTooltip()

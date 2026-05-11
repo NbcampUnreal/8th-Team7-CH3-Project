@@ -10,6 +10,7 @@ class UImage;
 class UPDInventorySlotWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventorySlotClicked, UPDInventorySlotWidget*, SlotWidget, int32, SlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventorySlotHovered, UPDInventorySlotWidget*, SlotWidget, int32, SlotIndex);
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventorySlotWidget : public UUserWidget
@@ -32,11 +33,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Inventory")
 	bool WasLastClickWithControl() const { return bLastClickWithControl; }
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
+	UUserWidget* CreateItemTooltipWidget();
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
 	FPDOnInventorySlotClicked OnSlotLeftClicked;
 
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
 	FPDOnInventorySlotClicked OnSlotRightClicked;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
+	FPDOnInventorySlotHovered OnSlotHovered;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
+	FPDOnInventorySlotHovered OnSlotUnhovered;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Inventory|Event")
 	void OpenItemDropdown();
@@ -47,6 +57,8 @@ public:
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeOnMouseEnter(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	FPDInventorySlot SlotData;
@@ -73,6 +85,9 @@ protected:
 	TSubclassOf<UUserWidget> TooltipWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
+	bool bUseNativeMouseFollowingTooltip = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
 	FName TooltipItemNameWidgetName = TEXT("Text_ItemName");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
@@ -83,6 +98,10 @@ private:
 	void RefreshVisuals();
 	void ApplyTooltip(const FText& DisplayName, const FText& Description);
 	void ClearTooltip();
+	void ApplyTooltipTextToWidget(UUserWidget* TooltipWidget, const FText& DisplayName, const FText& Description) const;
+
+	FText CachedTooltipDisplayName;
+	FText CachedTooltipDescription;
 
 	TObjectPtr<UTextBlock> TextItemNameWidget = nullptr;
 	TObjectPtr<UTextBlock> TextQuantityWidget = nullptr;

@@ -37,6 +37,15 @@ public:
 	bool RemoveItem(FName ItemID, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	bool RemoveItemFromSlot(int32 SlotIndex, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	bool DropItemFromSlot(int32 SlotIndex, int32 Quantity = 1);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
+	bool UseItemFromSlot(int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool HasItem(FName ItemID, int32 Quantity = 1) const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")

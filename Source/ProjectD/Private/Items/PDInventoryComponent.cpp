@@ -47,6 +47,53 @@ bool UPDInventoryComponent::RemoveItem(FName ItemID, int32 Quantity)
 	return true;
 }
 
+bool UPDInventoryComponent::RemoveItemFromSlot(int32 SlotIndex, int32 Quantity)
+{
+	if (!Items.IsValidIndex(SlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	FPDInventorySlot& Slot = Items[SlotIndex];
+	if (Slot.IsEmpty())
+	{
+		return false;
+	}
+
+	const int32 RemoveAmount = FMath::Min(Quantity, Slot.Quantity);
+	Slot.Quantity -= RemoveAmount;
+
+	if (Slot.Quantity <= 0)
+	{
+		Slot.Clear();
+	}
+
+	OnInventoryChanged.Broadcast();
+	return true;
+}
+
+bool UPDInventoryComponent::DropItemFromSlot(int32 SlotIndex, int32 Quantity)
+{
+	return RemoveItemFromSlot(SlotIndex, Quantity);
+}
+
+bool UPDInventoryComponent::UseItemFromSlot(int32 SlotIndex)
+{
+	if (!Items.IsValidIndex(SlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& Slot = Items[SlotIndex];
+	if (Slot.IsEmpty() || Slot.ItemData.ItemType != EPDItemType::Consumable)
+	{
+		return false;
+	}
+
+	// TODO: Apply the item's GameplayEffectClass here when consumable effects are added to FPDItemData.
+	return RemoveItemFromSlot(SlotIndex, 1);
+}
+
 bool UPDInventoryComponent::HasItem(FName ItemID, int32 Quantity) const
 {
 	if (ItemID.IsNone() || Quantity <= 0)

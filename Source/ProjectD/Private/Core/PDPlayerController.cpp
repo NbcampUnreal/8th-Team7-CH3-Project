@@ -404,6 +404,10 @@ void APDPlayerController::ToggleInventory()
 		InventoryWidgetInstance->RemoveFromParent();
 		InventoryWidgetInstance = nullptr;
 
+		bIsGameplayInputBlockedByModalUI = false;
+		SetIgnoreMoveInput(false);
+		SetIgnoreLookInput(false);
+
 		FInputModeGameOnly InputMode;
 		SetInputMode(InputMode);
 		bShowMouseCursor = false;
@@ -424,6 +428,18 @@ void APDPlayerController::ToggleInventory()
 	}
 
 	InventoryWidgetInstance->AddToViewport();
+
+	bIsGameplayInputBlockedByModalUI = true;
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+	}
 
 	FInputModeGameAndUI InputMode;
 	InputMode.SetWidgetToFocus(InventoryWidgetInstance->TakeWidget());
