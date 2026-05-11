@@ -1,5 +1,7 @@
 #include "Items/PDStashComponent.h"
 
+#include "Items/PDItemSlotTransfer.h"
+
 UPDStashComponent::UPDStashComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -132,6 +134,49 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 	return AddedQuantity;
 }
 
+
+int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
+{
+	if (StashItems.Num() != GetMaxSlotCount())
+	{
+		InitializeStash();
+	}
+
+	if (!StashItems.IsValidIndex(TargetSlotIndex))
+	{
+		return 0;
+	}
+
+	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(StashItems[TargetSlotIndex], ItemData, Quantity);
+	if (AddedQuantity > 0)
+	{
+		OnStashChanged.Broadcast();
+	}
+
+	return AddedQuantity;
+}
+
+bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (StashItems.Num() != GetMaxSlotCount())
+	{
+		InitializeStash();
+	}
+
+	if (!StashItems.IsValidIndex(SourceSlotIndex) || !StashItems.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[SourceSlotIndex], StashItems[TargetSlotIndex], Quantity);
+	if (bMoved)
+	{
+		OnStashChanged.Broadcast();
+	}
+
+	return bMoved;
+}
+
 bool UPDStashComponent::RemoveItem(FName ItemID, int32 Quantity)
 {
 	if (ItemID.IsNone() || Quantity <= 0 || !HasItem(ItemID, Quantity))
@@ -206,6 +251,37 @@ bool UPDStashComponent::StoreInventorySlotQuantity(UPDInventoryComponent* Source
 	return true;
 }
 
+
+bool UPDStashComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetStashSlotIndex, int32 Quantity)
+{
+	if (!SourceInventory || SourceInventory->Items.Num() != SourceInventory->GetMaxSlotCount())
+	{
+		if (SourceInventory)
+		{
+			SourceInventory->InitializeInventory();
+		}
+	}
+
+	if (StashItems.Num() != GetMaxSlotCount())
+	{
+		InitializeStash();
+	}
+
+	if (!SourceInventory || !SourceInventory->Items.IsValidIndex(SourceSlotIndex) || !StashItems.IsValidIndex(TargetStashSlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(SourceInventory->Items[SourceSlotIndex], StashItems[TargetStashSlotIndex], Quantity);
+	if (bMoved)
+	{
+		SourceInventory->OnInventoryChanged.Broadcast();
+		OnStashChanged.Broadcast();
+	}
+
+	return bMoved;
+}
+
 bool UPDStashComponent::TakeStashSlot(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex)
 {
 	if (!StashItems.IsValidIndex(StashSlotIndex))
@@ -248,6 +324,37 @@ bool UPDStashComponent::TakeStashSlotQuantity(UPDInventoryComponent* TargetInven
 
 	OnStashChanged.Broadcast();
 	return true;
+}
+
+
+bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
+{
+	if (!TargetInventory || TargetInventory->Items.Num() != TargetInventory->GetMaxSlotCount())
+	{
+		if (TargetInventory)
+		{
+			TargetInventory->InitializeInventory();
+		}
+	}
+
+	if (StashItems.Num() != GetMaxSlotCount())
+	{
+		InitializeStash();
+	}
+
+	if (!TargetInventory || !StashItems.IsValidIndex(StashSlotIndex) || !TargetInventory->Items.IsValidIndex(TargetInventorySlotIndex) || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[StashSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
+	if (bMoved)
+	{
+		OnStashChanged.Broadcast();
+		TargetInventory->OnInventoryChanged.Broadcast();
+	}
+
+	return bMoved;
 }
 
 bool UPDStashComponent::HasItem(FName ItemID, int32 Quantity) const

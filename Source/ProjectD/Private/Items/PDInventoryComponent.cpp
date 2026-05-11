@@ -1,5 +1,7 @@
 #include "Items/PDInventoryComponent.h"
 
+#include "Items/PDItemSlotTransfer.h"
+
 UPDInventoryComponent::UPDInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -156,6 +158,49 @@ int32 UPDInventoryComponent::FindEmptySlot() const
 	}
 
 	return INDEX_NONE;
+}
+
+
+int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex)
+{
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
+	if (!Items.IsValidIndex(TargetSlotIndex))
+	{
+		return 0;
+	}
+
+	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(Items[TargetSlotIndex], ItemData, Quantity);
+	if (AddedQuantity > 0)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return AddedQuantity;
+}
+
+bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity)
+{
+	if (Items.Num() != GetMaxSlotCount())
+	{
+		InitializeInventory();
+	}
+
+	if (!Items.IsValidIndex(SourceSlotIndex) || !Items.IsValidIndex(TargetSlotIndex) || SourceSlotIndex == TargetSlotIndex || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(Items[SourceSlotIndex], Items[TargetSlotIndex], Quantity);
+	if (bMoved)
+	{
+		OnInventoryChanged.Broadcast();
+	}
+
+	return bMoved;
 }
 
 int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quantity)

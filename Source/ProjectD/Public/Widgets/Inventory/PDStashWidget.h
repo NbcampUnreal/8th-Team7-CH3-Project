@@ -2,11 +2,13 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
+#include "Widgets/Inventory/PDInventoryDragDropOperation.h"
 #include "PDStashWidget.generated.h"
 
 class UUniformGridPanel;
 class UPDStashComponent;
 class UPDInventoryComponent;
+class UPDQuickSlotComponent;
 class UPDInventorySlotWidget;
 class UUserWidget;
 class UPDQuantityPopupWidget;
@@ -46,14 +48,27 @@ protected:
 	void HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex);
 
 	UFUNCTION()
+	void HandleStashSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation);
+
+	UFUNCTION()
 	void HandleQuantityConfirmed(int32 Quantity);
+
+	UFUNCTION()
+	void HandleQuantityCancelled();
 
 private:
 	void ResolveStashGridPanel();
 	UPDStashComponent* FindStashComponent() const;
 	UPDInventoryComponent* FindInventoryComponent() const;
+	UPDQuickSlotComponent* FindQuickSlotComponent() const;
+	const FPDInventorySlot* FindStashSlot(int32 SlotIndex) const;
+	const FPDInventorySlot* FindSourceSlot(EPDItemContainerType SourceContainerType, int32 SlotIndex) const;
 	void TakeStashSlotQuantity(int32 SlotIndex, int32 Quantity);
+	void ExecuteStashSlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, const FText& Title);
+	void OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title);
+	bool ShouldOpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32& OutMaxQuantity, FText& OutTitle) const;
+	void ClearQuantityRequest();
 	void BindStashChanged();
 	void UnbindStashChanged();
 
@@ -62,6 +77,11 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuantityPopupWidget> ActiveQuantityPopup;
+
+	bool bPendingTransferQuantityRequest = false;
+	EPDItemContainerType PendingTransferSourceContainerType = EPDItemContainerType::None;
+	int32 PendingTransferSourceSlotIndex = INDEX_NONE;
+	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
 	int32 PendingSlotIndex = INDEX_NONE;
 };

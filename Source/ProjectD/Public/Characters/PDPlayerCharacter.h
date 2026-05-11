@@ -10,6 +10,7 @@
 class APDWeaponBase;
 class UPDVisionComponent;
 class UPDInteractionComponent;
+class UPDQuickSlotComponent;
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -46,6 +47,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDInteractionComponent> InteractionComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
@@ -93,6 +97,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|Player")
 	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
+
+	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
+	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();

@@ -1,5 +1,6 @@
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 
+#include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
@@ -19,12 +20,12 @@ FReply UPDInventorySlotWidget::NativeOnMouseButtonDown(const FGeometry& InGeomet
 		bLastClickWithControl = InMouseEvent.IsControlDown();
 		OnSlotLeftClicked.Broadcast(this, SlotIndex);
 
-		if (!bLastClickWithControl && !SlotData.IsEmpty())
+		if (bLastClickWithControl || SlotData.IsEmpty() || SlotContainerType == EPDItemContainerType::None)
 		{
-			OpenItemDropdown();
+			return FReply::Handled();
 		}
 
-		return FReply::Handled();
+		return UWidgetBlueprintLibrary::DetectDragIfPressed(InMouseEvent, this, EKeys::LeftMouseButton).NativeReply;
 	}
 
 	if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton)
@@ -53,6 +54,44 @@ void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEven
 	OnSlotUnhovered.Broadcast(this, SlotIndex);
 }
 
+void UPDInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
+{
+	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
+
+	if (SlotData.IsEmpty() || SlotContainerType == EPDItemContainerType::None || SlotIndex == INDEX_NONE)
+	{
+		return;
+	}
+
+	UPDInventoryDragDropOperation* DragOperation = NewObject<UPDInventoryDragDropOperation>(this);
+	if (!DragOperation)
+	{
+		return;
+	}
+
+	DragOperation->SourceContainerType = SlotContainerType;
+	DragOperation->SourceSlotIndex = SlotIndex;
+	DragOperation->SlotData = SlotData;
+	DragOperation->DefaultDragVisual = CreateDragVisualWidget();
+	DragOperation->Pivot = EDragPivot::MouseDown;
+
+	OutOperation = DragOperation;
+}
+
+bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
+{
+	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
+	{
+		if (DragOperation->IsValidPayload() && SlotIndex != INDEX_NONE && OnSlotItemDropped.IsBound())
+		{
+			OnSlotItemDropped.Broadcast(this, SlotIndex, DragOperation);
+			return true;
+		}
+	}
+
+	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
+}
+
 void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int32 InSlotIndex)
 {
 	SlotData = InSlotData;
@@ -67,6 +106,11 @@ void UPDInventorySlotWidget::ClearSlotData(int32 InSlotIndex)
 	SlotIndex = InSlotIndex;
 	ResolveTextWidgets();
 	RefreshVisuals();
+}
+
+void UPDInventorySlotWidget::SetSlotContainerType(EPDItemContainerType InSlotContainerType)
+{
+	SlotContainerType = InSlotContainerType;
 }
 
 void UPDInventorySlotWidget::ResolveTextWidgets()
@@ -191,4 +235,22 @@ void UPDInventorySlotWidget::ClearTooltip()
 {
 	SetToolTip(nullptr);
 	SetToolTipText(FText::GetEmpty());
+}
+
+UPDInventorySlotWidget* UPDInventorySlotWidget::CreateDragVisualWidget() const
+{
+	UPDInventorySlotWidget* DragVisual = GetOwningPlayer()
+		? CreateWidget<UPDInventorySlotWidget>(GetOwningPlayer(), GetClass())
+		: CreateWidget<UPDInventorySlotWidget>(GetWorld(), GetClass());
+
+	if (!DragVisual)
+	{
+		return nullptr;
+	}
+
+	DragVisual->SetSlotContainerType(EPDItemContainerType::None);
+	DragVisual->SetSlotData(SlotData, SlotIndex);
+	DragVisual->SetVisibility(ESlateVisibility::HitTestInvisible);
+	DragVisual->SetRenderOpacity(0.85f);
+	return DragVisual;
 }

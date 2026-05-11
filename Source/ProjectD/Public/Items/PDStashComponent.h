@@ -43,6 +43,12 @@ public:
 	int32 AddItemPartial(const FPDItemData& ItemData, int32 Quantity = 1);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	int32 AddItemToSlotPartial(const FPDItemData& ItemData, int32 Quantity, int32 TargetSlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	bool MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	bool RemoveItem(FName ItemID, int32 Quantity = 1);
 
 
@@ -53,10 +59,16 @@ public:
 	bool StoreInventorySlotQuantity(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 Quantity);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	bool StoreInventorySlotQuantityToSlot(UPDInventoryComponent* SourceInventory, int32 SourceSlotIndex, int32 TargetStashSlotIndex, int32 Quantity);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	bool TakeStashSlot(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	bool TakeStashSlotQuantity(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex, int32 Quantity);
+
+	UFUNCTION(BlueprintCallable, Category="PD|Stash")
+	bool TakeStashSlotQuantityToInventorySlot(UPDInventoryComponent* TargetInventory, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity);
 
 	UFUNCTION(BlueprintCallable, Category="PD|Stash")
 	bool HasItem(FName ItemID, int32 Quantity = 1) const;

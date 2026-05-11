@@ -6,6 +6,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Items/PDQuickSlotComponent.h"
 #include "Weapons/PDWeaponBase.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
@@ -34,6 +35,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
+	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 
 	PrimaryActorTick.bCanEverTick=true;
 	PrimaryActorTick.bStartWithTickEnabled=true;
