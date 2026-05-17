@@ -1,8 +1,13 @@
 #include "Enemy/Characters/PDSoldier.h"
 
+#include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/PDAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
+#include "GameplayTag/PDGameplayTags.h"
 #include "Items/PDStashActor.h"
 #include "Items/PDStashComponent.h"
 #include "TimerManager.h"
@@ -18,12 +23,47 @@ void APDSoldier::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 무기 타입 태그 변경 시 AnimLayer 갈아끼우기 — Player 와 동일 패턴.
+	if (ASC)
+	{
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+	}
+	LinkDefaultAnimLayer();
+
 	SpawnAndEquipDefaultWeapon();
 
 	// 타겟 획득/상실에 맞춰 풀오토 루프 on/off.
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
 		Combat->OnTargetChanged.AddDynamic(this, &APDSoldier::HandleTargetChanged);
+	}
+}
+
+void APDSoldier::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount == 0) return;
+
+	APDWeaponBase* CurWeapon = GetCurrentWeapon();
+	if (!IsValid(CurWeapon)) return;
+
+	TSubclassOf<UAnimInstance> LayerClass = CurWeapon->GetWeaponAnimLayerClass();
+	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
+
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(LayerClass);
+	}
+}
+
+void APDSoldier::LinkDefaultAnimLayer()
+{
+	if (!DefaultAnimLayerClass) return;
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
 	}
 }
 
@@ -89,8 +129,20 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 {
 	if (EquippedWeapon == NewWeapon) return;
 
+	UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
 	if (EquippedWeapon)
 	{
+		// 무기 타입 태그 제거 — AnimInstance.WeaponType 캐시가 None 으로 복귀하도록.
+		if (ASC)
+		{
+			ASC->RemoveLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
+		}
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+
 		EquippedWeapon->OnUnequip();
 		if (bDestroyPrevious)
 		{
@@ -109,6 +161,18 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
 		{
 			Ranged->SetInfiniteAmmo(bForceInfiniteAmmo);
+		}
+
+		// AnimInstance 가 ASC 태그를 보고 WeaponType/bIsMelee 를 결정 — 태그를 먼저 박는다.
+		if (ASC)
+		{
+			ASC->AddLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
+		}
+
+		// Fire/Reload/Equip 몽타주 바인딩 + Equip 몽타주 즉시 재생.
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
 		}
 	}
 }

@@ -2,9 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Enemy/Characters/PDBipedEnemy.h"
+#include "GameplayTagContainer.h"
 #include "PDSoldier.generated.h"
 
 class APDWeaponBase;
+class UAnimInstance;
 class UAnimMontage;
 
 /**
@@ -65,6 +67,10 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 
+	/** 무기 미장착 또는 무기에 AnimLayer 가 없을 때 사용할 기본 레이어. */
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Soldier|Animation")
+	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
+
 	// 자식 클래스(예: APDEliteSoldier) 가 BT/상태머신 측에서 직접 발사 루프 on/off 하기 위함.
 	void StartContinuousFire();
 	void StopContinuousFire();
@@ -77,6 +83,9 @@ private:
 	void OnFireTick();
 
 	void SpawnAndEquipDefaultWeapon();
+
+	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void LinkDefaultAnimLayer();
 
 	FTimerHandle FireTimerHandle;
 };
