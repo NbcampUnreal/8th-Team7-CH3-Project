@@ -79,7 +79,7 @@ public:
 	int32 RewardGold = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
-	TArray<FPDItemData> RewardItems;
+	TArray<FName> RewardItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
 	int32 RewardTraderReputationExp = 0;

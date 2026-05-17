@@ -6,6 +6,9 @@
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Data/PDQuestComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDInventoryComponent.h"
@@ -137,9 +140,56 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
 		}
 
-		for (const FPDItemData& ItemData : QuestData.Reward.RewardItems)
+		for (const FName ItemID : QuestData.Reward.RewardItems)
 		{
-			AddDetailLine(VB_Rewards, !ItemData.DisplayName.IsEmpty() ? ItemData.DisplayName : FText::FromName(ItemData.ItemID));
+			const FPDItemData* ItemData = nullptr;
+
+			if (InventoryComponent && InventoryComponent->ItemDataTable)
+			{
+				TArray<FPDItemData*> Rows;
+				InventoryComponent->ItemDataTable->GetAllRows<FPDItemData>(TEXT("QuestRewardPreview"), Rows);
+
+				for (const FPDItemData* Row : Rows)
+				{
+					if (Row && Row->ItemID == ItemID)
+					{
+						ItemData = Row;
+						break;
+					}
+				}
+			}
+
+			if (!ItemData)
+			{
+				AddDetailLine(VB_Rewards, FText::FromName(ItemID));
+				continue;
+			}
+
+			UHorizontalBox* RewardRow = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+			UImage* ItemIcon = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass());
+			UTextBlock* ItemText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+
+			if (ItemData->Icon)
+			{
+				ItemIcon->SetBrushFromTexture(ItemData->Icon);
+			}
+
+			ItemIcon->SetDesiredSizeOverride(FVector2D(32.f, 32.f));
+
+			const FText DisplayName = ItemData->DisplayName.IsEmpty()
+				? FText::FromName(ItemData->ItemID)
+				: ItemData->DisplayName;
+
+			ItemText->SetText(DisplayName);
+
+			UHorizontalBoxSlot* IconSlot = RewardRow->AddChildToHorizontalBox(ItemIcon);
+			IconSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));
+			IconSlot->SetVerticalAlignment(VAlign_Center);
+
+			UHorizontalBoxSlot* TextSlot = RewardRow->AddChildToHorizontalBox(ItemText);
+			TextSlot->SetVerticalAlignment(VAlign_Center);
+
+			VB_Rewards->AddChildToVerticalBox(RewardRow);
 		}
 	}
 
