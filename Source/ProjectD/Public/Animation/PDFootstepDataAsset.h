@@ -7,6 +7,7 @@
 
 class USoundBase;
 class UNiagaraSystem;
+class USkeletalMeshComponent;
 
 //한 표면에 대한 발소리/노이즈/VFX 정보
 USTRUCT(BlueprintType)
@@ -41,4 +42,11 @@ public:
 	//Surface로 항목 조회. 없으면 DefaultEntry 반환
 	UFUNCTION(BlueprintPure, Category="Footstep")
 	const FPDFootstepEntry& GetEntryForSurface(EPhysicalSurface Surface) const;
+
+	// 발 위치에서 표면 트레이스 → 사운드/VFX/노이즈를 한 번에 처리. AnimNotify와 enemy 틱 양쪽에서 공유.
+	static void PlayFootstep(
+		USkeletalMeshComponent* MeshComp,
+		const UPDFootstepDataAsset* Data,
+		FName FootSocket,
+		float TraceDistance);
 };

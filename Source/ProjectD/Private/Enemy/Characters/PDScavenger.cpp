@@ -1,12 +1,10 @@
 #include "Enemy/Characters/PDScavenger.h"
 
-#include "Animation/AnimMontage.h"
-#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
-#include "Enemy/Interfaces/PDCombatInterface.h"
-#include "GameFramework/Character.h"
-#include "Interfaces/PDDamageable.h"
+#include "Items/PDStashActor.h"
+#include "Items/PDStashComponent.h"
+#include "Weapons/Base/PDWeaponBase.h"
 
 APDScavenger::APDScavenger()
 {
@@ -17,91 +15,101 @@ void APDScavenger::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Soldier 와 동일 흐름: CombatComponent 가 보낸 공격 의도 → 자체 몽타주 재생.
+	SpawnAndEquipDefaultWeapon();
+
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
 		Combat->OnAttackRequested.AddDynamic(this, &APDScavenger::HandleAttackRequested);
 	}
 }
 
-void APDScavenger::HandleAttackRequested(AActor* Target)
+void APDScavenger::OnEnterState_Dead()
 {
-	// 트레이스 시점에 다시 조회하지 않도록 공격 의도 시점의 타겟을 약참조로 보관.
-	CachedAttackTarget = Target;
+	Super::OnEnterState_Dead();
 
-	if (!bAutoPlayMontageOnAttackRequested) return;
-}
+	if (!EquippedWeapon) return;
 
-void APDScavenger::PerformMeleeTrace()
-{
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	UWorld* World = GetWorld();
-	if (!MeshComp || !World) return;
+	EquippedWeapon->OnUnequip();
 
-	const FVector Start = MeshComp->DoesSocketExist(MeleeSocketName)
-		? MeshComp->GetSocketLocation(MeleeSocketName)
-		: GetActorLocation();
-
-	// 기본은 정면. 캐시된 타겟의 head 소켓이 있으면 그쪽으로 보정.
-	FVector Direction = GetActorForwardVector();
-	if (const ACharacter* TargetChar = Cast<ACharacter>(CachedAttackTarget.Get()))
+	// 베이스가 스폰한 시체 컨테이너가 Stash 류면 무기 데이터를 그 안으로 이전. 픽업은 LootBox 상호작용으로만.
+	bool bTransferred = false;
+	if (APDStashActor* Corpse = Cast<APDStashActor>(GetCorpseContainer()))
 	{
-		const USkeletalMeshComponent* TargetMesh = TargetChar->GetMesh();
-		if (TargetMesh && TargetMesh->DoesSocketExist(TargetHeadSocketName))
+		if (UPDStashComponent* Stash = Corpse->GetStashComponent())
 		{
-			const FVector ToHead = TargetMesh->GetSocketLocation(TargetHeadSocketName) - Start;
-			if (!ToHead.IsNearlyZero())
+			const FName WeaponItemID = EquippedWeapon->GetItemID();
+			if (!WeaponItemID.IsNone() && Stash->AddItemByID(WeaponItemID, 1))
 			{
-				Direction = ToHead.GetSafeNormal();
+				bTransferred = true;
 			}
 		}
 	}
-	const FVector End = Start + Direction * MeleeTraceDistance;
 
-	TArray<FHitResult> Hits;
-	const FCollisionShape Sphere = FCollisionShape::MakeSphere(MeleeTraceRadius);
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_ScavengerMelee), false, this);
-	Params.AddIgnoredActor(this);
-
-	const bool bHit = World->SweepMultiByObjectType(
-		Hits,
-		Start,
-		End,
-		FQuat::Identity,
-		FCollisionObjectQueryParams(ECC_Pawn),
-		Sphere,
-		Params);
-
-	if (!bHit) return;
-
-	const uint8 OwnTeam = TeamID;
-
-	// 한 번의 스윕에서 동일 액터 중복 인가 방지.
-	TSet<AActor*> AlreadyHit;
-	AlreadyHit.Add(this);
-
-	for (const FHitResult& Hit : Hits)
+	if (!bTransferred)
 	{
-		AActor* Target = Hit.GetActor();
-		if (!Target) continue;
-		if (AlreadyHit.Contains(Target)) continue;
-		AlreadyHit.Add(Target);
-
-		// 같은 팀(아군) 제외.
-		if (Target->Implements<UPDCombatInterface>()
-			&& IPDCombatInterface::Execute_GetTeamID(Target) == OwnTeam)
-		{
-			continue;
-		}
-
-		if (!Target->Implements<UPDDamageable>()) continue;
-		if (!IPDDamageable::Execute_IsAlive(Target)) continue;
-
-		FPDDamageInfo Info;
-		Info.BaseDamage = MeleeDamage;
-		Info.Instigator = this;
-		Info.DamageTypeClass = MeleeDamageTypeClass;
-		Info.HitResult = Hit;
-		IPDDamageable::Execute_ApplyDamage(Target, Info);
+		UE_LOG(LogTemp, Warning,
+			TEXT("[%s] CorpseContainer 가 Stash 류가 아니거나 WeaponData 미지정 — 장착무기 소실."),
+			*GetName());
 	}
+
+	EquippedWeapon->Destroy();
+	EquippedWeapon = nullptr;
+}
+
+void APDScavenger::SpawnAndEquipDefaultWeapon()
+{
+	if (!DefaultWeaponClass) return;
+
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	APDWeaponBase* NewWeapon = World->SpawnActor<APDWeaponBase>(
+		DefaultWeaponClass,
+		GetActorLocation(),
+		GetActorRotation(),
+		SpawnParams);
+
+	if (!NewWeapon) return;
+
+	SetEquippedWeapon(NewWeapon, /*bDestroyPrevious=*/true);
+}
+
+void APDScavenger::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious)
+{
+	if (EquippedWeapon == NewWeapon) return;
+
+	if (EquippedWeapon)
+	{
+		EquippedWeapon->OnUnequip();
+		if (bDestroyPrevious)
+		{
+			EquippedWeapon->Destroy();
+		}
+	}
+
+	EquippedWeapon = NewWeapon;
+
+	if (EquippedWeapon)
+	{
+		AttachActorToWeaponSocket(EquippedWeapon);
+		EquippedWeapon->OnEquip(this);
+	}
+}
+
+void APDScavenger::HandleAttackRequested(AActor* /*Target*/)
+{
+	if (!bAutoFireOnAttackRequested) return;
+
+	if (!EquippedWeapon)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[%s] 공격 요청 — EquippedWeapon 없음."), *GetName());
+		return;
+	}
+
+	EquippedWeapon->Fire();
 }

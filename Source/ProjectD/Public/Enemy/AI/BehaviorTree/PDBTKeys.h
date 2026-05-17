@@ -32,8 +32,6 @@ namespace PDBTKeys
 	static const FName CoverLocation     = TEXT("CoverLocation");      // Vector  (Actor.SnapLocation 또는 EQS Points 결과)
 	static const FName bHasCoverTarget   = TEXT("bHasCoverTarget");    // Bool
 
-	// ─── Elite: LOS Occlusion / Grenade ───
+	// ─── Elite: LOS Occlusion ───
 	static const FName TimeSinceLastLOS  = TEXT("TimeSinceLastLOS");   // Float   (Service 누적)
-	static const FName LastGrenadeTime   = TEXT("LastGrenadeTime");    // Float   (World time 기준 마지막 투척)
-	static const FName bCanThrowGrenade  = TEXT("bCanThrowGrenade");   // Bool    (Service 가 갱신)
 }

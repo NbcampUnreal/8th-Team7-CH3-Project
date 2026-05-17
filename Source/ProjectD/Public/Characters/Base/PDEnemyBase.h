@@ -9,6 +9,11 @@
 
 class APDItemBase;
 class APDWeaponBase;
+class UWidgetComponent;
+class UPDEnemyOverheadWidget;
+class USoundBase;
+class USoundAttenuation;
+struct FOnAttributeChangeData;
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDEnemyBase : public APDCharacterBase, public IPDCombatInterface, public IPDDetectable
@@ -41,6 +46,10 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaSeconds) override;
+
+	// 이동 누적 거리로 발자국 트리거 — ABP/AnimNotify 미설정 적도 발소리/AI 노이즈 보장.
+	void TickFootstep(float DeltaSeconds);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
@@ -102,9 +111,64 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI|Death", meta = (ClampMin = "0.0"))
 	float CorpseDespawnDelay = 1.f;
 
+	// ─── 오버헤드 HUD (HP Bar + 상태 말풍선) ─────────────────────
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|HUD", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UWidgetComponent> OverheadWidgetComponent;
+
+	/** BP 에서 지정한 위젯 클래스. 미지정 시 헤드 HUD 미생성. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|HUD")
+	TSubclassOf<UPDEnemyOverheadWidget> OverheadWidgetClass;
+
+	/** 상태 전환 표시 시간(초). 0 이하면 수동 숨김까지 유지. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|HUD", meta = (ClampMin = "0.0"))
+	float SpeechBubbleDuration = 1.f;
+
+	/** 사망 애님 몽타그 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Animation")
+	TObjectPtr<UAnimMontage> DeathMontage;
+
+	// ─── 사운드 (Spatialized) ──────────────────────────────────
+	/** 모든 enemy 사운드에 공유되는 거리감쇄/공간화 설정. 미지정 시 2D 재생. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio")
+	TObjectPtr<USoundAttenuation> SoundAttenuation;
+
+	/** 사망 시 1회 재생. 액터 소멸과 무관하게 끝까지 재생됨. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio")
+	TObjectPtr<USoundBase> DeathSound;
+
+	/** 피격 시 재생 (살아있는 동안만 — 사망 후 데미지는 무시). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio")
+	TObjectPtr<USoundBase> HurtSound;
+
+	/** 이동 중 일정 간격으로 재생. 미지정 시 발소리 비활성. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio")
+	TObjectPtr<USoundBase> FootstepSound;
+
+	/** 한 발자국당 누적 이동 거리(cm). 작을수록 발자국이 잦음. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio", meta = (ClampMin = "10.0"))
+	float FootstepStrideDistance = 110.f;
+
+	/** 이 속도(cm/s) 미만이면 발소리 미생성 — 미세 슬라이드/정지 잡소리 방지. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio", meta = (ClampMin = "0.0"))
+	float FootstepMinSpeed = 50.f;
+
+	/** 발자국으로 발생시킬 AI 청각 노이즈 반경(cm). 0 이면 노이즈 미발생. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio", meta = (ClampMin = "0.0"))
+	float FootstepNoiseRange = 800.f;
+
 private:
+	// 발자국 트리거용 이동 거리 누적.
+	float FootstepDistanceAccumulator = 0.f;
+
 	UFUNCTION()
 	void OnCombatTargetChanged(AActor* NewTarget);
+
+	void OnTorsoHPChanged(const FOnAttributeChangeData& Data);
+
+	UPROPERTY()
+	TObjectPtr<UPDEnemyOverheadWidget> OverheadWidget;
+
+	bool bHealthBarShown = false;
 
 	UPROPERTY()
 	TArray<TObjectPtr<UMaterialInstanceDynamic>> DitherMaterials;

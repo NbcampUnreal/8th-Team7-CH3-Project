@@ -126,8 +126,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void DropCurrentWeapon();
 
-	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
-	APDWeaponBase* GetCurrentWeapon() const;
+	virtual APDWeaponBase* GetCurrentWeapon() const override;
 
 	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
 	APDWeaponBase* GetWeaponInSlot(EWeaponSlot Slot) const;

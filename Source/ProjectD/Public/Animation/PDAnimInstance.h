@@ -5,7 +5,7 @@
 #include "Type/Types.h"
 #include "PDAnimInstance.generated.h"
 
-class APDPlayerCharacter;
+class APDCharacterBase;
 class APDWeaponBase;
 class UAbilitySystemComponent;
 
@@ -79,7 +79,7 @@ public:
 
 private:
 	UPROPERTY()
-	TObjectPtr<APDPlayerCharacter> OwnerCharacter;
+	TObjectPtr<APDCharacterBase> OwnerCharacter;
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedASC;

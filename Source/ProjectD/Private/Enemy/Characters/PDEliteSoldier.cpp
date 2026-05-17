@@ -1,9 +1,6 @@
 #include "Enemy/Characters/PDEliteSoldier.h"
 
-#include "Components/SkeletalMeshComponent.h"
 #include "Cover/PDCoverBase.h"
-#include "Engine/World.h"
-#include "GameFramework/Actor.h"
 
 APDEliteSoldier::APDEliteSoldier()
 {
@@ -55,39 +52,6 @@ void APDEliteSoldier::SetPeeking(bool bPeek)
 		StopContinuousFire();
 		BP_OnEndPeek();
 	}
-}
-
-void APDEliteSoldier::ThrowGrenadeAt_Implementation(const FVector& TargetLocation)
-{
-	if (!GrenadeClass)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[%s] ThrowGrenadeAt: GrenadeClass 미지정 — BP override 또는 GrenadeClass 슬롯 설정 필요."),
-			*GetName());
-		return;
-	}
-
-	UWorld* World = GetWorld();
-	if (!World) return;
-
-	FVector SpawnLoc = GetActorLocation();
-	if (USkeletalMeshComponent* SkelMesh = GetMesh())
-	{
-		if (SkelMesh->DoesSocketExist(GrenadeSpawnSocketName))
-		{
-			SpawnLoc = SkelMesh->GetSocketLocation(GrenadeSpawnSocketName);
-		}
-	}
-
-	const FRotator SpawnRot = (TargetLocation - SpawnLoc).Rotation();
-
-	FActorSpawnParameters Params;
-	Params.Owner = this;
-	Params.Instigator = this;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-	// 궤적/폭발/데미지는 GrenadeClass 측 책임(ProjectileMovementComponent 등).
-	World->SpawnActor<AActor>(GrenadeClass, SpawnLoc, SpawnRot, Params);
 }
 
 void APDEliteSoldier::OnEnterState_Dead()

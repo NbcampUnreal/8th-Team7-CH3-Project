@@ -1,6 +1,6 @@
 #include "Animation/PDAnimInstance.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Characters/PDPlayerCharacter.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -9,7 +9,7 @@
 void UPDAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	OwnerCharacter=Cast<APDPlayerCharacter>(GetOwningActor());
+	OwnerCharacter=Cast<APDCharacterBase>(GetOwningActor());
 	if (IsValid(OwnerCharacter))
 		CachedASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter);
 }

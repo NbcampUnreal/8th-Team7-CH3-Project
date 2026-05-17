@@ -4,19 +4,19 @@
 #include "Enemy/Characters/PDBipedEnemy.h"
 #include "PDScavenger.generated.h"
 
-class UAnimMontage;
-class UDamageType;
+class APDWeaponBase;
 
 /**
  * 근접 공격형 적 (Scavenger).
  *  - APDSoldier 와 같은 BipedEnemy 계층의 형제 클래스. 행동(BT/Perception) 은 Soldier 와 동일하게 BP 측에서 구성.
- *  - 무기 액터 미보유. CombatComponent.OnAttackRequested → AttackMontage 재생,
- *    BP AnimNotify 가 PerformMeleeTrace() 호출하여 소켓 기준 SphereTrace + IPDDamageable 데미지 인가.
- *  - AttackRange 는 BP 디테일의 CombatComponent->AttackRange 에서 150 권장 (근접 사거리).
+ *  - BeginPlay 에서 DefaultWeaponClass(예: BP_WeaponBat) 스폰 + WeaponSocket 부착 + OnEquip(self).
+ *  - CombatComponent.OnAttackRequested → EquippedWeapon->Fire() 위임.
+ *    휘두름 몽타주/히트 판정/데미지 인가는 모두 무기 측 책임 (Fire 의 BP 구현).
+ *  - 사망 시 OnUnequip + 시체 Stash 이전 (Soldier 와 동일 흐름).
  *
  * 확장 포인트:
- *  - 다단 히트박스: BP 에서 AnimNotify 시점마다 PerformMeleeTrace() 를 여러 번 호출.
- *  - 동작 분리: bAutoPlayMontageOnAttackRequested=false 후 BP 측 OnAttackRequested 에서 직접 제어.
+ *  - 무기 교체: SetEquippedWeapon() 으로 런타임 변경.
+ *  - 발사 직접 제어 끄기: bAutoFireOnAttackRequested=false 후 BP 측 OnAttackRequested 처리.
  */
 UCLASS(Blueprintable)
 class PROJECTD_API APDScavenger : public APDBipedEnemy
@@ -26,42 +26,34 @@ class PROJECTD_API APDScavenger : public APDBipedEnemy
 public:
 	APDScavenger();
 
-	/** 캐릭터 메시의 소켓 기준 SphereTrace → 적대 IPDDamageable 에 데미지 인가. BP AnimNotify 에서 호출. */
-	UFUNCTION(BlueprintCallable, Category = "PD|Scavenger|Melee")
-	void PerformMeleeTrace();
+	UFUNCTION(BlueprintPure, Category = "PD|Scavenger|Weapon")
+	FORCEINLINE APDWeaponBase* GetEquippedWeapon() const { return EquippedWeapon; }
+
+	// PDCharacterBase 공용 인터페이스: AnimInstance 등 상위 코드가 캐릭터 종류와 무관하게 무기 조회.
+	virtual APDWeaponBase* GetCurrentWeapon() const override { return EquippedWeapon; }
+
+	/** 런타임 무기 교체. 기존 무기는 OnUnequip 후 Destroy. */
+	UFUNCTION(BlueprintCallable, Category = "PD|Scavenger|Weapon")
+	void SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious = true);
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnEnterState_Dead() override;
 
-	/** 트레이스 시작 소켓 (캐릭터 메시). 손/머리/입 등 공격 부위. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
-	FName MeleeSocketName = TEXT("hand_r");
+	/** 디자이너가 BP 디폴트에서 지정 (예: BP_WeaponBat). nullptr 이면 무기 미장착 — 공격 시 경고. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
+	TSubclassOf<APDWeaponBase> DefaultWeaponClass;
 
-	/** 타겟 메시에서 조준 기준이 되는 본/소켓 이름. UE5 manny 기본은 "head". */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
-	FName TargetHeadSocketName = TEXT("head");
+	/** OnAttackRequested 시 자동으로 EquippedWeapon->Fire() 호출. false 면 BP 가 OnAttackRequested 처리. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
+	bool bAutoFireOnAttackRequested = true;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee", meta = (ClampMin = "0.0"))
-	float MeleeTraceRadius = 35.f;
-
-	/** 소켓에서 조준 방향으로 뻗는 트레이스 길이. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee", meta = (ClampMin = "0.0"))
-	float MeleeTraceDistance = 80.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee", meta = (ClampMin = "0.0"))
-	float MeleeDamage = 12.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
-	TSubclassOf<UDamageType> MeleeDamageTypeClass;
-
-	/** OnAttackRequested 시 AttackMontage 자동 재생 여부. false 면 BP 가 OnAttackRequested 처리. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Melee")
-	bool bAutoPlayMontageOnAttackRequested = true;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
+	TObjectPtr<APDWeaponBase> EquippedWeapon;
 
 private:
 	UFUNCTION()
 	void HandleAttackRequested(AActor* Target);
 
-	/** OnAttackRequested 시점의 타겟 — PerformMeleeTrace 가 머리 방향 보정에 사용. */
-	TWeakObjectPtr<AActor> CachedAttackTarget;
+	void SpawnAndEquipDefaultWeapon();
 };

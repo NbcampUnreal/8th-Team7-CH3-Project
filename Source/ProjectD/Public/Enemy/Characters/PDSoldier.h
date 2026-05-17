@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Soldier|Weapon")
 	FORCEINLINE APDWeaponBase* GetEquippedWeapon() const { return EquippedWeapon; }
 
+	// PDCharacterBase 공용 인터페이스: AnimInstance 등 상위 코드가 캐릭터 종류와 무관하게 무기 조회.
+	virtual APDWeaponBase* GetCurrentWeapon() const override { return EquippedWeapon; }
+
 	/** 런타임 무기 교체. 기존 무기는 OnUnequip 후 Destroy. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Soldier|Weapon")
 	void SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious = true);
