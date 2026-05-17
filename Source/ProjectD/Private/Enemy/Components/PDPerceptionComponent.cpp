@@ -10,14 +10,21 @@ UPDPerceptionComponent::UPDPerceptionComponent()
 	SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("PDSightConfig"));
 	HearingConfig = CreateDefaultSubobject<UAISenseConfig_Hearing>(TEXT("PDHearingConfig"));
 
-	// ConfigureSense 는 생성자에서 호출되어야 함 — OnRegister 가 SensesConfig 배열을 listener 에 매핑.
+	// 친화도 필터는 ConfigureSense 이전에 확정해야 sense 등록 시 올바르게 반영됨.
+	// (엔진 디폴트는 셋 다 true 라 사후 변경이 안 먹는 케이스가 있음 — 같은 팀끼리도 spot 됨.)
 	if (SightConfig)
 	{
+		SightConfig->DetectionByAffiliation.bDetectEnemies    = true;
+		SightConfig->DetectionByAffiliation.bDetectNeutrals   = false;
+		SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
 		ConfigureSense(*SightConfig);
 		SetDominantSense(SightConfig->GetSenseImplementation());
 	}
 	if (HearingConfig)
 	{
+		HearingConfig->DetectionByAffiliation.bDetectEnemies    = true;
+		HearingConfig->DetectionByAffiliation.bDetectNeutrals   = false;
+		HearingConfig->DetectionByAffiliation.bDetectFriendlies = false;
 		ConfigureSense(*HearingConfig);
 	}
 }
@@ -33,18 +40,12 @@ void UPDPerceptionComponent::BeginPlay()
 		SightConfig->LoseSightRadius = FMath::Max(LoseSightRadius, SightRadius);
 		SightConfig->PeripheralVisionAngleDegrees = PeripheralVisionAngleDegrees;
 		SightConfig->SetMaxAge(SightMaxAge);
-		SightConfig->DetectionByAffiliation.bDetectEnemies    = bDetectEnemies;
-		SightConfig->DetectionByAffiliation.bDetectNeutrals   = bDetectNeutrals;
-		SightConfig->DetectionByAffiliation.bDetectFriendlies = bDetectFriendlies;
 	}
 
 	if (HearingConfig)
 	{
 		HearingConfig->HearingRange = HearingRange;
 		HearingConfig->SetMaxAge(HearingMaxAge);
-		HearingConfig->DetectionByAffiliation.bDetectEnemies    = bDetectEnemies;
-		HearingConfig->DetectionByAffiliation.bDetectNeutrals   = bDetectNeutrals;
-		HearingConfig->DetectionByAffiliation.bDetectFriendlies = bDetectFriendlies;
 	}
 
 	RequestStimuliListenerUpdate();

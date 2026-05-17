@@ -58,6 +58,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	bool bRequireInRangeToFire = true;
 
+	/** 장착 무기에 무한탄약 강제. 장전 모션은 정상 재생되지만 탄은 절대 마르지 않음. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
+	bool bForceInfiniteAmmo = true;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 

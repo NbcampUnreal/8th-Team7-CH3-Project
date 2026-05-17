@@ -146,7 +146,7 @@ protected:
 
 	/** 한 발자국당 누적 이동 거리(cm). 작을수록 발자국이 잦음. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio", meta = (ClampMin = "10.0"))
-	float FootstepStrideDistance = 110.f;
+	float FootstepStrideDistance = 250.f;
 
 	/** 이 속도(cm/s) 미만이면 발소리 미생성 — 미세 슬라이드/정지 잡소리 방지. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Audio", meta = (ClampMin = "0.0"))

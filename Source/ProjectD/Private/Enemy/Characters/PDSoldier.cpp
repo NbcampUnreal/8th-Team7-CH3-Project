@@ -7,6 +7,7 @@
 #include "Items/PDStashComponent.h"
 #include "TimerManager.h"
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 
 APDSoldier::APDSoldier()
 {
@@ -103,6 +104,12 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 	{
 		AttachActorToWeaponSocket(EquippedWeapon);
 		EquippedWeapon->OnEquip(this);
+
+		// 무한탄약 옵션 전파: Soldier가 든 사격무기는 인벤토리 없이도 장전 시 풀충.
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+		{
+			Ranged->SetInfiniteAmmo(bForceInfiniteAmmo);
+		}
 	}
 }
 
@@ -164,6 +171,17 @@ void APDSoldier::OnFireTick()
 			const float Range = Combat->GetAttackRange();
 			const float DistSq = FVector::DistSquared(GetActorLocation(), Target->GetActorLocation());
 			if (DistSq > Range * Range) return; // 사거리 밖이면 이번 틱 스킵, 루프는 유지.
+		}
+	}
+
+	// 탄 소진 시 자동 장전: 모션 재생 후 FinishReload에서 풀충 → 사실상 무한 사격 사이클.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		if (Ranged->IsReloading()) return; // 장전 중에는 사격 스킵.
+		if (Ranged->GetCurrentAmmo() <= 0)
+		{
+			Ranged->Reload();
+			return;
 		}
 	}
 
