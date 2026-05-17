@@ -30,6 +30,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Soldier|Weapon")
 	FORCEINLINE APDWeaponBase* GetEquippedWeapon() const { return EquippedWeapon; }
 
+	// PDCharacterBase 공용 인터페이스: AnimInstance 등 상위 코드가 캐릭터 종류와 무관하게 무기 조회.
+	virtual APDWeaponBase* GetCurrentWeapon() const override { return EquippedWeapon; }
+
 	/** 런타임 무기 교체. 기존 무기는 OnUnequip 후 Destroy. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Soldier|Weapon")
 	void SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious = true);
@@ -54,6 +57,10 @@ protected:
 	/** true 면 사거리 밖에서는 발사를 건너뜀(루프는 유지, 사거리 복귀 시 즉시 재개). */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	bool bRequireInRangeToFire = true;
+
+	/** 장착 무기에 무한탄약 강제. 장전 모션은 정상 재생되지만 탄은 절대 마르지 않음. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
+	bool bForceInfiniteAmmo = true;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Soldier|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;

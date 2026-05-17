@@ -1,9 +1,5 @@
 #include "Widgets/HUD/PDSkillSlotBarWidget.h"
 
-#include "Blueprint/WidgetTree.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
-#include "Components/PanelWidget.h"
 #include "Engine/Texture2D.h"
 #include "Widgets/HUD/PDSkillSlotWidget.h"
 
@@ -25,24 +21,11 @@ void UPDSkillSlotBarWidget::SetSelectedIndex(int32 NewIndex)
 
 void UPDSkillSlotBarWidget::RebuildSlots()
 {
-	if (!SlotContainer && WidgetTree && !GetRootWidget())
-	{
-		UHorizontalBox* RootBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass(), TEXT("SlotContainer"));
-		WidgetTree->RootWidget = RootBox;
-		SlotContainer = RootBox;
-	}
+	CollectSlotWidgets();
 
-	if (!SlotContainer || !SlotWidgetClass)
+	for (int32 Index = 0; Index < SlotWidgets.Num(); ++Index)
 	{
-		return;
-	}
-
-	SlotContainer->ClearChildren();
-	SlotWidgets.Reset();
-
-	for (int32 Index = 0; Index < SlotCount; ++Index)
-	{
-		UPDSkillSlotWidget* SlotWidget = CreateWidget<UPDSkillSlotWidget>(GetOwningPlayer(), SlotWidgetClass);
+		UPDSkillSlotWidget* SlotWidget = SlotWidgets[Index];
 		if (!SlotWidget)
 		{
 			continue;
@@ -52,21 +35,18 @@ void UPDSkillSlotBarWidget::RebuildSlots()
 
 		UTexture2D* Icon = SkillIcons.IsValidIndex(Index) ? SkillIcons[Index].LoadSynchronous() : nullptr;
 		SlotWidget->SetSkillIcon(Icon);
-
-		SlotContainer->AddChild(SlotWidget);
-
-		if (UHorizontalBoxSlot* HBoxSlot = Cast<UHorizontalBoxSlot>(SlotWidget->Slot))
-		{
-			const float HalfSpacing = SlotSpacing * 0.5f;
-			HBoxSlot->SetPadding(FMargin(HalfSpacing, 0.f, HalfSpacing, 0.f));
-			HBoxSlot->SetHorizontalAlignment(HAlign_Center);
-			HBoxSlot->SetVerticalAlignment(VAlign_Center);
-		}
-
-		SlotWidgets.Add(SlotWidget);
 	}
 
 	ApplySelection();
+}
+
+void UPDSkillSlotBarWidget::CollectSlotWidgets()
+{
+	SlotWidgets.Reset();
+	SlotWidgets.Add(Slot_0);
+	SlotWidgets.Add(Slot_1);
+	SlotWidgets.Add(Slot_2);
+	SlotWidgets.Add(Slot_3);
 }
 
 void UPDSkillSlotBarWidget::ApplySelection()

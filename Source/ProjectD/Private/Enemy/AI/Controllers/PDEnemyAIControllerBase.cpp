@@ -11,6 +11,7 @@
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Enemy/Types/EnemyTypes.h"
 #include "Engine/World.h"
+#include "GenericTeamAgentInterface.h"
 #include "HAL/IConsoleManager.h"
 #include "Navigation/PathFollowingComponent.h"
 
@@ -47,11 +48,20 @@ void APDEnemyAIControllerBase::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	UE_LOG(LogPDAI, Log, TEXT("[%s] OnPossess: Pawn=%s, Perception=%s, BT=%s"),
+	// Perception 친화도 평가는 Controller 의 GenericTeamId 를 기준으로 함.
+	// Pawn 의 TeamID 를 그대로 전파하지 않으면 Controller 가 NoTeam 으로 남아
+	// 같은 팀(Soldier↔Soldier)이 서로 적/중립으로 잘못 판정될 수 있다.
+	if (const IGenericTeamAgentInterface* PawnTeam = Cast<IGenericTeamAgentInterface>(InPawn))
+	{
+		SetGenericTeamId(PawnTeam->GetGenericTeamId());
+	}
+
+	UE_LOG(LogPDAI, Log, TEXT("[%s] OnPossess: Pawn=%s, Perception=%s, BT=%s, TeamID=%u"),
 		*GetNameSafe(this),
 		*GetNameSafe(InPawn),
 		GetPDPerception() ? TEXT("OK") : TEXT("MISSING"),
-		BehaviorTreeAsset ? TEXT("OK") : TEXT("MISSING"));
+		BehaviorTreeAsset ? TEXT("OK") : TEXT("MISSING"),
+		GetGenericTeamId().GetId());
 
 	if (UPDPerceptionComponent* PDPerception = GetPDPerception())
 	{

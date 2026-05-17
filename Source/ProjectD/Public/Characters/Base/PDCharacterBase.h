@@ -14,6 +14,7 @@
 class UPDAttributeSet;
 class UGameplayAbility;
 class UAIPerceptionStimuliSourceComponent;
+class APDWeaponBase;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathSignature, AActor*, Killer);
 class UGameplayEffect;
 
@@ -104,6 +105,10 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void AttachActorToWeaponSocket(AActor* ActorToAttach);
+
+	// 현재 장착 무기. Player/Enemy 가 각자의 보관 구조(슬롯/단일 멤버)에 맞게 override.
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
+	virtual APDWeaponBase* GetCurrentWeapon() const { return nullptr; }
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
 	void OnDeath(AActor* Killer);
