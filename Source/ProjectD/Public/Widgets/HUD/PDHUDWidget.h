@@ -6,6 +6,7 @@
 #include "GameplayTagContainer.h"
 #include "Widgets/PDActivatableBase.h"
 #include "AttributeSet.h"
+#include "Type/Types.h"
 #include "PDHUDWidget.generated.h"
 
 class UPDAttributeBarWidget;
@@ -16,6 +17,8 @@ class UPDCrosshairWidget;
 class UPDGasMaskWidget;
 class UPDActionPromptListWidget;
 class UPDSkillSlotBarWidget;
+class UPDCircularProgressWidget;
+class UPDQuickSlotComponent;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 enum class EWeaponType : uint8;
@@ -70,6 +73,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDCrosshairWidget> WBP_Crosshair;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDCircularProgressWidget> WBP_UseProgress;
+
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")
 	void RefreshNewQuickSlots();
@@ -118,7 +124,20 @@ private:
 	void HandleStarving(const FGameplayTag& Tag, int32 NewCount);
 	void HandleDehydrated(const FGameplayTag& Tag, int32 NewCount);
 
+	UFUNCTION()
+	void HandleConsumableUseStarted(int32 SlotIndex, FPDItemData ItemData, float Duration);
+
+	UFUNCTION()
+	void HandleConsumableUseCanceled(int32 SlotIndex, FPDItemData ItemData);
+
+	UFUNCTION()
+	void HandleConsumableUseCompleted(int32 SlotIndex, FPDItemData ItemData);
+
+	UPDQuickSlotComponent* FindOwningQuickSlotComponent() const;
+	void RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent);
+
 	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
+	TWeakObjectPtr<UPDQuickSlotComponent> CachedQuickSlot;
 	TArray<FBoundAttributeHandle> BoundAttributeHandles;
 	TArray<FBoundTagHandle> BoundTagHandles;
 };

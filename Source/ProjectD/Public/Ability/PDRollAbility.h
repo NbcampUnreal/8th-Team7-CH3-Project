@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Ability/PDGameplayAbilityBase.h"
+#include "Sound/SoundBase.h"
 #include "PDRollAbility.generated.h"
 
 UCLASS()
@@ -29,8 +30,11 @@ public:
 	void FinishRoll();
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category="PD|Roll")
+	UPROPERTY(EditDefaultsOnly, Category="Roll")
 	bool bUseInputDirection = true;
+
+	UPROPERTY(EditDefaultsOnly, Category="Roll")
+	TObjectPtr<USoundBase> RollSound;
 
 private:
 	FVector GetRollDirection() const;

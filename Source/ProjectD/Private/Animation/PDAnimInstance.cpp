@@ -5,6 +5,7 @@
 #include "GameplayTag/PDGameplayTags.h"
 #include "Kismet/KismetMathLibrary.h"
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 
 void UPDAnimInstance::NativeInitializeAnimation()
 {
@@ -79,4 +80,103 @@ void UPDAnimInstance::NativeThreadSafeUpdateAnimation(float DeltaSeconds)
 	bIsInCover=Cache.bIsInCover;
 	bIsCoverAiming=Cache.bIsCoverAiming;
 	bIsMeleeEquipped=Cache.bIsMeleeEquipped;
+}
+
+// ── 무기 이벤트 바인딩 ──────────────────────────────────────────────────────
+
+void UPDAnimInstance::OnWeaponEquipped(APDRangedWeaponBase* Weapon)
+{
+	OnWeaponUnequipped(BoundWeapon.Get());   // 이전 무기 바인딩 해제
+
+	if (!Weapon) return;
+	BoundWeapon = Weapon;
+
+	Weapon->OnWeaponFired.AddDynamic(this, &UPDAnimInstance::HandleWeaponFired);
+	Weapon->OnWeaponReloadStarted.AddDynamic(this, &UPDAnimInstance::HandleWeaponReloadStarted);
+
+	// Equip 중 발사 차단
+	Weapon->bCanFire = false;
+
+	const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon);
+	if (Set && Set->EquipMontage)
+	{
+		Montage_Play(Set->EquipMontage);
+		if (Set->EquipStartSection != NAME_None)
+			Montage_JumpToSection(Set->EquipStartSection, Set->EquipMontage);
+
+		// 몽타주 종료 시 발사 허용
+		FOnMontageEnded EndDelegate;
+		EndDelegate.BindUObject(this, &UPDAnimInstance::OnEquipMontageEnded);
+		Montage_SetEndDelegate(EndDelegate, Set->EquipMontage);
+	}
+	else
+	{
+		// 몽타주 없으면 즉시 해제
+		Weapon->bCanFire = true;
+	}
+}
+
+void UPDAnimInstance::OnEquipMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+	if (BoundWeapon.IsValid())
+		BoundWeapon->bCanFire = true;
+}
+
+void UPDAnimInstance::OnWeaponUnequipped(APDRangedWeaponBase* Weapon)
+{
+	if (!Weapon || BoundWeapon.Get() != Weapon) return;
+
+	Weapon->OnWeaponFired.RemoveDynamic(this, &UPDAnimInstance::HandleWeaponFired);
+	Weapon->OnWeaponReloadStarted.RemoveDynamic(this, &UPDAnimInstance::HandleWeaponReloadStarted);
+
+	BoundWeapon = nullptr;
+}
+
+void UPDAnimInstance::HandleWeaponFired(APDWeaponBase* Weapon)
+{
+	if (const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon))
+		if (Set->FireMontage)
+			Montage_Play(Set->FireMontage);
+}
+
+void UPDAnimInstance::HandleWeaponReloadStarted(APDWeaponBase* Weapon)
+{
+	if (const FPDWeaponAnimSet* Set = GetAnimSetForWeapon(Weapon))
+	{
+		if (Set->ReloadMontage)
+		{
+			Montage_Play(Set->ReloadMontage);
+			if (Set->ReloadStartSection != NAME_None)
+				Montage_JumpToSection(Set->ReloadStartSection, Set->ReloadMontage);
+		}
+	}
+}
+
+const FPDWeaponAnimSet* UPDAnimInstance::GetAnimSetForWeapon(APDWeaponBase* Weapon) const
+{
+	if (!Weapon) return nullptr;
+
+	const FGameplayTag& Tag = Weapon->GetWeaponTypeTag();
+
+	if (Tag == PDGameplayTags::Weapon_Type_Rifle)   return &RifleAnimSet;
+	if (Tag == PDGameplayTags::Weapon_Type_Shotgun) return &ShotgunAnimSet;
+	if (Tag == PDGameplayTags::Weapon_Type_Sniper)  return &SniperAnimSet;
+	if (Tag == PDGameplayTags::Weapon_Type_Melee)   return &MeleeAnimSet;
+
+	return nullptr;
+}
+
+// ── 피격 반응 ────────────────────────────────────────────────────────────────
+
+void UPDAnimInstance::PlayHitReaction()
+{
+	TArray<UAnimMontage*, TInlineAllocator<4>> Available;
+	if (HitMontage_1) Available.Add(HitMontage_1);
+	if (HitMontage_2) Available.Add(HitMontage_2);
+	if (HitMontage_3) Available.Add(HitMontage_3);
+	if (HitMontage_4) Available.Add(HitMontage_4);
+
+	if (Available.IsEmpty()) return;
+
+	Montage_Play(Available[FMath::RandRange(0, Available.Num() - 1)]);
 }

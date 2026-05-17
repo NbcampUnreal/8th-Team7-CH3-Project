@@ -11,6 +11,8 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDEquipmentModificationComponent.h"
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
+#include "Animation/PDAnimInstance.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
@@ -124,22 +126,23 @@ void APDPlayerCharacter::OnStaminaChanged(const FOnAttributeChangeData& Data)
 
 void APDPlayerCharacter::HandleDeath(AActor* Killer)
 {
-	// 무기 언이큅
 	if (APDWeaponBase* CurWeapon=GetCurrentWeapon())
+	{
+		if (UPDAnimInstance* AnimInst = GetMesh()
+			? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr)
+		{
+			AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(CurWeapon));
+		}
 		CurWeapon->OnUnequip();
+	}
 
-	// 입력 차단
 	if (APlayerController* PC=Cast<APlayerController>(GetController()))
 		PC->DisableInput(PC);
 
-	// 이동 중지
 	GetCharacterMovement()->DisableMovement();
 	GetCharacterMovement()->StopMovementImmediately();
-
-	// 캡슐 콜리전 비활성화 (래그돌/시체가 다른 오브젝트 방해 안 하도록)
 	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// 이후 OnDeath(BP) → GM->OnPlayerDied 순으로 호출됨
 	Super::HandleDeath(Killer);
 }
 
@@ -167,11 +170,19 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 {
 	if (Slot==CurrentSlot) return;
 
+	if (QuickSlotComponent)
+		QuickSlotComponent->CancelConsumableUse();
+
 	int32 Idx=static_cast<int32>(Slot);
 	if (!WeaponSlots.IsValidIndex(Idx)||!WeaponSlots[Idx]) return;
 
+	UPDAnimInstance* AnimInst = GetMesh()
+		? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
 	if (APDWeaponBase* CurWeapon=GetCurrentWeapon())
 	{
+		if (AnimInst)
+			AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(CurWeapon));
 		CurWeapon->OnUnequip();
 		CurWeapon->SetActorHiddenInGame(true);
 	}
@@ -189,6 +200,11 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 	}
 	NewWeapon->SetActorHiddenInGame(false);
 	AttachActorToWeaponSocket(NewWeapon);
+
+	// AnimInstance에 장착 통보 — 태그 추가 이후에 호출해야 RaiseMontage 태그 조회 가능
+	if (AnimInst)
+		AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(NewWeapon));
+
 	OnWeaponSwapped.Broadcast(NewWeapon, Slot);
 }
 
@@ -197,6 +213,11 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	APDWeaponBase* CurWeapon=GetCurrentWeapon();
 	if (!CurWeapon) return;
 
+	if (UPDAnimInstance* AnimInst = GetMesh()
+		? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr)
+	{
+		AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(CurWeapon));
+	}
 	CurWeapon->OnUnequip();
 	CurWeapon->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	// 떨어뜨린 무기를 다시 픽업할 수 있도록 PickupCollision 복구 + 시뮬레이션 ON.
@@ -362,6 +383,9 @@ void APDPlayerCharacter::ResetToBase()
 
 void APDPlayerCharacter::TryInteract()
 {
+	if (QuickSlotComponent)
+		QuickSlotComponent->CancelConsumableUse();
+
 	if (InteractionComponent)
 	{
 		InteractionComponent->Interact();

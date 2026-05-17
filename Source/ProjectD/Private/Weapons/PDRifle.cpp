@@ -21,32 +21,16 @@ void APDRifle::Fire_Implementation()
 
     FHitResult Hit;
     if (PerformLineTrace(Hit))
+    {
         ApplyDamage(Hit.GetActor(), GetCurrentStats().Damage);
+        SpawnImpactEffect(Hit);
+        PlayHitSound(Hit);
+    }
 
     PlayFireEffects();
+    SpawnCartridge();
     PlayWeaponMontage(FireMontage);
     PostFire();
-}
-
-void APDRifle::Reload_Implementation()
-{
-    if (bIsReloading) return;
-    if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-
-    bIsReloading = true;
-
-    if (ReloadMontage)
-    {
-        PlayWeaponMontage(ReloadMontage);
-        BindMontageEndedForReload(ReloadMontage);
-    }
-    else
-    {
-        GetWorldTimerManager().SetTimer(
-            ReloadHandle, this,
-            &APDRangedWeaponBase::FinishReload,
-            GetCurrentStats().ReloadTime, false);
-    }
 }
 
 void APDRifle::ToggleFireMode()
@@ -63,8 +47,9 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return false;
 
-    APlayerController* PC = Cast<APlayerController>(
-        WeaponOwnerActor->GetInstigatorController());
+    APlayerController* PC = nullptr;
+    if (APawn* OwnerPawn = Cast<APawn>(WeaponOwnerActor))
+        PC = Cast<APlayerController>(OwnerPawn->GetController());
 
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
@@ -92,6 +77,7 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
 
     const bool bHit = GetWorld()->LineTraceSingleByChannel(OutHit, Start, End, ECC_Pawn, Params);
 
+    SpawnBeamEffect(Start, bHit ? OutHit.Location : End);
     SpawnTracerEffect(Start, bHit ? OutHit.Location : End);
 
     return bHit;

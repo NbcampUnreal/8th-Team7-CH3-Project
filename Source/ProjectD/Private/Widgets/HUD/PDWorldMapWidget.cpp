@@ -4,6 +4,7 @@
 #include "Ping/PDFaintMarkWidget.h"
 #include "Ping/PDMapMarkerSubsystem.h"
 #include "Ping/PDPingSubsystem.h"
+#include "Blueprint/WidgetTree.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Components/CanvasPanel.h"
@@ -60,6 +61,12 @@ void UPDWorldMapWidget::NativeConstruct()
             HandleFaintMarkAdded(F);
         }
     }
+    
+    //Zoom/Pan초기화
+    ZoomLevel = 1.0f;
+    PanOffset = FVector2D::ZeroVector;
+    bIsPanning = false;
+    UpdateMapBackgroundTransform();
 }
 
 void UPDWorldMapWidget::NativeDestruct()
@@ -113,10 +120,21 @@ void UPDWorldMapWidget::NativeTick(const FGeometry& Geo, float DeltaTime)
     
     SyncAllMarkerPositions();
     SyncAllFaintMarkPositions();
+    UpdateMapBackgroundTransform(); 
 }
 
 FReply UPDWorldMapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
-{
+{   
+    //드래그 시작
+    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && MapCanvas)
+    {
+        bIsPanning = true;
+        DragStartMousePos = InMouseEvent.GetScreenSpacePosition();
+        DragStartPanOffset = PanOffset;
+        return FReply::Handled().CaptureMouse(TakeWidget());
+    }
+
+    
     if (InMouseEvent.GetEffectingButton() == EKeys::RightMouseButton && MapCanvas)
     {
         //클릭 화면 좌표 => MapCanvas 로컬 좌표 => 중앙 기준 상대 좌표 => 월드 좌표
@@ -146,6 +164,40 @@ FReply UPDWorldMapWidget::NativeOnMouseButtonDown(const FGeometry& InGeometry, c
     }
 
     return Super::NativeOnMouseButtonDown(InGeometry, InMouseEvent);
+}
+
+FReply UPDWorldMapWidget::NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (bIsPanning)
+    {
+        const FVector2D Current = InMouseEvent.GetScreenSpacePosition();
+        PanOffset = DragStartPanOffset + (Current - DragStartMousePos);
+        return FReply::Handled();
+    }
+    return Super::NativeOnMouseMove(InGeometry, InMouseEvent);
+}
+
+FReply UPDWorldMapWidget::NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    if (InMouseEvent.GetEffectingButton() == EKeys::LeftMouseButton && bIsPanning)
+    {
+        bIsPanning = false;
+        return FReply::Handled().ReleaseMouseCapture();
+    }
+    return Super::NativeOnMouseButtonUp(InGeometry, InMouseEvent);
+}
+
+FReply UPDWorldMapWidget::NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent)
+{
+    const float Delta = InMouseEvent.GetWheelDelta();
+    if (FMath::IsNearlyZero(Delta))
+    {
+        return Super::NativeOnMouseWheel(InGeometry, InMouseEvent);
+    }
+
+    const float Factor = Delta > 0 ? ZoomStep : 1.f / ZoomStep;
+    SetZoomLevel(ZoomLevel * Factor);
+    return FReply::Handled();
 }
 
 void UPDWorldMapWidget::HandleMarkerAdded(const FPDMapMarker& Marker)
@@ -246,23 +298,27 @@ FVector2D UPDWorldMapWidget::WorldToMap(const FVector& WorldPos) const
     const float HalfY = CanvasSize.Y * 0.5f;
     const float HalfWorld = MapWorldSize * 0.5f;
 
-    const float ScreenX = (Delta.Y / HalfWorld) * HalfX;
-    const float ScreenY = -(Delta.X / HalfWorld) * HalfY;
+    const float ScreenX = (Delta.Y / HalfWorld) * HalfX * ZoomLevel + PanOffset.X;
+    const float ScreenY = -(Delta.X / HalfWorld) * HalfY * ZoomLevel + PanOffset.Y;
 
     return FVector2D(ScreenX, ScreenY);
 }
 
 FVector UPDWorldMapWidget::LocalToWorld(const FVector2D& LocalPos) const
 {
-    if (!MapCanvas || MapWorldSize <= 0.f) return FVector::ZeroVector;
+    if (!MapCanvas || MapWorldSize <= 0.f || ZoomLevel <= 0.f) return FVector::ZeroVector;
 
     const FVector2D CanvasSize = MapCanvas->GetCachedGeometry().GetLocalSize();
     const float HalfX = CanvasSize.X * 0.5f;
     const float HalfY = CanvasSize.Y * 0.5f;
     const float HalfWorld = MapWorldSize * 0.5f;
-    
-    const float WorldY = (LocalPos.X / HalfX) * HalfWorld;
-    const float WorldX = -(LocalPos.Y / HalfY) * HalfWorld;
+
+    //줌/팬 역적용
+    const float AdjustedX = (LocalPos.X - PanOffset.X) / ZoomLevel;
+    const float AdjustedY = (LocalPos.Y - PanOffset.Y) / ZoomLevel;
+
+    const float WorldY = (AdjustedX / HalfX) * HalfWorld;
+    const float WorldX = -(AdjustedY / HalfY) * HalfWorld;
 
     return FVector(MapWorldCenter.X + WorldX, MapWorldCenter.Y + WorldY, 0.f);
 }
@@ -321,3 +377,22 @@ void UPDWorldMapWidget::SyncAllFaintMarkPositions()
         }
     }
 }
+
+void UPDWorldMapWidget::SetZoomLevel(float NewLevel)
+{
+    NewLevel = FMath::Clamp(NewLevel, ZoomMin, ZoomMax);
+    if (FMath::IsNearlyEqual(NewLevel, ZoomLevel)) return;
+
+    //화면 중앙 기준 줌: 보던 위치가 화면 중앙에 유지되도록 PanOffset 비례 조정
+    const float Ratio = NewLevel / ZoomLevel;
+    PanOffset *= Ratio;
+    ZoomLevel = NewLevel;
+}
+
+void UPDWorldMapWidget::UpdateMapBackgroundTransform()
+{
+    if (!MapBackground) return;
+    MapBackground->SetRenderScale(FVector2D(ZoomLevel, ZoomLevel));
+    MapBackground->SetRenderTranslation(PanOffset);
+}
+

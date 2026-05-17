@@ -4,7 +4,6 @@
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "PDShotgun.generated.h"
 
-
 UCLASS(Blueprintable)
 class PROJECTD_API APDShotgun : public APDRangedWeaponBase
 {
@@ -14,15 +13,14 @@ public:
     APDShotgun();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Shotgun")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     TArray<int32> PelletCountPerLevel = { 5, 7, 9 };
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Shotgun")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     float SpreadAngle = 15.f;
 
 public:
     virtual void Fire_Implementation() override;
-    virtual void Reload_Implementation() override;
 
 private:
     int32 GetCurrentPelletCount() const;

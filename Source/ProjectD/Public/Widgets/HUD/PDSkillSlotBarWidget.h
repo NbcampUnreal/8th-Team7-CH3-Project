@@ -4,7 +4,6 @@
 #include "Blueprint/UserWidget.h"
 #include "PDSkillSlotBarWidget.generated.h"
 
-class UPanelWidget;
 class UTexture2D;
 class UPDSkillSlotWidget;
 
@@ -20,25 +19,26 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|SkillSlot")
 	int32 GetSelectedIndex() const { return SelectedIndex; }
 
+	// 슬롯에 텍스처/아이콘 푸시 + 현재 선택 상태 반영. WBP 디폴트 변경 후 재반영 시 호출.
 	UFUNCTION(BlueprintCallable, Category="PD|SkillSlot")
 	void RebuildSlots();
 
 protected:
 	virtual void NativeConstruct() override;
 
-	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
-	TObjectPtr<UPanelWidget> SlotContainer;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UPDSkillSlotWidget> Slot_0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|SkillSlot", meta=(ClampMin="1"))
-	int32 SlotCount = 4;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UPDSkillSlotWidget> Slot_1;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|SkillSlot", meta=(ClampMin="0.0"))
-	float SlotSpacing = 8.f;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UPDSkillSlotWidget> Slot_2;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|SkillSlot")
-	TSubclassOf<UPDSkillSlotWidget> SlotWidgetClass;
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidget))
+	TObjectPtr<UPDSkillSlotWidget> Slot_3;
 
-	// 인덱스별 스킬 아이콘 (SlotCount와 같은 길이로 BP에서 채움)
+	// 인덱스별 스킬 아이콘 (4 슬롯과 같은 길이로 BP에서 채움. 비워두면 아이콘 없음)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|SkillSlot|Visuals")
 	TArray<TSoftObjectPtr<UTexture2D>> SkillIcons;
 
@@ -49,6 +49,7 @@ protected:
 	TSoftObjectPtr<UTexture2D> UnselectedTexture;
 
 private:
+	void CollectSlotWidgets();
 	void ApplySelection();
 
 	UPROPERTY(Transient)

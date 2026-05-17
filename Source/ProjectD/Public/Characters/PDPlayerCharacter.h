@@ -10,6 +10,8 @@
 #include "PDPlayerCharacter.generated.h"
 
 class APDWeaponBase;
+class APDRangedWeaponBase;
+class UPDAnimInstance;
 class UPDVisionComponent;
 class UPDInteractionComponent;
 class UPDQuickSlotComponent;

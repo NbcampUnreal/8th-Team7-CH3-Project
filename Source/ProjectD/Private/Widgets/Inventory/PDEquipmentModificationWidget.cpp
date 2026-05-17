@@ -9,13 +9,12 @@
 #include "GameFramework/Pawn.h"
 #include "Items/PDEquipmentModificationComponent.h"
 #include "Items/PDInventoryComponent.h"
-#include "Widgets/Inventory/PDInventorySlotWidget.h"
+#include "Widgets/Inventory/PDEquipmentListItemWidget.h"
 
 void UPDEquipmentModificationWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	ResolveComponents();
-	ResolveWidgets();
 	BindWidgetEvents();
 	BindComponentEvents();
 	RefreshAll();
@@ -35,78 +34,51 @@ void UPDEquipmentModificationWidget::ResolveComponents()
 	ModificationComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDEquipmentModificationComponent>() : nullptr;
 }
 
-void UPDEquipmentModificationWidget::ResolveWidgets()
-{
-	if (!WidgetTree)
-	{
-		return;
-	}
-
-	ScrollBoxEquipmentList = Cast<UScrollBox>(WidgetTree->FindWidget(ScrollBoxEquipmentListWidgetName));
-	ImageSelectedItemIcon = Cast<UImage>(WidgetTree->FindWidget(ImageSelectedItemIconWidgetName));
-	TextSelectedItemName = Cast<UTextBlock>(WidgetTree->FindWidget(TextSelectedItemNameWidgetName));
-	TextCurrentLevel = Cast<UTextBlock>(WidgetTree->FindWidget(TextCurrentLevelWidgetName));
-	TextTargetLevel = Cast<UTextBlock>(WidgetTree->FindWidget(TextTargetLevelWidgetName));
-	TextStatType = Cast<UTextBlock>(WidgetTree->FindWidget(TextStatTypeWidgetName));
-	TextStatPreview = Cast<UTextBlock>(WidgetTree->FindWidget(TextStatPreviewWidgetName));
-	TextGoldCost = Cast<UTextBlock>(WidgetTree->FindWidget(TextGoldCostWidgetName));
-	VerticalBoxRequiredMaterials = Cast<UVerticalBox>(WidgetTree->FindWidget(VerticalBoxRequiredMaterialsWidgetName));
-	TextBaseSuccessRate = Cast<UTextBlock>(WidgetTree->FindWidget(TextBaseSuccessRateWidgetName));
-	TextBoostSuccessRate = Cast<UTextBlock>(WidgetTree->FindWidget(TextBoostSuccessRateWidgetName));
-	TextFinalSuccessRate = Cast<UTextBlock>(WidgetTree->FindWidget(TextFinalSuccessRateWidgetName));
-	ButtonBoostNone = Cast<UButton>(WidgetTree->FindWidget(ButtonBoostNoneWidgetName));
-	ButtonBoostLow = Cast<UButton>(WidgetTree->FindWidget(ButtonBoostLowWidgetName));
-	ButtonBoostMid = Cast<UButton>(WidgetTree->FindWidget(ButtonBoostMidWidgetName));
-	ButtonBoostHigh = Cast<UButton>(WidgetTree->FindWidget(ButtonBoostHighWidgetName));
-	ButtonModify = Cast<UButton>(WidgetTree->FindWidget(ButtonModifyWidgetName));
-	TextResult = Cast<UTextBlock>(WidgetTree->FindWidget(TextResultWidgetName));
-}
-
 void UPDEquipmentModificationWidget::BindWidgetEvents()
 {
-	if (ButtonBoostNone)
+	if (Button_Boost_None)
 	{
-		ButtonBoostNone->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
+		Button_Boost_None->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
 	}
-	if (ButtonBoostLow)
+	if (Button_Boost_Low)
 	{
-		ButtonBoostLow->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostLowClicked);
+		Button_Boost_Low->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostLowClicked);
 	}
-	if (ButtonBoostMid)
+	if (Button_Boost_Mid)
 	{
-		ButtonBoostMid->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostMidClicked);
+		Button_Boost_Mid->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostMidClicked);
 	}
-	if (ButtonBoostHigh)
+	if (Button_Boost_High)
 	{
-		ButtonBoostHigh->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostHighClicked);
+		Button_Boost_High->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostHighClicked);
 	}
-	if (ButtonModify)
+	if (Button_Modify)
 	{
-		ButtonModify->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
+		Button_Modify->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
 	}
 }
 
 void UPDEquipmentModificationWidget::UnbindWidgetEvents()
 {
-	if (ButtonBoostNone)
+	if (Button_Boost_None)
 	{
-		ButtonBoostNone->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
+		Button_Boost_None->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
 	}
-	if (ButtonBoostLow)
+	if (Button_Boost_Low)
 	{
-		ButtonBoostLow->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostLowClicked);
+		Button_Boost_Low->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostLowClicked);
 	}
-	if (ButtonBoostMid)
+	if (Button_Boost_Mid)
 	{
-		ButtonBoostMid->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostMidClicked);
+		Button_Boost_Mid->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostMidClicked);
 	}
-	if (ButtonBoostHigh)
+	if (Button_Boost_High)
 	{
-		ButtonBoostHigh->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostHighClicked);
+		Button_Boost_High->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostHighClicked);
 	}
-	if (ButtonModify)
+	if (Button_Modify)
 	{
-		ButtonModify->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
+		Button_Modify->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
 	}
 }
 
@@ -143,14 +115,14 @@ void UPDEquipmentModificationWidget::RefreshAll()
 
 void UPDEquipmentModificationWidget::RefreshEquipmentList()
 {
-	if (!ScrollBoxEquipmentList)
+	if (!ScrollBox_EquipmentList)
 	{
 		return;
 	}
 
-	ScrollBoxEquipmentList->ClearChildren();
+	ScrollBox_EquipmentList->ClearChildren();
 
-	if (!InventoryComponent || !EquipmentSlotWidgetClass)
+	if (!InventoryComponent || !EquipmentListItemWidgetClass)
 	{
 		return;
 	}
@@ -163,16 +135,16 @@ void UPDEquipmentModificationWidget::RefreshEquipmentList()
 			continue;
 		}
 
-		UPDInventorySlotWidget* SlotWidget = CreateWidget<UPDInventorySlotWidget>(GetOwningPlayer(), EquipmentSlotWidgetClass);
-		if (!SlotWidget)
+		UPDEquipmentListItemWidget* ItemWidget = CreateWidget<UPDEquipmentListItemWidget>(GetOwningPlayer(), EquipmentListItemWidgetClass);
+		if (!ItemWidget)
 		{
 			continue;
 		}
 
-		SlotWidget->SetSlotContainerType(EPDItemContainerType::Inventory);
-		SlotWidget->SetSlotData(InventorySlotData, Index);
-		SlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleEquipmentSlotClicked);
-		ScrollBoxEquipmentList->AddChild(SlotWidget);
+		ItemWidget->SetSlotData(InventorySlotData, Index);
+		ItemWidget->SetSelected(Index == SelectedSlotIndex);
+		ItemWidget->OnItemClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleEquipmentListItemClicked);
+		ScrollBox_EquipmentList->AddChild(ItemWidget);
 	}
 }
 
@@ -197,14 +169,14 @@ void UPDEquipmentModificationWidget::SelectFirstEquipmentSlotIfNeeded()
 void UPDEquipmentModificationWidget::SelectInventorySlot(int32 SlotIndex)
 {
 	SelectedSlotIndex = SlotIndex;
-	SetText(TextResult, ModifyReadyText);
+	SetText(Text_Result, ModifyReadyText);
 	RefreshPreview();
 }
 
 void UPDEquipmentModificationWidget::SetBoostType(EPDModificationBoostType BoostType)
 {
 	SelectedBoostType = BoostType;
-	SetText(TextResult, ModifyReadyText);
+	SetText(Text_Result, ModifyReadyText);
 	RefreshPreview();
 }
 
@@ -238,85 +210,85 @@ void UPDEquipmentModificationWidget::RefreshPreview()
 
 void UPDEquipmentModificationWidget::ClearPreview()
 {
-	SetText(TextSelectedItemName, EmptySelectionText);
-	SetText(TextCurrentLevel, FText::FromString(TEXT("-")));
-	SetText(TextTargetLevel, FText::FromString(TEXT("-")));
-	SetText(TextStatType, FText::FromString(TEXT("-")));
-	SetText(TextStatPreview, FText::FromString(TEXT("-")));
-	SetText(TextGoldCost, FText::FromString(TEXT("-")));
-	SetText(TextBaseSuccessRate, FText::FromString(TEXT("-")));
-	SetText(TextBoostSuccessRate, FText::FromString(TEXT("-")));
-	SetText(TextFinalSuccessRate, FText::FromString(TEXT("-")));
-	if (ImageSelectedItemIcon)
+	SetText(Text_SelectedItemName, EmptySelectionText);
+	SetText(Text_CurrentLevel, FText::FromString(TEXT("-")));
+	SetText(Text_TargetLevel, FText::FromString(TEXT("-")));
+	SetText(Text_StatType, FText::FromString(TEXT("-")));
+	SetText(Text_StatPreview, FText::FromString(TEXT("-")));
+	SetText(Text_GoldCost, FText::FromString(TEXT("-")));
+	SetText(Text_BaseSuccessRate, FText::FromString(TEXT("-")));
+	SetText(Text_BoostSuccessRate, FText::FromString(TEXT("-")));
+	SetText(Text_FinalSuccessRate, FText::FromString(TEXT("-")));
+	if (Image_SelectedItemIcon)
 	{
-		ImageSelectedItemIcon->SetBrushFromTexture(nullptr);
+		Image_SelectedItemIcon->SetBrushFromTexture(nullptr);
 	}
-	if (VerticalBoxRequiredMaterials)
+	if (VerticalBox_RequiredMaterials)
 	{
-		VerticalBoxRequiredMaterials->ClearChildren();
+		VerticalBox_RequiredMaterials->ClearChildren();
 	}
-	if (ButtonModify)
+	if (Button_Modify)
 	{
-		ButtonModify->SetIsEnabled(false);
+		Button_Modify->SetIsEnabled(false);
 	}
 }
 
 void UPDEquipmentModificationWidget::ApplyPreview(const FPDModificationPreview& Preview, const FPDInventorySlot& SlotData)
 {
 	const FPDItemData& ItemData = SlotData.ItemData;
-	SetText(TextSelectedItemName, ItemData.DisplayName.IsEmpty() ? FText::FromName(ItemData.ItemID) : ItemData.DisplayName);
-	SetText(TextCurrentLevel, FormatLevelText(Preview.CurrentModificationLevel));
+	SetText(Text_SelectedItemName, ItemData.DisplayName.IsEmpty() ? FText::FromName(ItemData.ItemID) : ItemData.DisplayName);
+	SetText(Text_CurrentLevel, FormatLevelText(Preview.CurrentModificationLevel));
 
 	if (CurrentPreviewResult == EPDModificationResult::AlreadyMaxLevel)
 	{
-		SetText(TextTargetLevel, FText::FromString(TEXT("MAX")));
+		SetText(Text_TargetLevel, FText::FromString(TEXT("MAX")));
 	}
 	else
 	{
-		SetText(TextTargetLevel, FormatLevelText(Preview.TargetModificationLevel));
+		SetText(Text_TargetLevel, FormatLevelText(Preview.TargetModificationLevel));
 	}
 
-	if (ImageSelectedItemIcon)
+	if (Image_SelectedItemIcon)
 	{
-		ImageSelectedItemIcon->SetBrushFromTexture(ItemData.Icon);
+		Image_SelectedItemIcon->SetBrushFromTexture(ItemData.Icon);
 	}
 
 	if (Preview.AttackBonus > 0.f)
 	{
-		SetText(TextStatType, FText::FromString(TEXT("공격력")));
-		SetText(TextStatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.AttackBonus)));
+		SetText(Text_StatType, FText::FromString(TEXT("공격력")));
+		SetText(Text_StatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.AttackBonus)));
 	}
 	else if (Preview.DefenseBonus > 0.f)
 	{
-		SetText(TextStatType, FText::FromString(TEXT("방어력")));
-		SetText(TextStatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.DefenseBonus)));
+		SetText(Text_StatType, FText::FromString(TEXT("방어력")));
+		SetText(Text_StatPreview, FText::FromString(FString::Printf(TEXT("+%.1f"), Preview.DefenseBonus)));
 	}
 	else
 	{
-		SetText(TextStatType, FText::FromString(TEXT("-")));
-		SetText(TextStatPreview, FText::FromString(TEXT("-")));
+		SetText(Text_StatType, FText::FromString(TEXT("-")));
+		SetText(Text_StatPreview, FText::FromString(TEXT("-")));
 	}
 
-	SetText(TextGoldCost, FText::FromString(FString::Printf(TEXT("%d / %d"), InventoryComponent ? InventoryComponent->GetGold() : 0, Preview.GoldCost)));
-	SetText(TextBaseSuccessRate, FormatPercent(Preview.BaseSuccessRate));
-	SetText(TextBoostSuccessRate, FText::FromString(FString::Printf(TEXT("+%s"), *FormatPercent(Preview.BoostSuccessRate).ToString())));
-	SetText(TextFinalSuccessRate, FormatPercent(Preview.SuccessRate));
+	SetText(Text_GoldCost, FText::FromString(FString::Printf(TEXT("%d / %d"), InventoryComponent ? InventoryComponent->GetGold() : 0, Preview.GoldCost)));
+	SetText(Text_BaseSuccessRate, FormatPercent(Preview.BaseSuccessRate));
+	SetText(Text_BoostSuccessRate, FText::FromString(FString::Printf(TEXT("+%s"), *FormatPercent(Preview.BoostSuccessRate).ToString())));
+	SetText(Text_FinalSuccessRate, FormatPercent(Preview.SuccessRate));
 	RefreshMaterialList(Preview);
 
-	if (ButtonModify)
+	if (Button_Modify)
 	{
-		ButtonModify->SetIsEnabled(bCurrentPreviewValid);
+		Button_Modify->SetIsEnabled(bCurrentPreviewValid);
 	}
 }
 
 void UPDEquipmentModificationWidget::RefreshMaterialList(const FPDModificationPreview& Preview)
 {
-	if (!VerticalBoxRequiredMaterials || !WidgetTree)
+	if (!VerticalBox_RequiredMaterials || !WidgetTree)
 	{
 		return;
 	}
 
-	VerticalBoxRequiredMaterials->ClearChildren();
+	VerticalBox_RequiredMaterials->ClearChildren();
 
 	for (const FPDModificationMaterialRequirement& Material : Preview.RequiredMaterials)
 	{
@@ -327,7 +299,7 @@ void UPDEquipmentModificationWidget::RefreshMaterialList(const FPDModificationPr
 		}
 
 		TextBlock->SetText(FText::FromString(FString::Printf(TEXT("%s  %d / %d"), *Material.RequiredItemID.ToString(), CountItem(Material.RequiredItemID), Material.Quantity)));
-		VerticalBoxRequiredMaterials->AddChild(TextBlock);
+		VerticalBox_RequiredMaterials->AddChild(TextBlock);
 	}
 
 	if (!Preview.BoostItemID.IsNone() && Preview.BoostItemQuantity > 0)
@@ -336,14 +308,15 @@ void UPDEquipmentModificationWidget::RefreshMaterialList(const FPDModificationPr
 		if (TextBlock)
 		{
 			TextBlock->SetText(FText::FromString(FString::Printf(TEXT("%s  %d / %d"), *Preview.BoostItemID.ToString(), CountItem(Preview.BoostItemID), Preview.BoostItemQuantity)));
-			VerticalBoxRequiredMaterials->AddChild(TextBlock);
+			VerticalBox_RequiredMaterials->AddChild(TextBlock);
 		}
 	}
 }
 
-void UPDEquipmentModificationWidget::HandleEquipmentSlotClicked(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
+void UPDEquipmentModificationWidget::HandleEquipmentListItemClicked(UPDEquipmentListItemWidget* ItemWidget, int32 SlotIndex)
 {
 	SelectInventorySlot(SlotIndex);
+	RefreshEquipmentList();
 }
 
 void UPDEquipmentModificationWidget::HandleBoostNoneClicked()
@@ -370,14 +343,14 @@ void UPDEquipmentModificationWidget::HandleModifyClicked()
 {
 	if (!InventoryComponent || !ModificationComponent || SelectedSlotIndex == INDEX_NONE)
 	{
-		SetText(TextResult, GetResultText(EPDModificationResult::InvalidSlot, false));
+		SetText(Text_Result, GetResultText(EPDModificationResult::InvalidSlot, false));
 		return;
 	}
 
 	FPDModificationPreview Preview;
 	EPDModificationResult Result = EPDModificationResult::InvalidSlot;
 	const bool bSuccess = ModificationComponent->TryModifyInventorySlotWithBoost(InventoryComponent, SelectedSlotIndex, SelectedBoostType, Preview, Result);
-	SetText(TextResult, GetResultText(Result, bSuccess));
+	SetText(Text_Result, GetResultText(Result, bSuccess));
 	RefreshEquipmentList();
 	RefreshPreview();
 }
@@ -393,25 +366,12 @@ void UPDEquipmentModificationWidget::HandleInventoryChanged()
 
 void UPDEquipmentModificationWidget::HandleModificationFinished(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result)
 {
-	SetText(TextResult, GetResultText(Result, bSuccess));
+	SetText(Text_Result, GetResultText(Result, bSuccess));
 }
 
 void UPDEquipmentModificationWidget::SetText(UTextBlock* TextBlock, const FText& Text) const
 {
 	if (TextBlock)
-	{
-		TextBlock->SetText(Text);
-	}
-}
-
-void UPDEquipmentModificationWidget::SetTextByName(FName WidgetName, const FText& Text) const
-{
-	if (!WidgetTree || WidgetName.IsNone())
-	{
-		return;
-	}
-
-	if (UTextBlock* TextBlock = Cast<UTextBlock>(WidgetTree->FindWidget(WidgetName)))
 	{
 		TextBlock->SetText(Text);
 	}

@@ -37,7 +37,21 @@ public:
     //잔존 표식 위젯 클래스(BP에서 WBP_FaintMark 지정)
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap")
     TSubclassOf<UPDFaintMarkWidget> FaintMarkWidgetClass;
+    
+    //Zoom/Pan 설정
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap|Zoom", meta=(ClampMin="0.1"))
+    float ZoomMin = 0.5f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap|Zoom", meta=(ClampMin="0.1"))
+    float ZoomMax = 4.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="WorldMap|Zoom", meta=(ClampMin="1.01"))
+    float ZoomStep = 1.15f;
 
+    //현재 상태
+    UPROPERTY(Transient, BlueprintReadOnly, Category="WorldMap|Zoom")
+    float ZoomLevel = 1.0f;
+    UPROPERTY(Transient, BlueprintReadOnly, Category="WorldMap|Zoom")
+    FVector2D PanOffset = FVector2D::ZeroVector;
+    
 protected:
     UPROPERTY(meta=(BindWidget))
     TObjectPtr<UCanvasPanel> MapCanvas;
@@ -64,6 +78,10 @@ protected:
 
     UFUNCTION()
     void HandleFaintMarkRemoved(int32 FaintId);
+    
+    virtual FReply NativeOnMouseWheel(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseMove(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
+    virtual FReply NativeOnMouseButtonUp(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 
 private:
     // 월드 => 맵 캔버스 로컬 좌표
@@ -85,4 +103,12 @@ private:
     //활성 표식 위젯 추적
     UPROPERTY(Transient)
     TMap<int32, TObjectPtr<UPDFaintMarkWidget>> FaintMarkWidgets;
+    
+    void SetZoomLevel(float NewLevel);
+    void UpdateMapBackgroundTransform();
+
+    //드래그 상태
+    bool bIsPanning = false;
+    FVector2D DragStartMousePos = FVector2D::ZeroVector;
+    FVector2D DragStartPanOffset = FVector2D::ZeroVector;
 };

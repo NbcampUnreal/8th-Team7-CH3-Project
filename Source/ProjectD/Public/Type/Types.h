@@ -116,6 +116,9 @@ struct FPDItemData : public FTableRowBase
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TSubclassOf<UGameplayEffect> UseEffect;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta=(ClampMin="0.0", EditCondition="ItemType == EPDItemType::Consumable", EditConditionHides))
+	float UseDuration = 0.f;
 };
 
 USTRUCT(BlueprintType)

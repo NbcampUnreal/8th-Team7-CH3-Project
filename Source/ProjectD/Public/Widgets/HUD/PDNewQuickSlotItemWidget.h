@@ -13,6 +13,7 @@ class USizeBox;
 class UTextBlock;
 class UTexture2D;
 class UMaterialInterface;
+class UWidgetAnimation;
 class UPDQuickSlotComponent;
 class UPDInventoryComponent;
 class UPDStashComponent;
@@ -50,16 +51,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
 	void SetSlotMaterials(TSoftObjectPtr<UMaterialInterface> InBase, TSoftObjectPtr<UMaterialInterface> InSelected);
 
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void SetWeaponCooldownUI(bool bActive, float RemainingTime);
+
+	UFUNCTION(BlueprintCallable, Category="PD|QuickSlot")
+	void PlayCooldownReadyFlash();
+
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	bool IsSlotSelected() const { return bSelected; }
 
 protected:
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
+	virtual void NativePreConstruct() override;
 	virtual FReply NativeOnMouseButtonDown(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
-
+	
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UBorder> SlotBackground;
 
@@ -74,7 +82,7 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UOverlay> Container_AmmoLabel;
-
+	
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Image_AmmoCapsule;
 
@@ -83,6 +91,18 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<UImage> Image_KeyBinding;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_CooldownOverlay;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UTextBlock> Text_CooldownRemain;
+
+	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
+	TObjectPtr<UImage> Image_Flash;
+
+	UPROPERTY(Transient, BlueprintReadOnly, meta=(BindWidgetAnimOptional))
+	TObjectPtr<UWidgetAnimation> Anim_CooldownReadyFlash;
 
 	UPROPERTY(BlueprintReadOnly, meta=(BindWidgetOptional))
 	TObjectPtr<USizeBox> Box_Slot;
@@ -99,6 +119,7 @@ protected:
 private:
 	void BuildFallbackWidget();
 	void RefreshVisuals();
+	void ClearWeaponCooldownUI();
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 

@@ -35,6 +35,8 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot5, "Input.Quickslot5");
 	UE_DEFINE_GAMEPLAY_TAG(Input_Quickslot6, "Input.Quickslot6");
 
+	UE_DEFINE_GAMEPLAY_TAG(Input_CancelConsumableUse, "Input.CancelConsumableUse");
+
 	UE_DEFINE_GAMEPLAY_TAG(Data_Damage, "Data.Damage");
 
 	UE_DEFINE_GAMEPLAY_TAG(State_Debuff_LegDamaged,  "State.Debuff.LegDamaged");
@@ -56,9 +58,6 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_Type_Melee,   "Weapon.Type.Melee");
 	UE_DEFINE_GAMEPLAY_TAG(State_Aiming, "State.Aiming");
 
-	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_EquipEnd,      "Anim.Notify.EquipEnd");
-	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_ReloadEnd,     "Anim.Notify.ReloadEnd");
-	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_WeaponVisible, "Anim.Notify.WeaponVisible");
 
 	// Weapon State
 	UE_DEFINE_GAMEPLAY_TAG(Weapon_State_Firing, "Weapon.State.Firing");

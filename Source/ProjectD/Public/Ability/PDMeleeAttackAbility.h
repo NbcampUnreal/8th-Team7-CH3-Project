@@ -23,10 +23,10 @@ public:
 		bool bReplicateEndAbility, bool bWasCancelled) override;
 
 protected:
-	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
+	UPROPERTY(EditDefaultsOnly, Category="Melee")
 	TObjectPtr<UAnimMontage> AttackMontage;
 
-	UPROPERTY(EditDefaultsOnly, Category="PD|Melee")
+	UPROPERTY(EditDefaultsOnly, Category="Melee")
 	TArray<FName> AttackSections = {TEXT("Attack1"), TEXT("Attack2"), TEXT("Attack3"), TEXT("Attack4")};
 
 

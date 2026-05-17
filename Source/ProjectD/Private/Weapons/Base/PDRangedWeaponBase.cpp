@@ -1,4 +1,5 @@
 #include "Weapons/Base/PDRangedWeaponBase.h"
+#include "Weapons/PDCartridge.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -17,7 +18,8 @@ void APDRangedWeaponBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (LevelStats.IsValidIndex(0))
+	// CurrentAmmo가 BP에서 직접 설정된 경우 그대로 사용, 0이면 MaxAmmo로 채움
+	if (CurrentAmmo == 0 && LevelStats.IsValidIndex(0))
 		CurrentAmmo = LevelStats[0].MaxAmmo;
 }
 
@@ -30,6 +32,9 @@ void APDRangedWeaponBase::Reload_Implementation()
 	if (!HasAmmoToReload()) return;
 
 	bIsReloading = true;
+
+	// 캐릭터 애니메이션은 AnimInstance가 이 델리게이트를 구독해서 처리
+	OnWeaponReloadStarted.Broadcast(this);
 
 	if (ReloadMontage && WeaponMesh && WeaponMesh->GetAnimInstance())
 	{
@@ -51,6 +56,8 @@ void APDRangedWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 
 	if (CurrentAmmo == 0 && !LevelStats.IsEmpty())
 		CurrentAmmo = LevelStats[0].MaxAmmo;
+
+	// 캐릭터 Equip 몽타주는 PDAnimInstance가 OnWeaponEquipped에서 담당.
 }
 
 void APDRangedWeaponBase::OnUnequip_Implementation()
@@ -177,25 +184,17 @@ void APDRangedWeaponBase::OnReloadMontageEnded(UAnimMontage* Montage, bool bInte
 
 void APDRangedWeaponBase::ApplyRecoil()
 {
-	// 카메라 셰이크 (시각적 피드백)
-	if (FireCameraShakeClass)
-	{
-		if (APlayerController* PC = GetOwnerPlayerController())
-			PC->PlayerCameraManager->StartCameraShake(FireCameraShakeClass);
-	}
-
 	// 에임 Yaw 오프셋 — PlayerController에 누적
 	if (APDPlayerController* PDPC = Cast<APDPlayerController>(GetOwnerPlayerController()))
 	{
-		// 좌우 랜덤 + MaxRecoilYaw 클램프
-		const float Sign = FMath::RandBool() ? 1.f : -1.f;
+		// 한 방향으로 누적(+방향). 회복은 TickRecoilRecovery에서 0으로 수렴.
+		// 랜덤 좌우는 서로 상쇄되어 체감이 없으므로 단방향 누적 사용.
 		const float CurrentOffset = PDPC->GetRecoilYawOffset();
-		const float Delta = FMath::Min(
-			RecoilYawPerShot,
-			MaxRecoilYaw - FMath::Abs(CurrentOffset));
+		const float Remaining = MaxRecoilYaw - CurrentOffset;
+		const float Delta = FMath::Min(RecoilYawPerShot, FMath::Max(0.f, Remaining));
 
 		if (Delta > 0.f)
-			PDPC->AddRecoilOffset(Sign * Delta);
+			PDPC->AddRecoilOffset(Delta);
 	}
 }
 
@@ -222,28 +221,66 @@ void APDRangedWeaponBase::PlayFireEffects()
 	}
 }
 
+void APDRangedWeaponBase::SpawnBeamEffect(const FVector& Start, const FVector& End)
+{
+	if (!BeamParticle || !GetWorld()) return;
+
+	// Beam emitter: 시작점에 스폰 후 Target 파라미터로 끝점 지정
+	UParticleSystemComponent* BeamComp = UGameplayStatics::SpawnEmitterAtLocation(
+		GetWorld(), BeamParticle, Start, FRotator::ZeroRotator, true);
+	if (BeamComp)
+		BeamComp->SetVectorParameter(FName("Target"), End);
+}
+
 void APDRangedWeaponBase::SpawnTracerEffect(const FVector& Start, const FVector& End)
 {
 	if (!TracerEffect || !GetWorld()) return;
 
 	FVector Dir = (End - Start).GetSafeNormal();
-	float Distance = FVector::Dist(Start, End);
-	float Speed = Distance / 0.05f;
-
-	UParticleSystemComponent* PSC = UGameplayStatics::SpawnEmitterAtLocation(
+	UGameplayStatics::SpawnEmitterAtLocation(
 		GetWorld(), TracerEffect, Start, Dir.Rotation());
+}
 
-	if (PSC)
-	{
-		PSC->SetVectorParameter(FName("InitialVelocity"), Dir * Speed);
-		PSC->SetFloatParameter(FName("InitialSpeed"), Speed);
-	}
+void APDRangedWeaponBase::SpawnImpactEffect(const FHitResult& Hit)
+{
+	if (!HitImpactEffect || !GetWorld()) return;
+
+	UGameplayStatics::SpawnEmitterAtLocation(
+		GetWorld(),
+		HitImpactEffect,
+		Hit.ImpactPoint,
+		Hit.ImpactNormal.Rotation());
+}
+
+void APDRangedWeaponBase::PlayHitSound(const FHitResult& Hit)
+{
+	// 피격 대상이 Pawn이면 HitBodySound, 아니면 HitSurfaceSound
+	USoundBase* Sound = Cast<APawn>(Hit.GetActor()) ? HitBodySound : HitSurfaceSound;
+	if (Sound)
+		UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, Hit.ImpactPoint);
+}
+
+void APDRangedWeaponBase::SpawnCartridge()
+{
+	if (!CartridgeClass || !WeaponMesh) return;
+	if (!WeaponMesh->DoesSocketExist(CartridgeEjectSocketName)) return;
+
+	const FTransform EjectTransform = WeaponMesh->GetSocketTransform(CartridgeEjectSocketName);
+	GetWorld()->SpawnActor<APDCartridge>(
+		CartridgeClass,
+		EjectTransform.GetLocation(),
+		EjectTransform.GetRotation().Rotator());
 }
 
 APlayerController* APDRangedWeaponBase::GetOwnerPlayerController() const
 {
 	if (!WeaponOwner.IsValid()) return nullptr;
-	return Cast<APlayerController>(WeaponOwner->GetInstigatorController());
+	// WeaponOwner는 AActor*로 저장되어 있어 AActor::GetInstigatorController()가 호출됨.
+	// 이 함수는 Actor의 Instigator 필드(미설정)를 통해 반환하므로 nullptr이 됨.
+	// APawn::GetController()를 직접 사용해야 실제 PlayerController를 얻을 수 있다.
+	if (APawn* OwnerPawn = Cast<APawn>(WeaponOwner.Get()))
+		return Cast<APlayerController>(OwnerPawn->GetController());
+	return nullptr;
 }
 
 UPDInventoryComponent* APDRangedWeaponBase::GetOwnerInventory() const

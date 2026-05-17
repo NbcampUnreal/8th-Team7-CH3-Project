@@ -543,6 +543,19 @@ void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* 
 		return;
 	}
 
+	if (SlotType == EPDEquipmentSlotType::Weapon)
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			if (QuickSlotComponent->EquipInventoryWeaponSlot(DragOperation->SourceSlotIndex))
+			{
+				RefreshEquipmentSlots();
+				RefreshInventoryGrid();
+			}
+		}
+		return;
+	}
+
 	if (EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, DragOperation->SourceSlotIndex, SlotType))
 	{
 		RefreshEquipmentSlots();
@@ -943,6 +956,21 @@ void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenu
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
+	const FPDInventorySlot* SourceSlot = FindInventorySlot(SlotIndex);
+	if (!SourceSlot || SourceSlot->IsEmpty())
+	{
+		return;
+	}
+
+	if (SourceSlot->ItemData.ItemType == EPDItemType::Consumable)
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			QuickSlotComponent->UseInventoryConsumableSlot(SlotIndex);
+		}
+		return;
+	}
+
 	if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
 	{
 		InventoryComponent->UseItemFromSlot(SlotIndex);
@@ -969,6 +997,25 @@ void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMe
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
 	if (!InventoryComponent || !EquipmentComponent)
 	{
+		return;
+	}
+
+	const FPDInventorySlot* SourceSlot = FindInventorySlot(SlotIndex);
+	if (!SourceSlot || SourceSlot->IsEmpty())
+	{
+		return;
+	}
+
+	if (EquipmentComponent->ResolveEquipmentSlotType(SourceSlot->ItemData) == EPDEquipmentSlotType::Weapon)
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			if (QuickSlotComponent->EquipInventoryWeaponSlot(SlotIndex))
+			{
+				RefreshEquipmentSlots();
+				RefreshInventoryGrid();
+			}
+		}
 		return;
 	}
 

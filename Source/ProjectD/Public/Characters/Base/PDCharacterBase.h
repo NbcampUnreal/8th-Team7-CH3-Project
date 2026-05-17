@@ -115,6 +115,9 @@ public:
 
 	virtual void HandleDeath(AActor* Killer);
 
+	/** 데미지를 받았을 때 AnimInstance에 HitReact 요청 */
+	virtual void OnDamageTaken();
+
 protected:
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> ASC;

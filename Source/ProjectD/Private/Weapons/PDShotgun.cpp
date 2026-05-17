@@ -1,5 +1,6 @@
 #include "Weapons/PDShotgun.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
+#include "GameFramework/Pawn.h"
 
 APDShotgun::APDShotgun()
 {
@@ -17,36 +18,23 @@ void APDShotgun::Fire_Implementation()
     TArray<FHitResult> Hits;
     PerformPelletTraces(Hits);
 
+    // 동일 액터에 중복 데미지 방지
     TSet<AActor*> HitActors;
     for (const FHitResult& Hit : Hits)
     {
         AActor* HitActor = Hit.GetActor();
-        if (HitActor && !HitActors.Contains(HitActor))
-        {
-            HitActors.Add(HitActor);
-            ApplyDamage(HitActor, GetCurrentStats().Damage);
-        }
+        if (!HitActor || HitActors.Contains(HitActor)) continue;
+
+        HitActors.Add(HitActor);
+        ApplyDamage(HitActor, GetCurrentStats().Damage);
+        SpawnImpactEffect(Hit);
+        PlayHitSound(Hit);
     }
 
     PlayFireEffects();
+    SpawnCartridge();
     PlayWeaponMontage(FireMontage);
     PostFire();
-}
-
-void APDShotgun::Reload_Implementation()
-{
-    if (bIsReloading) return;
-    if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-    bIsReloading = true;
-    if (ReloadMontage)
-    {
-        PlayWeaponMontage(ReloadMontage);
-        BindMontageEndedForReload(ReloadMontage);
-    }
-    else
-    {
-        GetWorldTimerManager().SetTimer(ReloadHandle, this, &APDRangedWeaponBase::FinishReload, GetCurrentStats().ReloadTime, false);
-    }
 }
 
 int32 APDShotgun::GetCurrentPelletCount() const
@@ -60,7 +48,9 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return;
 
-    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
+    APlayerController* PC = nullptr;
+    if (APawn* OwnerPawn = Cast<APawn>(WeaponOwnerActor))
+        PC = Cast<APlayerController>(OwnerPawn->GetController());
 
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
@@ -82,16 +72,16 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
     Params.bTraceComplex = true;
 
     const int32 Pellets = GetCurrentPelletCount();
-
     for (int32 i = 0; i < Pellets; ++i)
     {
         FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
-        FVector End = Start + RandDir * TraceLength;
+        FVector End     = Start + RandDir * TraceLength;
 
         FHitResult Hit;
-        bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
+        const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
 
         if (bHit) OutHits.Add(Hit);
+        SpawnBeamEffect(Start, bHit ? Hit.Location : End);
         SpawnTracerEffect(Start, bHit ? Hit.Location : End);
     }
 }

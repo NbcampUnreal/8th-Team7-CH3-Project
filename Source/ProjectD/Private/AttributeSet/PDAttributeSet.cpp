@@ -49,6 +49,8 @@ void UPDAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallback
 				Owner->HandleDeath(Data.EffectSpec.GetContext().GetInstigator());
 				return;
 			}
+			// 살아있을 때만 HitReact
+			Owner->OnDamageTaken();
 		}
 		
 		UAbilitySystemComponent* ASC=GetOwningAbilitySystemComponent();

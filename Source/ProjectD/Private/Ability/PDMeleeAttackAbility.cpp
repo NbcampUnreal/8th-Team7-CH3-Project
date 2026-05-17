@@ -7,6 +7,7 @@
 #include "GameplayTag/PDGameplayTags.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "Abilities/Tasks/AbilityTask_WaitGameplayEvent.h"
+#include "Kismet/GameplayStatics.h"
 
 UPDMeleeAttackAbility::UPDMeleeAttackAbility()
 {
@@ -33,6 +34,15 @@ void UPDMeleeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Han
 	}
 
 	HitActors.Reset();
+
+	// 공격 시작 — Swing 사운드
+	APDPlayerCharacter* SwingChar = Cast<APDPlayerCharacter>(GetPDCharacter());
+	if (APDMeleeWeaponBase* SwingWeapon = SwingChar
+		? Cast<APDMeleeWeaponBase>(SwingChar->GetCurrentWeapon()) : nullptr)
+	{
+		if (USoundBase* Sound = SwingWeapon->GetSwingSound())
+			UGameplayStatics::SpawnSoundAttached(Sound, SwingChar->GetMesh());
+	}
 
 	const FName Section=AttackSections[FMath::RandRange(0, AttackSections.Num()-1)];
 
@@ -94,6 +104,7 @@ void UPDMeleeAttackAbility::PerformSweep()
 	GetWorld()->SweepMultiByChannel(Hits, Start, End, FQuat::Identity,
 		ECC_Pawn, FCollisionShape::MakeSphere(SweepRadius), Params);
 
+	bool bPlayedHitSound = false;
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor=Hit.GetActor();
@@ -101,6 +112,14 @@ void UPDMeleeAttackAbility::PerformSweep()
 		if (!HitActor->Implements<UPDDamageable>()) continue;
 
 		HitActors.Add(HitActor);
+
+		// 첫 명중 시 Hit 사운드 (여러 명 동시 히트 시 중복 방지)
+		if (!bPlayedHitSound)
+		{
+			if (USoundBase* Sound = Weapon->GetHitSound())
+				UGameplayStatics::PlaySoundAtLocation(GetWorld(), Sound, Hit.ImpactPoint);
+			bPlayedHitSound = true;
+		}
 
 		FPDDamageInfo DamageInfo;
 		DamageInfo.BaseDamage=Damage;

@@ -11,6 +11,7 @@
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/Widget.h"
+#include "Animation/WidgetAnimation.h"
 #include "Materials/MaterialInterface.h"
 #include "Core/PDPlayerController.h"
 #include "Items/PDInventoryComponent.h"
@@ -33,6 +34,7 @@ void UPDNewQuickSlotItemWidget::NativeOnInitialized()
 		SlotBackground->SetVisibility(ESlateVisibility::Hidden);
 	}
 	SetSelected(false);
+	ClearWeaponCooldownUI();
 	RefreshVisuals();
 }
 
@@ -51,8 +53,17 @@ void UPDNewQuickSlotItemWidget::NativeConstruct()
 	{
 		SlotBackground->SetVisibility(ESlateVisibility::Hidden);
 	}
+	SetSlotSize(SlotSize);
 	SetSelected(false);
+	ClearWeaponCooldownUI();
 	RefreshVisuals();
+}
+
+void UPDNewQuickSlotItemWidget::NativePreConstruct()
+{
+	Super::NativePreConstruct();
+	SetSlotSize(SlotSize);
+	SetSelected(bSelected);
 }
 
 void UPDNewQuickSlotItemWidget::InitializeQuickSlot(UPDQuickSlotComponent* InQuickSlotComponent, int32 InSlotIndex)
@@ -122,7 +133,6 @@ bool UPDNewQuickSlotItemWidget::NativeOnDrop(const FGeometry& InGeometry, const 
 		bMoved = QuickSlotComponent->StoreInventorySlotQuantityToSlot(FindInventoryComponent(), DragOperation->SourceSlotIndex, SlotIndex, Quantity);
 		break;
 	case EPDItemContainerType::Stash:
-		// Stash is storage only. Do not allow items stored in stash to be registered to quick slots.
 		return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 	case EPDItemContainerType::QuickSlot:
 		bMoved = QuickSlotComponent->MoveSlotQuantityToSlot(DragOperation->SourceSlotIndex, SlotIndex, Quantity);
@@ -166,6 +176,35 @@ void UPDNewQuickSlotItemWidget::BuildFallbackWidget()
 		ImageSlot->SetVerticalAlignment(VAlign_Fill);
 	}
 
+	Image_CooldownOverlay = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Image_CooldownOverlay"));
+	Image_CooldownOverlay->SetColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.55f));
+	Image_CooldownOverlay->SetVisibility(ESlateVisibility::Hidden);
+	if (UOverlaySlot* CooldownOverlaySlot = Overlay->AddChildToOverlay(Image_CooldownOverlay))
+	{
+		CooldownOverlaySlot->SetHorizontalAlignment(HAlign_Fill);
+		CooldownOverlaySlot->SetVerticalAlignment(VAlign_Fill);
+	}
+
+	Text_CooldownRemain = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_CooldownRemain"));
+	Text_CooldownRemain->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	Text_CooldownRemain->SetShadowOffset(FVector2D(1.f, 1.f));
+	Text_CooldownRemain->SetShadowColorAndOpacity(FLinearColor::Black);
+	Text_CooldownRemain->SetJustification(ETextJustify::Center);
+	Text_CooldownRemain->SetVisibility(ESlateVisibility::Hidden);
+	if (UOverlaySlot* CooldownTextSlot = Overlay->AddChildToOverlay(Text_CooldownRemain))
+	{
+		CooldownTextSlot->SetHorizontalAlignment(HAlign_Center);
+		CooldownTextSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	Image_Flash = WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Image_Flash"));
+	Image_Flash->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.f));
+	Image_Flash->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	if (UOverlaySlot* FlashSlot = Overlay->AddChildToOverlay(Image_Flash))
+	{
+		FlashSlot->SetHorizontalAlignment(HAlign_Fill);
+		FlashSlot->SetVerticalAlignment(VAlign_Fill);
+	}
 
 	Text_Quantity = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Text_Quantity"));
 	Text_Quantity->SetColorAndOpacity(FSlateColor(FLinearColor::White));
@@ -224,6 +263,44 @@ void UPDNewQuickSlotItemWidget::RefreshVisuals()
 	}
 }
 
+void UPDNewQuickSlotItemWidget::SetWeaponCooldownUI(bool bActive, float RemainingTime)
+{
+	const bool bVisible = bActive && RemainingTime > 0.f;
+
+	if (Image_CooldownOverlay)
+	{
+		Image_CooldownOverlay->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+	}
+
+	if (Text_CooldownRemain)
+	{
+		Text_CooldownRemain->SetVisibility(bVisible ? ESlateVisibility::SelfHitTestInvisible : ESlateVisibility::Hidden);
+		Text_CooldownRemain->SetText(bVisible ? FText::AsNumber(FMath::CeilToInt(RemainingTime)) : FText::GetEmpty());
+	}
+}
+
+void UPDNewQuickSlotItemWidget::ClearWeaponCooldownUI()
+{
+	SetWeaponCooldownUI(false, 0.f);
+}
+
+void UPDNewQuickSlotItemWidget::PlayCooldownReadyFlash()
+{
+	if (!Image_Flash)
+	{
+		return;
+	}
+
+	if (Anim_CooldownReadyFlash)
+	{
+		StopAnimation(Anim_CooldownReadyFlash);
+		PlayAnimation(Anim_CooldownReadyFlash);
+		return;
+	}
+
+	Image_Flash->SetColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.f));
+}
+
 UPDInventoryComponent* UPDNewQuickSlotItemWidget::FindInventoryComponent() const
 {
 	if (APawn* Pawn = GetOwningPlayerPawn())
@@ -235,7 +312,6 @@ UPDInventoryComponent* UPDNewQuickSlotItemWidget::FindInventoryComponent() const
 
 UPDStashComponent* UPDNewQuickSlotItemWidget::FindStashComponent() const
 {
-	// stash 인터페이스가 열려있을 때만 유효. PC가 ActiveStashComponent를 캐시.
 	if (APDPlayerController* PC = Cast<APDPlayerController>(GetOwningPlayer()))
 	{
 		return PC->GetActiveStashComponent();

@@ -12,7 +12,7 @@ class UScrollBox;
 class UTextBlock;
 class UVerticalBox;
 class UPDInventoryComponent;
-class UPDInventorySlotWidget;
+class UPDEquipmentListItemWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDEquipmentModificationWidget : public UUserWidget
@@ -40,61 +40,25 @@ protected:
 	virtual void NativeDestruct() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	TSubclassOf<UPDInventorySlotWidget> EquipmentSlotWidgetClass;
+	TSubclassOf<UPDEquipmentListItemWidget> EquipmentListItemWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ScrollBoxEquipmentListWidgetName = TEXT("ScrollBox_EquipmentList");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ImageSelectedItemIconWidgetName = TEXT("Image_SelectedItemIcon");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextSelectedItemNameWidgetName = TEXT("Text_SelectedItemName");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextCurrentLevelWidgetName = TEXT("Text_CurrentLevel");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextTargetLevelWidgetName = TEXT("Text_TargetLevel");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextStatTypeWidgetName = TEXT("Text_StatType");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextStatPreviewWidgetName = TEXT("Text_StatPreview");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextGoldCostWidgetName = TEXT("Text_GoldCost");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName VerticalBoxRequiredMaterialsWidgetName = TEXT("VerticalBox_RequiredMaterials");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextBaseSuccessRateWidgetName = TEXT("Text_BaseSuccessRate");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextBoostSuccessRateWidgetName = TEXT("Text_BoostSuccessRate");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextFinalSuccessRateWidgetName = TEXT("Text_FinalSuccessRate");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ButtonBoostNoneWidgetName = TEXT("Button_Boost_None");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ButtonBoostLowWidgetName = TEXT("Button_Boost_Low");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ButtonBoostMidWidgetName = TEXT("Button_Boost_Mid");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ButtonBoostHighWidgetName = TEXT("Button_Boost_High");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName ButtonModifyWidgetName = TEXT("Button_Modify");
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Widget")
-	FName TextResultWidgetName = TEXT("Text_Result");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Equipment Modification|Format")
 	FText EmptySelectionText = FText::FromString(TEXT("장비를 선택하세요"));
@@ -104,7 +68,6 @@ protected:
 
 private:
 	void ResolveComponents();
-	void ResolveWidgets();
 	void BindWidgetEvents();
 	void UnbindWidgetEvents();
 	void BindComponentEvents();
@@ -114,7 +77,6 @@ private:
 	void ApplyPreview(const FPDModificationPreview& Preview, const FPDInventorySlot& SlotData);
 	void RefreshMaterialList(const FPDModificationPreview& Preview);
 	void SetText(UTextBlock* TextBlock, const FText& Text) const;
-	void SetTextByName(FName WidgetName, const FText& Text) const;
 	int32 CountItem(FName ItemID) const;
 	FText GetResultText(EPDModificationResult Result, bool bSuccess) const;
 	FText FormatPercent(float Rate) const;
@@ -127,7 +89,7 @@ private:
 	void HandleModificationFinished(int32 InventorySlotIndex, int32 NewModificationLevel, bool bSuccess, EPDModificationResult Result);
 
 	UFUNCTION()
-	void HandleEquipmentSlotClicked(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
+	void HandleEquipmentListItemClicked(UPDEquipmentListItemWidget* ItemWidget, int32 SlotIndex);
 
 	UFUNCTION()
 	void HandleBoostNoneClicked();
@@ -150,59 +112,59 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDEquipmentModificationComponent> ModificationComponent;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UScrollBox> ScrollBoxEquipmentList;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UScrollBox> ScrollBox_EquipmentList;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageSelectedItemIcon;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UImage> Image_SelectedItemIcon;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextSelectedItemName;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_SelectedItemName;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextCurrentLevel;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_CurrentLevel;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextTargetLevel;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_TargetLevel;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextStatType;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_StatType;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextStatPreview;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_StatPreview;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextGoldCost;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_GoldCost;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UVerticalBox> VerticalBoxRequiredMaterials;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UVerticalBox> VerticalBox_RequiredMaterials;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextBaseSuccessRate;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_BaseSuccessRate;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextBoostSuccessRate;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_BoostSuccessRate;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextFinalSuccessRate;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_FinalSuccessRate;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> ButtonBoostNone;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UButton> Button_Boost_None;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> ButtonBoostLow;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UButton> Button_Boost_Low;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> ButtonBoostMid;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UButton> Button_Boost_Mid;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> ButtonBoostHigh;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UButton> Button_Boost_High;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UButton> ButtonModify;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UButton> Button_Modify;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextResult;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UTextBlock> Text_Result;
 
 	int32 SelectedSlotIndex = INDEX_NONE;
 	EPDModificationBoostType SelectedBoostType = EPDModificationBoostType::None;

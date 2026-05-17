@@ -12,6 +12,7 @@
 #include "Widgets/HUD/PDActionPromptListWidget.h"
 #include "Widgets/HUD/PDAttributeBarWidget.h"
 #include "Widgets/HUD/PDBodyPartHealthGroupWidget.h"
+#include "Widgets/HUD/PDCircularProgressWidget.h"
 #include "Widgets/HUD/PDGasMaskWidget.h"
 #include "Widgets/HUD/PDNewQuickSlotBarWidget.h"
 #include "Widgets/HUD/PDDebuffIconBarWidget.h"
@@ -41,6 +42,7 @@ void UPDHUDWidget::NativeOnActivated()
 
 void UPDHUDWidget::NativeOnDeactivated()
 {
+	RefreshUseProgressBinding(nullptr);
 	RebindToASC(nullptr);
 	Super::NativeOnDeactivated();
 }
@@ -267,16 +269,76 @@ void UPDHUDWidget::SetCrosshairVisible(bool bVisible)
 
 void UPDHUDWidget::RefreshNewQuickSlots()
 {
-	if (!Bar_NewQuickSlots)
+	UPDQuickSlotComponent* QuickSlotComponent = FindOwningQuickSlotComponent();
+
+	if (Bar_NewQuickSlots)
+	{
+		Bar_NewQuickSlots->BindQuickSlotComponent(QuickSlotComponent);
+	}
+
+	RefreshUseProgressBinding(QuickSlotComponent);
+}
+
+UPDQuickSlotComponent* UPDHUDWidget::FindOwningQuickSlotComponent() const
+{
+	if (APawn* Pawn = GetOwningPlayerPawn())
+	{
+		return Pawn->FindComponentByClass<UPDQuickSlotComponent>();
+	}
+	return nullptr;
+}
+
+void UPDHUDWidget::RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent)
+{
+	UPDQuickSlotComponent* Old = CachedQuickSlot.Get();
+	if (Old == NewComponent)
 	{
 		return;
 	}
 
-	UPDQuickSlotComponent* QuickSlotComponent = nullptr;
-	if (APawn* Pawn = GetOwningPlayerPawn())
+	if (Old)
 	{
-		QuickSlotComponent = Pawn->FindComponentByClass<UPDQuickSlotComponent>();
+		Old->OnConsumableUseStarted.RemoveDynamic(this, &UPDHUDWidget::HandleConsumableUseStarted);
+		Old->OnConsumableUseCanceled.RemoveDynamic(this, &UPDHUDWidget::HandleConsumableUseCanceled);
+		Old->OnConsumableUseCompleted.RemoveDynamic(this, &UPDHUDWidget::HandleConsumableUseCompleted);
 	}
 
-	Bar_NewQuickSlots->BindQuickSlotComponent(QuickSlotComponent);
+	// 이전 구독 해제 후 활성 채널링이 있었다면 시각적 잔상 제거.
+	if (WBP_UseProgress && WBP_UseProgress->IsRunning())
+	{
+		WBP_UseProgress->StopProgress();
+	}
+
+	CachedQuickSlot = NewComponent;
+
+	if (NewComponent)
+	{
+		NewComponent->OnConsumableUseStarted.AddUniqueDynamic(this, &UPDHUDWidget::HandleConsumableUseStarted);
+		NewComponent->OnConsumableUseCanceled.AddUniqueDynamic(this, &UPDHUDWidget::HandleConsumableUseCanceled);
+		NewComponent->OnConsumableUseCompleted.AddUniqueDynamic(this, &UPDHUDWidget::HandleConsumableUseCompleted);
+	}
+}
+
+void UPDHUDWidget::HandleConsumableUseStarted(int32 SlotIndex, FPDItemData ItemData, float Duration)
+{
+	if (WBP_UseProgress)
+	{
+		WBP_UseProgress->StartProgress(Duration);
+	}
+}
+
+void UPDHUDWidget::HandleConsumableUseCanceled(int32 SlotIndex, FPDItemData ItemData)
+{
+	if (WBP_UseProgress)
+	{
+		WBP_UseProgress->StopProgress();
+	}
+}
+
+void UPDHUDWidget::HandleConsumableUseCompleted(int32 SlotIndex, FPDItemData ItemData)
+{
+	if (WBP_UseProgress)
+	{
+		WBP_UseProgress->CompleteProgress();
+	}
 }

@@ -2,6 +2,7 @@
 #include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
+#include "Kismet/GameplayStatics.h"
 
 UPDRollAbility::UPDRollAbility()
 {
@@ -36,6 +37,9 @@ void UPDRollAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 
 	if (ASC)
 		ASC->AddLooseGameplayTag(PDGameplayTags::State_Rolling);
+
+	if (RollSound)
+		UGameplayStatics::SpawnSoundAttached(RollSound, Character->GetMesh());
 
 	BP_OnActivate(RollDir);
 }

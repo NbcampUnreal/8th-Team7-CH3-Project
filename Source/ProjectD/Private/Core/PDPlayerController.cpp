@@ -88,10 +88,12 @@ void APDPlayerController::SetupInputComponent()
 		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
 		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
 		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
-		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
-		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
-		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
-		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
+		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnQuickslot1);
+		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnQuickslot2);
+		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnQuickslot3);
+		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnQuickslot4);
+		InputComponent->BindKey(EKeys::Five, IE_Pressed, this, &APDPlayerController::OnQuickslot5);
+		InputComponent->BindKey(EKeys::Six, IE_Pressed, this, &APDPlayerController::OnQuickslot6);
 		return;
 	}
 
@@ -142,7 +144,7 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Reload,
 		ETriggerEvent::Started, this, &APDPlayerController::OnReload);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot1,
-		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);
+		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot1);	
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot2,
 		ETriggerEvent::Started, this, &APDPlayerController::OnSwitchSlot2);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_SwitchSlot3,
@@ -176,6 +178,12 @@ void APDPlayerController::SetupInputComponent()
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot5);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot6,
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot6);
+
+	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_CancelConsumableUse))
+	{
+		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_CancelConsumableUse,
+			ETriggerEvent::Started, this, &APDPlayerController::OnCancelConsumableUse);
+	}
 
 	if (PingInputComp && InputConfig)
 	{
@@ -1004,12 +1012,9 @@ void APDPlayerController::UpdateAimRotation()
 	if (!AimDirection.IsNearlyZero())
 	{
 		FRotator AimRot = AimDirection.Rotation();
-		AimRot.Yaw += RecoilYawOffset; // 반동만큼 에임 방향 틀어짐
+		AimRot.Yaw += RecoilYawOffset;
+		SetControlRotation(AimRot);
 		ControlledPawn->SetActorRotation(AimRot);
-
-		DrawDebugLine(GetWorld(), ControlledPawn->GetActorLocation(),
-			ControlledPawn->GetActorLocation() + AimDirection.GetSafeNormal() * 200.f,
-			FColor::Blue, false, 0.1f, 0, 2.f);
 	}
 }
 
@@ -1035,32 +1040,51 @@ void APDPlayerController::OnUseQuickSlot4()
 
 void APDPlayerController::OnQuickslot1()
 {
-	SelectQuickslot(0);
+	UseQuickSlot(0);
 }
 
 void APDPlayerController::OnQuickslot2()
 {
-	SelectQuickslot(1);
+	UseQuickSlot(1);
 }
 
 void APDPlayerController::OnQuickslot3()
 {
-	SelectQuickslot(2);
+	UseQuickSlot(2);
 }
 
 void APDPlayerController::OnQuickslot4()
 {
-	SelectQuickslot(3);
+	UseQuickSlot(3);
 }
 
 void APDPlayerController::OnQuickslot5()
 {
-	SelectQuickslot(4);
+	UseQuickSlot(4);
 }
 
 void APDPlayerController::OnQuickslot6()
 {
-	SelectQuickslot(5);
+	UseQuickSlot(5);
+}
+
+void APDPlayerController::OnCancelConsumableUse()
+{
+	if (IsGameplayInputBlockedByModalUI())
+	{
+		return;
+	}
+
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		QuickSlotComponent->CancelConsumableUse();
+	}
 }
 
 void APDPlayerController::SelectQuickslot(int32 Index)
@@ -1155,6 +1179,11 @@ void APDPlayerController::OnInteract()
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn) return;
 
+	if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+	{
+		QuickSlotComponent->CancelConsumableUse();
+	}
+
 	TArray<AActor*> OverlappingActors;
 	ControlledPawn->GetOverlappingActors(OverlappingActors);
 
@@ -1187,6 +1216,14 @@ void APDPlayerController::OnFirePressed()
 
 	if (UPDPingSubsystem* PingSys = GetWorld()->GetSubsystem<UPDPingSubsystem>())
 		if (PingSys->IsPingActive()) return;
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		if (UPDQuickSlotComponent* QuickSlotComponent = ControlledPawn->FindComponentByClass<UPDQuickSlotComponent>())
+		{
+			QuickSlotComponent->CancelConsumableUse();
+		}
+	}
 
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))

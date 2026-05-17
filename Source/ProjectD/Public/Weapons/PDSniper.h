@@ -1,5 +1,3 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -13,42 +11,42 @@ UCLASS(Blueprintable)
 class PROJECTD_API APDSniper : public APDRangedWeaponBase
 {
 	GENERATED_BODY()
-	
+
 public:
     APDSniper();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     TSubclassOf<APDProjectile> ProjectileClass;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Sniper")
+    /** 볼트 액션 (무기 메시) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
     TObjectPtr<UAnimMontage> BoltActionMontage;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     TArray<bool> PenetrationPerLevel = { false, false, true };
 
-    // 줌 (저격총 전용)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    // ── 줌 ───────────────────────────────────────────────────────────────────
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Zoom")
     float DefaultFOV = 90.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Zoom")
     float ZoomedFOV = 40.f;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|Zoom")
     bool bIsZoomed = false;
 
 public:
-    UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
+    UPROPERTY(BlueprintAssignable, Category="Weapon")
     FOnScopeToggled OnScopeToggled;
 
-    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Sniper")
+    UFUNCTION(BlueprintCallable, Category="Weapon")
     void ToggleZoom();
 
-    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Sniper")
+    UFUNCTION(BlueprintPure, Category="Weapon")
     FORCEINLINE bool IsZoomed() const { return bIsZoomed; }
-    
+
     virtual void Fire_Implementation() override;
-    virtual void Reload_Implementation() override;
 
 private:
     bool CanPenetrate() const;

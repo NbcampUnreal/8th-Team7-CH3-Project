@@ -238,6 +238,7 @@ private:
 	void OnQuickslot4();
 	void OnQuickslot5();
 	void OnQuickslot6();
+	void OnCancelConsumableUse();
 	void SelectQuickslot(int32 Index);
 	void OnToggleFireMode();
 	void OnDropWeapon();

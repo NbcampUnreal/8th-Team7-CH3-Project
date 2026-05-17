@@ -10,6 +10,7 @@
 
 class APDWeaponBase;
 class USphereComponent;
+class USoundBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnWeaponLevelChanged, APDWeaponBase*, Weapon, int32, NewLevel);
 
@@ -25,97 +26,90 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Weapon|Component")
+	// ── 컴포넌트 ──────────────────────────────────────────────────────────────
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
 	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon|Component")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon")
 	TObjectPtr<USphereComponent> PickupCollision;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Config")
-	EWeaponType WeaponType = EWeaponType::None;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Stats")
-	TArray<FWeaponLevelStats> LevelStats;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|GAS")
+	// ── 설정 ──────────────────────────────────────────────────────────────────
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
 	FGameplayTag WeaponTypeTag;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Animation")
-	TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Weapon|Animation")
-	FName LeftHandGripSocket = TEXT("LeftHandGrip");
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon|State")
-	int32 CurrentLevel = 1;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="PD|Weapon|State")
-	bool bIsDropped = false;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Weapon")
-	TWeakObjectPtr<AActor> WeaponOwner;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="PD|Weapon|Item")
+	/** 인벤토리 아이템 ID. DT_Items 행 이름과 일치해야 함. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Weapon")
 	FName ItemID;
 
+	/** 무기 장착 시 링크할 애님 레이어 클래스. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
+	TSubclassOf<UAnimInstance> WeaponAnimLayerClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
+	FName LeftHandGripSocket = TEXT("LeftHandGrip");
+
+	/** 레벨별 스탯 배열. [0]=Lv1, [1]=Lv2 … */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Stats")
+	TArray<FWeaponLevelStats> LevelStats;
+
+	/** 무기 꺼낼 때 재생 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|FX")
+	TObjectPtr<USoundBase> EquipSound;
+
+	// C++ 서브클래스 생성자에서 설정. 에디터 미노출 (태그로 대체 예정)
+	EWeaponType WeaponType = EWeaponType::None;
+
+	// ── 런타임 상태 (읽기 전용) ───────────────────────────────────────────────
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	int32 CurrentLevel = 1;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	bool bIsDropped = false;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	TWeakObjectPtr<AActor> WeaponOwner;
+
 public:
-	UPROPERTY(BlueprintAssignable, Category="PD|Weapon|Events")
+	UPROPERTY(BlueprintAssignable, Category="Weapon")
 	FOnWeaponLevelChanged OnWeaponLevelChanged;
 
-	UFUNCTION(BlueprintImplementableEvent, Category="PD|Weapon")
+	UFUNCTION(BlueprintImplementableEvent, Category="Weapon")
 	void OnPickupFailed();
 
-public:
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Weapon")
 	void Fire();
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Weapon")
 	void Reload();
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Weapon")
 	void OnEquip(AActor* NewOwner);
 
-	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category="Weapon")
 	void OnUnequip();
 
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
-	UFUNCTION(BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintCallable, Category="Weapon")
 	void UpgradeLevel();
 
-	UFUNCTION(BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintCallable, Category="Weapon")
 	void SetLevel(int32 NewLevel);
 
-	UFUNCTION(BlueprintCallable, Category="PD|Weapon")
+	UFUNCTION(BlueprintCallable, Category="Weapon")
 	void SetDropped(bool bDropped);
 
-	UFUNCTION(BlueprintPure, Category="PD|Weapon")
+	UFUNCTION(BlueprintPure, Category="Weapon")
 	const FWeaponLevelStats& GetCurrentStats() const;
 
-	UFUNCTION(BlueprintPure, Category="PD|Weapon")
-	FORCEINLINE int32 GetCurrentLevel() const { return CurrentLevel; }
-
-UFUNCTION(BlueprintPure, Category="PD|Weapon")
-	FORCEINLINE EWeaponType GetWeaponType() const { return WeaponType; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon")
-	FORCEINLINE AActor* GetWeaponOwner() const { return WeaponOwner.Get(); }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon")
-	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon|GAS")
-	FORCEINLINE FGameplayTag GetWeaponTypeTag() const { return WeaponTypeTag; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
+	FORCEINLINE int32              GetCurrentLevel()        const { return CurrentLevel; }
+	FORCEINLINE EWeaponType        GetWeaponType()          const { return WeaponType; }  // C++ 내부용, 태그로 대체 예정
+	FORCEINLINE AActor*            GetWeaponOwner()         const { return WeaponOwner.Get(); }
+	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh()     const { return WeaponMesh; }
+	FORCEINLINE FGameplayTag       GetWeaponTypeTag()       const { return WeaponTypeTag; }
 	FORCEINLINE TSubclassOf<UAnimInstance> GetWeaponAnimLayerClass() const { return WeaponAnimLayerClass; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon|Animation")
-	FORCEINLINE FName GetLeftHandGripSocket() const { return LeftHandGripSocket; }
-
-	UFUNCTION(BlueprintPure, Category="PD|Weapon|Item")
-	FORCEINLINE FName GetItemID() const { return ItemID; }
+	FORCEINLINE FName              GetLeftHandGripSocket()  const { return LeftHandGripSocket; }
+	FORCEINLINE FName              GetItemID()              const { return ItemID; }
 
 protected:
 	FVector GetAimDirectionFromOwner(const FVector& StartLocation) const;

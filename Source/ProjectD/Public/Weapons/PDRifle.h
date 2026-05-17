@@ -18,20 +18,19 @@ public:
     APDRifle();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Rifle")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
     EFireMode FireMode = EFireMode::Auto;
 
 public:
-    UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
+    UPROPERTY(BlueprintAssignable, Category = "Weapon")
     FOnFireModeChanged OnFireModeChanged;
 
     virtual void Fire_Implementation() override;
-    virtual void Reload_Implementation() override;
 
-    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Rifle")
+    UFUNCTION(BlueprintCallable, Category = "Weapon")
     void ToggleFireMode();
 
-    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Rifle")
+    UFUNCTION(BlueprintPure, Category = "Weapon")
     FORCEINLINE EFireMode GetFireMode() const { return FireMode; }
 
 private:

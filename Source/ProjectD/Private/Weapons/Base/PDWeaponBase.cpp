@@ -1,4 +1,5 @@
 #include "Weapons/Base/PDWeaponBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "Characters/PDPlayerCharacter.h"
 
 #include "Components/SkeletalMeshComponent.h"
@@ -62,6 +63,9 @@ void APDWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 	SetOwner(NewOwner);
 	WeaponMesh->SetSimulatePhysics(false);
 	PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	if (EquipSound)
+		UGameplayStatics::SpawnSoundAttached(EquipSound, WeaponMesh);
 }
 
 void APDWeaponBase::OnUnequip_Implementation()

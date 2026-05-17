@@ -1,4 +1,5 @@
 ﻿#include "Characters/Base/PDCharacterBase.h"
+#include "Animation/PDAnimInstance.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffectTypes.h"
 #include "GameplayTagContainer.h"
@@ -154,6 +155,12 @@ void APDCharacterBase::HandleDeath(AActor* Killer)
 			GM->OnPlayerDied(PC, Killer);
 		}
 	}
+}
+
+void APDCharacterBase::OnDamageTaken()
+{
+	if (UPDAnimInstance* AI = Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()))
+		AI->PlayHitReaction();
 }
 
 void APDCharacterBase::AttachActorToWeaponSocket(AActor* ActorToAttach)

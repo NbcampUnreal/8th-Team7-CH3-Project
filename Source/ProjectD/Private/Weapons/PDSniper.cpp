@@ -1,15 +1,16 @@
 #include "Weapons/PDSniper.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 
 APDSniper::APDSniper()
 {
     WeaponType = EWeaponType::Sniper;
 
     DefaultFOV = 90.f;
-    ZoomedFOV = 40.f;
+    ZoomedFOV  = 40.f;
 
-    LevelStats.Add({ 80.f, 1.5f,  8000.f, 5, 3.0f, 1.0f }); // Lv1
+    LevelStats.Add({ 80.f,  1.5f,  8000.f, 5, 3.0f, 1.0f }); // Lv1
     LevelStats.Add({ 120.f, 1.3f, 10000.f, 5, 2.7f, 1.0f }); // Lv2
     LevelStats.Add({ 180.f, 1.2f, 15000.f, 5, 2.5f, 1.0f }); // Lv3
 }
@@ -24,8 +25,8 @@ void APDSniper::Fire_Implementation()
     }
 
     PlayFireEffects();
+    SpawnCartridge();
     SpawnProjectile(CanPenetrate());
-    PostFire();
 
     if (BoltActionMontage)
     {
@@ -38,44 +39,26 @@ void APDSniper::Fire_Implementation()
             AnimInst->Montage_SetEndDelegate(EndDelegate, BoltActionMontage);
         }
     }
-}
 
-void APDSniper::Reload_Implementation()
-{
-    if (bIsReloading) return;
-    if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-
-    bIsReloading = true;
-
-    if (ReloadMontage)
-    {
-        PlayWeaponMontage(ReloadMontage);
-        BindMontageEndedForReload(ReloadMontage);
-    }
-    else
-    {
-        GetWorldTimerManager().SetTimer(
-            ReloadHandle, this,
-            &APDRangedWeaponBase::FinishReload,
-            GetCurrentStats().ReloadTime, false);
-    }
+    PostFire();
 }
 
 void APDSniper::OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
+    // 볼트 액션 완료 후 처리 필요 시 여기서
 }
 
 void APDSniper::ToggleZoom()
 {
     bIsZoomed = !bIsZoomed;
 
-    AActor* WeaponOwnerActor = GetWeaponOwner();
-    if (!WeaponOwnerActor) return;
+    APlayerController* PC = nullptr;
+    if (APawn* OwnerPawn = Cast<APawn>(GetWeaponOwner()))
+        PC = Cast<APlayerController>(OwnerPawn->GetController());
 
-    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
-    if (!PC || !PC->PlayerCameraManager) return;
+    if (PC && PC->PlayerCameraManager)
+        PC->PlayerCameraManager->SetFOV(bIsZoomed ? ZoomedFOV : DefaultFOV);
 
-    PC->PlayerCameraManager->SetFOV(bIsZoomed ? ZoomedFOV : DefaultFOV);
     OnScopeToggled.Broadcast(bIsZoomed);
 }
 
@@ -88,14 +71,12 @@ void APDSniper::SpawnProjectile(bool bPenetrate)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
 
-    FVector Forward = GetAimDirection();
-    FRotator SpawnRot = Forward.Rotation();
+    FRotator SpawnRot = GetAimDirection().Rotation();
 
     FActorSpawnParameters SpawnParams;
-    SpawnParams.Owner = this;
-    SpawnParams.Instigator = GetInstigator();
-    SpawnParams.SpawnCollisionHandlingOverride =
-        ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    SpawnParams.Owner       = this;
+    SpawnParams.Instigator  = Cast<APawn>(WeaponOwnerActor);
+    SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     APDProjectile* Projectile = GetWorld()->SpawnActor<APDProjectile>(
         ProjectileClass, Start, SpawnRot, SpawnParams);
@@ -118,5 +99,6 @@ FVector APDSniper::GetAimDirection() const
 
 bool APDSniper::CanPenetrate() const
 {
-    return PenetrationPerLevel[FMath::Clamp(CurrentLevel - 1, 0, PenetrationPerLevel.Num() - 1)];
+    int32 Idx = FMath::Clamp(CurrentLevel - 1, 0, PenetrationPerLevel.Num() - 1);
+    return PenetrationPerLevel[Idx];
 }
