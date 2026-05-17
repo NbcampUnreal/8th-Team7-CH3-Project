@@ -111,7 +111,7 @@ void UPDLoadingScreenSubsystem::HandlePostLoadMapWithWorld(UWorld* LoadedWorld)
 	{
 		return;
 	}
-	
+
 	bHolding = true;
 	HoldElapsed = 0.f;
 }

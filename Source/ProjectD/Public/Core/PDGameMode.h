@@ -6,6 +6,7 @@
 #include "PDGameMode.generated.h"
 
 class APDPlayerController;
+class UPDActivatableBase;
 
 UCLASS(abstract)
 class PROJECTD_API APDGameMode : public AGameModeBase
@@ -34,6 +35,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid", meta=(ClampMin="0.0"))
 	float DeathToTravelDelay = 3.0f;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="PD|Raid")
+	TSubclassOf<UPDActivatableBase> DeathScreenClass;
+
 	void SetRaidState(ERaidState NewState);
 
 	UFUNCTION(BlueprintImplementableEvent, Category="PD|Raid")
@@ -43,9 +47,6 @@ protected:
 	void OnRaidEnded(bool bSuccess);
 
 private:
-	void HandleDeathTravel();
-	FTimerHandle DeathTravelTimerHandle;
-
 	void InitializePlayerInventoryFromLoadout(APlayerController* PC);
 	void TransferPlayerInventoryToStash(APlayerController* PC);
 };

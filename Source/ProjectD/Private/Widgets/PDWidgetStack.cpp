@@ -4,6 +4,7 @@
 #include "Widgets/PDWidgetStack.h"
 
 #include "Components/Overlay.h"
+#include "Components/OverlaySlot.h"
 #include "Widgets/PDActivatableBase.h"
 
 UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenClass)
@@ -22,7 +23,11 @@ UPDActivatableBase* UPDWidgetStack::Push(TSubclassOf<UPDActivatableBase> ScreenC
 	UPDActivatableBase* NewScreen = CreateWidget<UPDActivatableBase>(GetOwningPlayer(), ScreenClass);
 	if (!NewScreen) return nullptr;
 
-	ContentRoot->AddChildToOverlay(NewScreen);
+	if (UOverlaySlot* OverlaySlot = ContentRoot->AddChildToOverlay(NewScreen))
+	{
+		OverlaySlot->SetHorizontalAlignment(HAlign_Fill);
+		OverlaySlot->SetVerticalAlignment(VAlign_Fill);
+	}
 	NewScreen->SetVisibility(ESlateVisibility::Visible);
 	NewScreen->Activate();
 	Stack.Add(NewScreen);
