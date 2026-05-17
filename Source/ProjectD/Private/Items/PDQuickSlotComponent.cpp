@@ -4,6 +4,8 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDStashComponent.h"
+#include "Items/PDItemSoundLibrary.h"
+#include "Components/AudioComponent.h"
 
 #include "GameFramework/Actor.h"
 #include "GameFramework/Character.h"
@@ -368,6 +370,7 @@ int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 		TargetSlot.ItemData = ItemData;
 		TargetSlot.Quantity = 1;
 		TargetSlot.bIsEmpty = false;
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnQuickSlotsChanged.Broadcast();
 		return 1;
 	}
@@ -375,6 +378,7 @@ int32 UPDQuickSlotComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(TargetSlot, ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		SyncQuickSlotsWithInventory();
 		OnQuickSlotsChanged.Broadcast();
 	}
@@ -412,6 +416,7 @@ bool UPDQuickSlotComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 	}
 
 	Swap(QuickSlotItems[SourceSlotIndex], QuickSlotItems[TargetSlotIndex]);
+	UPDItemSoundLibrary::PlayItemMoveSound(this, SourceSlot.ItemData);
 	SyncQuickSlotsWithInventory();
 	OnQuickSlotsChanged.Broadcast();
 	return true;
@@ -456,6 +461,7 @@ bool UPDQuickSlotComponent::StoreInventorySlotQuantityToSlot(UPDInventoryCompone
 	TargetSlot.Quantity = SourceSlot.ItemData.ItemType == EPDItemType::Equipment ? 1 : FMath::Max(1, GetInventoryItemQuantity(SourceSlot.ItemData.ItemID));
 	TargetSlot.bIsEmpty = false;
 
+	UPDItemSoundLibrary::PlayItemMoveSound(this, SourceSlot.ItemData);
 	SyncQuickSlotsWithInventory();
 	OnQuickSlotsChanged.Broadcast();
 	return true;
@@ -558,11 +564,6 @@ bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
 
 	if (IsConsumableQuickSlot(SlotIndex))
 	{
-		if (bIsUsingConsumable && UsingConsumableSlotIndex == SlotIndex)
-		{
-			return CancelConsumableUse();
-		}
-
 		if (bIsUsingConsumable)
 		{
 			return false;
@@ -649,6 +650,7 @@ bool UPDQuickSlotComponent::BeginConsumableUse(int32 SlotIndex, const FPDInvento
 	{
 		if (ConsumeItem(Slot))
 		{
+			UPDItemSoundLibrary::PlayConsumableUseSound(this, Slot.ItemData);
 			if (QuickSlotItems.IsValidIndex(SlotIndex))
 			{
 				SetSelectedIndex(SlotIndex);
@@ -671,6 +673,7 @@ bool UPDQuickSlotComponent::BeginConsumableUse(int32 SlotIndex, const FPDInvento
 	ConsumableUseStartTime = World->GetTimeSeconds();
 	ConsumableUseEndTime = ConsumableUseStartTime + Duration;
 
+	StartConsumableUseSound(Slot.ItemData);
 	ApplyConsumableMoveSpeed();
 	World->GetTimerManager().SetTimer(ConsumableUseTimerHandle, this, &UPDQuickSlotComponent::FinishConsumableUse, Duration, false);
 	if (QuickSlotItems.IsValidIndex(SlotIndex))
@@ -697,6 +700,7 @@ void UPDQuickSlotComponent::FinishConsumableUse()
 	ConsumableUseEndTime = 0.f;
 	PendingConsumableSlot.Clear();
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 
 	if (ConsumeItem(CompletedSlot))
 	{
@@ -710,6 +714,24 @@ void UPDQuickSlotComponent::FinishConsumableUse()
 
 	SyncQuickSlotsWithInventory();
 	OnQuickSlotsChanged.Broadcast();
+}
+
+
+void UPDQuickSlotComponent::StartConsumableUseSound(const FPDItemData& ItemData)
+{
+	StopConsumableUseSound();
+	ConsumableUseAudioComponent = UPDItemSoundLibrary::SpawnConsumableUseSound(this, ItemData);
+}
+
+void UPDQuickSlotComponent::StopConsumableUseSound()
+{
+	if (!ConsumableUseAudioComponent)
+	{
+		return;
+	}
+
+	ConsumableUseAudioComponent->Stop();
+	ConsumableUseAudioComponent = nullptr;
 }
 
 bool UPDQuickSlotComponent::ConsumeItem(const FPDInventorySlot& Slot)
@@ -762,6 +784,7 @@ bool UPDQuickSlotComponent::CancelConsumableUse()
 	ConsumableUseStartTime = 0.f;
 	ConsumableUseEndTime = 0.f;
 	RestoreConsumableMoveSpeed();
+	StopConsumableUseSound();
 	OnConsumableUseCanceled.Broadcast(CanceledSlotIndex, CanceledItemData);
 	return true;
 }

@@ -2,6 +2,7 @@
 
 #include "Core/PDGameInstance.h"
 #include "Items/PDItemSlotTransfer.h"
+#include "Items/PDItemSoundLibrary.h"
 
 UPDStashComponent::UPDStashComponent()
 {
@@ -219,6 +220,7 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 				if (RemainingQuantity <= 0)
 				{
+					UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 					SaveToGameInstance();
 					OnStashChanged.Broadcast();
 					return AddedQuantity;
@@ -248,6 +250,7 @@ int32 UPDStashComponent::AddItemPartial(const FPDItemData& ItemData, int32 Quant
 
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
@@ -287,6 +290,7 @@ int32 UPDStashComponent::AddItemToSlotPartial(const FPDItemData& ItemData, int32
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(StashItems[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
@@ -306,9 +310,11 @@ bool UPDStashComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 Targ
 		return false;
 	}
 
+	const FPDItemData MovedItemData = StashItems[SourceSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[SourceSlotIndex], StashItems[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 	}
@@ -412,9 +418,11 @@ bool UPDStashComponent::StoreInventorySlotQuantityToSlot(UPDInventoryComponent* 
 		return false;
 	}
 
+	const FPDItemData MovedItemData = SourceInventory->Items[SourceSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(SourceInventory->Items[SourceSlotIndex], StashItems[TargetStashSlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		SourceInventory->OnInventoryChanged.Broadcast();
 		SaveToGameInstance();
 		OnStashChanged.Broadcast();
@@ -496,9 +504,11 @@ bool UPDStashComponent::TakeStashSlotQuantityToInventorySlot(UPDInventoryCompone
 		return false;
 	}
 
+	const FPDItemData MovedItemData = StashItems[StashSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(StashItems[StashSlotIndex], TargetInventory->Items[TargetInventorySlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		SaveToGameInstance();
 		OnStashChanged.Broadcast();
 		TargetInventory->OnInventoryChanged.Broadcast();

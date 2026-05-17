@@ -2,6 +2,7 @@
 
 #include "Characters/PDPlayerCharacter.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 
 UPDEquipmentComponent::UPDEquipmentComponent()
 {
@@ -164,6 +165,7 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 		InventoryComponent->Items[InventorySlotIndex].Clear();
 	}
 
+	UPDItemSoundLibrary::PlayItemMoveSound(this, EquippedSlot.ItemData);
 	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
@@ -195,6 +197,7 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 	NewEquippedItem.ItemSlot = NewSlot;
 	EquippedItems.Add(TargetSlotType, NewEquippedItem);
 
+	UPDItemSoundLibrary::PlayItemMoveSound(this, NewSlot.ItemData);
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, NewSlot);
 	return true;

@@ -3,6 +3,7 @@
 #include "Data/PDQuestComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
@@ -309,6 +310,7 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(Items[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -336,9 +338,11 @@ bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 		return false;
 	}
 
+	const FPDItemData MovedItemData = Items[SourceSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(Items[SourceSlotIndex], Items[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		OnInventoryChanged.Broadcast();
 	}
 
@@ -407,6 +411,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 				if (RemainingQuantity <= 0)
 				{
+					UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 					OnInventoryChanged.Broadcast();
 
 					if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -446,6 +451,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -492,6 +498,7 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 		Items[EmptySlot] = SourceSlot;
 		Items[EmptySlot].Quantity = FMath::Max(1, SourceSlot.Quantity);
 		Items[EmptySlot].bIsEmpty = false;
+		UPDItemSoundLibrary::PlayItemMoveSound(this, SourceSlot.ItemData);
 		OnInventoryChanged.Broadcast();
 		return Items[EmptySlot].Quantity;
 	}
