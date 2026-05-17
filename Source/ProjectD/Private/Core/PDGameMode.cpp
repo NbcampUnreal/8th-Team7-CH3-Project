@@ -3,7 +3,9 @@
 #include "Core/PDGameInstance.h"
 #include "Items/PDInventoryComponent.h"
 #include "GameFramework/Pawn.h"
-#include "TimerManager.h"
+#include "Subsystems/PDFrontendUISubsystem.h"
+#include "Type/Types.h"
+#include "Widgets/PDActivatableBase.h"
 
 APDGameMode::APDGameMode()
 {
@@ -45,17 +47,13 @@ void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 {
 	if (!PC) return;
 	EndRaid(false);
-	GetWorldTimerManager().SetTimer(
-		DeathTravelTimerHandle,
-		this, &APDGameMode::HandleDeathTravel,
-		DeathToTravelDelay, false);
-}
 
-void APDGameMode::HandleDeathTravel()
-{
-	if (UPDGameInstance* GI=GetGameInstance<UPDGameInstance>())
+	if (DeathScreenClass)
 	{
-		GI->TravelToBaseLevel(true);
+		if (UPDFrontendUISubsystem* UI = UPDFrontendUISubsystem::Get(this))
+		{
+			UI->PushToLayer(EUILayer::Frontend, DeathScreenClass);
+		}
 	}
 }
 
