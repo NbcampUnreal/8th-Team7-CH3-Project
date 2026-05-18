@@ -9,6 +9,7 @@
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Enemy/Components/PDPerceptionComponent.h"
 #include "Enemy/Components/PDCombatComponent.h"
+#include "GameFramework/Controller.h"
 #include "Enemy/Types/EnemyTypes.h"
 #include "Engine/World.h"
 #include "GenericTeamAgentInterface.h"
@@ -44,6 +45,28 @@ UPDPerceptionComponent* APDEnemyAIControllerBase::GetPDPerception() const
 	return Cast<UPDPerceptionComponent>(PerceptionComponent);
 }
 
+ETeamAttitude::Type APDEnemyAIControllerBase::GetTeamAttitudeTowards(const AActor& Other) const
+{
+	// 1) Pawn 자체 → 2) Pawn 의 Controller 순으로 팀 해석.
+	//    AAIController 디폴트는 Controller 우선이라 Pawn 점유 직후 타이밍에 NoTeam(255) 으로 평가될 수 있어
+	//    여기서는 Pawn 우선으로 뒤집어 안정성 확보.
+	const IGenericTeamAgentInterface* OtherTeam = Cast<IGenericTeamAgentInterface>(&Other);
+	if (!OtherTeam)
+	{
+		if (const APawn* OtherPawn = Cast<APawn>(&Other))
+		{
+			OtherTeam = Cast<IGenericTeamAgentInterface>(OtherPawn->GetController());
+		}
+	}
+	if (!OtherTeam) return ETeamAttitude::Neutral;
+
+	const FGenericTeamId MyId    = GetGenericTeamId();
+	const FGenericTeamId OtherId = OtherTeam->GetGenericTeamId();
+	if (MyId == FGenericTeamId::NoTeam || OtherId == FGenericTeamId::NoTeam) return ETeamAttitude::Neutral;
+
+	return (MyId == OtherId) ? ETeamAttitude::Friendly : ETeamAttitude::Hostile;
+}
+
 void APDEnemyAIControllerBase::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
@@ -56,18 +79,17 @@ void APDEnemyAIControllerBase::OnPossess(APawn* InPawn)
 		SetGenericTeamId(PawnTeam->GetGenericTeamId());
 	}
 
-	UE_LOG(LogPDAI, Log, TEXT("[%s] OnPossess: Pawn=%s, Perception=%s, BT=%s, TeamID=%u"),
-		*GetNameSafe(this),
-		*GetNameSafe(InPawn),
-		GetPDPerception() ? TEXT("OK") : TEXT("MISSING"),
-		BehaviorTreeAsset ? TEXT("OK") : TEXT("MISSING"),
-		GetGenericTeamId().GetId());
-
 	if (UPDPerceptionComponent* PDPerception = GetPDPerception())
 	{
 		PDPerception->OnTargetSpotted.AddDynamic(this, &APDEnemyAIControllerBase::HandleTargetSpotted);
 		PDPerception->OnTargetLost   .AddDynamic(this, &APDEnemyAIControllerBase::HandleTargetLost);
 		PDPerception->OnNoiseHeard   .AddDynamic(this, &APDEnemyAIControllerBase::HandleNoiseHeard);
+	}
+
+	// Squad 통보(NotifyAlliesInRadius) 등 외부 경로로 들어온 타겟도 BB 에 반영하도록 구독.
+	if (UPDCombatComponent* Combat = InPawn ? InPawn->FindComponentByClass<UPDCombatComponent>() : nullptr)
+	{
+		Combat->OnTargetChanged.AddDynamic(this, &APDEnemyAIControllerBase::HandleCombatTargetChanged);
 	}
 
 	StartBehaviorTree();
@@ -91,6 +113,14 @@ void APDEnemyAIControllerBase::OnUnPossess()
 		PDPerception->OnNoiseHeard   .RemoveAll(this);
 	}
 
+	if (APawn* OwnerPawn = GetPawn())
+	{
+		if (UPDCombatComponent* Combat = OwnerPawn->FindComponentByClass<UPDCombatComponent>())
+		{
+			Combat->OnTargetChanged.RemoveAll(this);
+		}
+	}
+
 	if (BehaviorTreeComponent)
 	{
 		BehaviorTreeComponent->StopTree(EBTStopMode::Safe);
@@ -99,30 +129,25 @@ void APDEnemyAIControllerBase::OnUnPossess()
 	Super::OnUnPossess();
 }
 
+void APDEnemyAIControllerBase::NotifyPawnDied()
+{
+	// 사망 즉시 의사결정 중단 — Perception 구독/팀ID는 보존(액터 소멸 시 OnUnPossess 가 일괄 해제).
+	if (BehaviorTreeComponent && BehaviorTreeComponent->IsRunning())
+	{
+		BehaviorTreeComponent->StopTree(EBTStopMode::Safe);
+	}
+}
+
 void APDEnemyAIControllerBase::StartBehaviorTree()
 {
-	if (!BehaviorTreeAsset)
-	{
-		UE_LOG(LogPDAI, Warning, TEXT("[%s] BehaviorTreeAsset 미지정 — BT 가 실행되지 않음."), *GetNameSafe(this));
-		return;
-	}
+	if (!BehaviorTreeAsset) return;
 
 	// RunBehaviorTree 는 BlackboardComponent 가 없으면 BT 자산의 BlackboardAsset 으로 생성/초기화.
-	if (RunBehaviorTree(BehaviorTreeAsset))
-	{
-		UE_LOG(LogPDAI, Log, TEXT("[%s] RunBehaviorTree OK."), *GetNameSafe(this));
-	}
-	else
-	{
-		UE_LOG(LogPDAI, Warning, TEXT("[%s] RunBehaviorTree 실패 — BT 자산의 Blackboard 설정 확인."), *GetNameSafe(this));
-	}
+	RunBehaviorTree(BehaviorTreeAsset);
 }
 
 void APDEnemyAIControllerBase::HandleTargetSpotted(AActor* Target)
 {
-	UE_LOG(LogPDAI, Log, TEXT("[%s] HandleTargetSpotted: Target=%s"),
-		*GetNameSafe(this), *GetNameSafe(Target));
-
 	// CombatComponent 결합은 AIController 가 담당 → BT 는 BB 만 보고 단순히 분기.
 	APawn* OwnerPawn = GetPawn();
 	if (UPDCombatComponent* Combat = OwnerPawn ? OwnerPawn->FindComponentByClass<UPDCombatComponent>() : nullptr)
@@ -167,6 +192,25 @@ void APDEnemyAIControllerBase::HandleTargetLost(AActor* Target, FVector LastKnow
 	OnTargetLost(Target, LastKnownLocation);
 }
 
+void APDEnemyAIControllerBase::HandleCombatTargetChanged(AActor* NewTarget)
+{
+	// Combat 측에서 타겟이 set/clear 될 때마다 BB 와 동기화.
+	// HandleTargetSpotted 가 Perception 발견 시 이미 BB 갱신을 하므로 이 경로는 멱등 처리.
+	// 의의: Squad 통보(NotifyAlliesInRadius) 등 Perception 을 거치지 않는 외부 경로의 타겟도 BT 에 반영.
+	UBlackboardComponent* BB = GetBlackboardComponent();
+	if (!BB) return;
+
+	if (NewTarget)
+	{
+		BB->SetValueAsObject(PDBTKeys::TargetActor, NewTarget);
+		BB->SetValueAsVector(PDBTKeys::LastSeenLocation, NewTarget->GetActorLocation());
+	}
+	else
+	{
+		BB->ClearValue(PDBTKeys::TargetActor);
+	}
+}
+
 void APDEnemyAIControllerBase::HandleNoiseHeard(AActor* NoiseInstigator, FVector Location)
 {
 	APawn* OwnerPawn = GetPawn();
@@ -174,9 +218,14 @@ void APDEnemyAIControllerBase::HandleNoiseHeard(AActor* NoiseInstigator, FVector
 
 	const bool bHasVisualTarget = Combat && Combat->HasValidTarget();
 
-	UE_LOG(LogPDAI, Log, TEXT("[%s] HandleNoiseHeard: Instigator=%s, Loc=%s, Suppressed(VisualTarget)=%s"),
-		*GetNameSafe(this), *GetNameSafe(NoiseInstigator), *Location.ToString(),
-		bHasVisualTarget ? TEXT("true") : TEXT("false"));
+	const uint8 SelfTeam        = GetGenericTeamId().GetId();
+	const uint8 InstigatorTeam  = FGenericTeamId::GetTeamIdentifier(NoiseInstigator).GetId();
+	const bool  bSameTeam       = (SelfTeam != FGenericTeamId::NoTeam)
+	                              && (InstigatorTeam != FGenericTeamId::NoTeam)
+	                              && (SelfTeam == InstigatorTeam);
+
+	// Affiliation 필터 통과 후라도 같은 팀이면 노이즈 힌트 갱신 차단.
+	if (bSameTeam) { OnNoiseHeard(NoiseInstigator, Location); return; }
 
 	// 시각 타겟이 있으면 청각은 정보가치 낮음 — skip.
 	if (bHasVisualTarget) { OnNoiseHeard(NoiseInstigator, Location); return; }

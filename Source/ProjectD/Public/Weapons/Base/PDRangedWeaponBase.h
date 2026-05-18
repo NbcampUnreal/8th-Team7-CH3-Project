@@ -109,6 +109,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Recoil", meta=(ClampMin="0.0"))
 	float MaxRecoilYaw = 15.f;
 
+	// ── 청각 자극 (AI Perception) ─────────────────────────────────────────────
+	/** 총성 청각 자극 반경(cm). 0 이하면 noise 미발생. 발자국(800)보다 훨씬 크게. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Noise", meta=(ClampMin="0.0"))
+	float GunshotNoiseRange = 2500.f;
+
+	/** Hearing 자극 태그 — 디자이너가 자극 종류 분류용 (총성/발자국/폭발 등). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Noise")
+	FName GunshotNoiseTag = TEXT("Gunshot");
+
 	// ── 런타임 상태 ───────────────────────────────────────────────────────────
 	/** 초기 탄 수. 0이면 MaxAmmo(LevelStats)로 가득 채움. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|State", meta=(ClampMin="0"))

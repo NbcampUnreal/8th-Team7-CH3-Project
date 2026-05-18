@@ -1,10 +1,22 @@
 #include "Enemy/Components/PDCombatComponent.h"
 
+#include "Engine/Engine.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "HAL/IConsoleManager.h"
 #include "Enemy/Interfaces/PDCombatInterface.h"
+#include "GenericTeamAgentInterface.h"
 #include "Interfaces/PDDamageable.h"
+
+#if ENABLE_DRAW_DEBUG
+// pd.ai.debugdraw 와 동일 CVar 를 참조 — 정의는 PDEnemyAIControllerBase.cpp 에 있음.
+static IConsoleVariable* GetPDAIDebugDrawCVar()
+{
+	static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
+	return CVar;
+}
+#endif
 
 UPDCombatComponent::UPDCombatComponent()
 {
@@ -51,8 +63,31 @@ bool UPDCombatComponent::CanAttack() const
 	const AActor* Target = CurrentTarget.Get();
 	if (!Owner || !Target) return false;
 
-	const float DistSq = FVector::DistSquared(Owner->GetActorLocation(), Target->GetActorLocation());
-	return DistSq <= (AttackRange * AttackRange);
+	const float DistSq   = FVector::DistSquared(Owner->GetActorLocation(), Target->GetActorLocation());
+	const float Dist     = FMath::Sqrt(DistSq);
+	const bool  bInRange = DistSq <= (AttackRange * AttackRange);
+
+#if ENABLE_DRAW_DEBUG
+	// pd.ai.debugdraw 1 일 때만 OnScreen 출력.
+	if (GEngine)
+	{
+		const IConsoleVariable* CVar = GetPDAIDebugDrawCVar();
+		if (CVar && CVar->GetInt() != 0)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				static_cast<int32>(GetUniqueID()),
+				0.3f,
+				bInRange ? FColor::Green : FColor::Red,
+				FString::Printf(TEXT("[%s] CanAttack: Dist=%.0f / Range=%.0f → %s"),
+					*GetNameSafe(Owner), Dist, AttackRange,
+					bInRange ? TEXT("YES") : TEXT("NO")));
+		}
+	}
+#else
+	(void)Dist;
+#endif
+
+	return bInRange;
 }
 
 bool UPDCombatComponent::RequestAttack()
@@ -102,6 +137,38 @@ void UPDCombatComponent::ClearNoiseHint()
 	bHasNoiseHint = false;
 	LastNoiseInstigator.Reset();
 	OnNoiseHintChanged.Broadcast(LastNoiseLocation, false);
+}
+
+bool UPDCombatComponent::IsFriendlyInLineOfFire(float ZOffset) const
+{
+	const AActor* Owner = GetOwner();
+	const AActor* Target = CurrentTarget.Get();
+	const UWorld* World = GetWorld();
+	if (!Owner || !Target || !World) return false;
+
+	uint8 OwnerTeam = FGenericTeamId::NoTeam;
+	if (Owner->Implements<UPDCombatInterface>())
+	{
+		OwnerTeam = IPDCombatInterface::Execute_GetTeamID(Owner);
+	}
+	// 무팀(NoTeam) 은 우군 개념이 없으므로 검사 자체를 건너뜀.
+	if (OwnerTeam == FGenericTeamId::NoTeam) return false;
+
+	const FVector Start = Owner ->GetActorLocation() + FVector(0.f, 0.f, ZOffset);
+	const FVector End   = Target->GetActorLocation() + FVector(0.f, 0.f, ZOffset);
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_FriendlyLOF), /*bTraceComplex=*/false, Owner);
+	Params.AddIgnoredActor(Target);
+
+	FHitResult Hit;
+	const bool bBlocked = World->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
+	if (!bBlocked) return false;
+
+	const AActor* HitActor = Hit.GetActor();
+	if (!HitActor || !HitActor->Implements<UPDCombatInterface>()) return false;
+
+	const uint8 HitTeam = IPDCombatInterface::Execute_GetTeamID(HitActor);
+	return (HitTeam != FGenericTeamId::NoTeam) && (HitTeam == OwnerTeam);
 }
 
 void UPDCombatComponent::NotifyAlliesInRadius(float Radius, AActor* SharedTarget)

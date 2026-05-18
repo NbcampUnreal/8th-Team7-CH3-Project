@@ -9,6 +9,7 @@
 #include "Items/PDInventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Core/PDPlayerController.h"
+#include "Perception/AISense_Hearing.h"
 
 APDRangedWeaponBase::APDRangedWeaponBase()
 {
@@ -96,6 +97,20 @@ void APDRangedWeaponBase::PostFire()
 	OnWeaponFired.Broadcast(this);
 
 	ApplyRecoil();
+
+	// 총성 청각 자극 — 주변 AI 가 발사 위치/사수를 인지하도록.
+	// Instigator 는 WeaponOwner(사수 Pawn) — Perception 측 affiliation 평가에 사용.
+	if (GunshotNoiseRange > 0.f)
+	{
+		AActor* NoiseInstigator = WeaponOwner.IsValid() ? WeaponOwner.Get() : this;
+		UAISense_Hearing::ReportNoiseEvent(
+			GetWorld(),
+			GetActorLocation(),
+			/*Loudness=*/1.f,
+			NoiseInstigator,
+			GunshotNoiseRange,
+			GunshotNoiseTag);
+	}
 
 	GetWorldTimerManager().SetTimer(
 		FireCooldownHandle, this,

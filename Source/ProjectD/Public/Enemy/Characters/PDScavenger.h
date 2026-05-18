@@ -2,9 +2,12 @@
 
 #include "CoreMinimal.h"
 #include "Enemy/Characters/PDBipedEnemy.h"
+#include "GameplayTagContainer.h"
 #include "PDScavenger.generated.h"
 
 class APDWeaponBase;
+class UAnimInstance;
+class UAnimMontage;
 
 /**
  * 근접 공격형 적 (Scavenger).
@@ -51,9 +54,27 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Scavenger|Weapon")
 	TObjectPtr<APDWeaponBase> EquippedWeapon;
 
+	/** 무기 미장착 또는 무기에 AnimLayer 가 없을 때 사용할 기본 레이어. */
+	UPROPERTY(EditDefaultsOnly, Category = "PD|Scavenger|Animation")
+	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
+
+	/** 공격 시 재생할 캐릭터 측 휘두름 몽타주. AttackSections 와 함께 사용. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Combat")
+	TObjectPtr<UAnimMontage> AttackMontage;
+
+	/** AttackMontage 의 섹션 이름 목록. 공격 시 랜덤 한 개 재생. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Combat")
+	TArray<FName> AttackSections;
+
 private:
 	UFUNCTION()
 	void HandleAttackRequested(AActor* Target);
 
 	void SpawnAndEquipDefaultWeapon();
+
+	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
+	void LinkDefaultAnimLayer();
+
+	/** 휘두름 sweep + 데미지 인가. friendly fire 차단 포함. */
+	void PerformMeleeAttack();
 };

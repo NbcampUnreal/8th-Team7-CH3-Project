@@ -40,6 +40,9 @@ public:
 	virtual void OnUnPossess() override;
 	virtual void Tick(float DeltaTime) override;
 
+	// 친화도 결정 단일 진실 원천 — 엔진 디폴트의 타이밍/솔버 모호함 회피.
+	virtual ETeamAttitude::Type GetTeamAttitudeTowards(const AActor& Other) const override;
+
 	UFUNCTION(BlueprintPure, Category = "PD|AI")
 	UPDPerceptionComponent* GetPDPerception() const;
 
@@ -48,6 +51,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|AI")
 	UBlackboardComponent* GetBlackboard() const { return const_cast<UBlackboardComponent*>(GetBlackboardComponent()); }
+
+	/** 폰 사망 시 호출 — BT 즉시 정지(Safe). 컨트롤러/구독은 보존, 최종 정리는 OnUnPossess(액터 소멸 시)에 위임. */
+	UFUNCTION(BlueprintCallable, Category = "PD|AI")
+	void NotifyPawnDied();
 
 protected:
 	/** 디자이너가 BP 디폴트에서 지정. nullptr 이면 BT 미실행 — 경고 로그 후 통과. */
@@ -64,6 +71,7 @@ private:
 	UFUNCTION() void HandleTargetSpotted(AActor* Target);
 	UFUNCTION() void HandleTargetLost   (AActor* Target, FVector LastKnownLocation);
 	UFUNCTION() void HandleNoiseHeard   (AActor* NoiseInstigator, FVector Location);
+	UFUNCTION() void HandleCombatTargetChanged(AActor* NewTarget);
 
 	void StartBehaviorTree();
 	void DrawAIDebug() const;

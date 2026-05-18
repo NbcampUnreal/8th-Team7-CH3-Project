@@ -6,13 +6,28 @@
 #include "Animation/PDAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
+#include "HAL/IConsoleManager.h"
 #include "Items/PDStashActor.h"
 #include "Items/PDStashComponent.h"
 #include "TimerManager.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
+
+#if ENABLE_DRAW_DEBUG
+static IConsoleVariable* GetPDAIDebugCVar_Soldier()
+{
+	static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
+	return CVar;
+}
+#define PD_SOLDIER_FIRE_LOG(Reason, ...) \
+	do { const IConsoleVariable* CVar = GetPDAIDebugCVar_Soldier(); \
+	     if (CVar && CVar->GetInt() != 0) { UE_LOG(LogPDAI, Log, TEXT("[%s] OnFireTick: " Reason), *GetName(), ##__VA_ARGS__); } } while(0)
+#else
+#define PD_SOLDIER_FIRE_LOG(Reason, ...)
+#endif
 
 APDSoldier::APDSoldier()
 {
@@ -29,7 +44,6 @@ void APDSoldier::BeginPlay()
 		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
 		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
 		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
-		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
 	}
 	LinkDefaultAnimLayer();
 
@@ -91,12 +105,6 @@ void APDSoldier::OnEnterState_Dead()
 		}
 	}
 
-	if (!bTransferred)
-	{
-		UE_LOG(LogTemp, Warning,
-			TEXT("[%s] CorpseContainer 가 Stash 류가 아니거나 WeaponData 미지정 — 장착무기 소실."),
-			*GetName());
-	}
 
 	EquippedWeapon->Destroy();
 	EquippedWeapon = nullptr;
@@ -179,6 +187,11 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 
 void APDSoldier::HandleTargetChanged(AActor* NewTarget)
 {
+	PD_SOLDIER_FIRE_LOG("HandleTargetChanged NewTarget=%s, bAutoFire=%s, HasWeapon=%s",
+		*GetNameSafe(NewTarget),
+		bAutoFireOnAttackRequested ? TEXT("Y") : TEXT("N"),
+		EquippedWeapon ? TEXT("Y") : TEXT("N"));
+
 	if (!bAutoFireOnAttackRequested) return;
 
 	if (NewTarget && EquippedWeapon)
@@ -217,6 +230,7 @@ void APDSoldier::OnFireTick()
 {
 	if (!EquippedWeapon)
 	{
+		PD_SOLDIER_FIRE_LOG("STOP (no weapon)");
 		StopContinuousFire();
 		return;
 	}
@@ -224,6 +238,7 @@ void APDSoldier::OnFireTick()
 	UPDCombatComponent* Combat = GetCombatComponent();
 	if (!Combat || !Combat->HasValidTarget())
 	{
+		PD_SOLDIER_FIRE_LOG("STOP (no valid target)");
 		StopContinuousFire();
 		return;
 	}
@@ -234,20 +249,37 @@ void APDSoldier::OnFireTick()
 		{
 			const float Range = Combat->GetAttackRange();
 			const float DistSq = FVector::DistSquared(GetActorLocation(), Target->GetActorLocation());
-			if (DistSq > Range * Range) return; // 사거리 밖이면 이번 틱 스킵, 루프는 유지.
+			if (DistSq > Range * Range)
+			{
+				PD_SOLDIER_FIRE_LOG("SKIP (out of range Dist=%.0f Range=%.0f)", FMath::Sqrt(DistSq), Range);
+				return;
+			}
 		}
 	}
 
 	// 탄 소진 시 자동 장전: 모션 재생 후 FinishReload에서 풀충 → 사실상 무한 사격 사이클.
 	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
 	{
-		if (Ranged->IsReloading()) return; // 장전 중에는 사격 스킵.
+		if (Ranged->IsReloading())
+		{
+			PD_SOLDIER_FIRE_LOG("SKIP (reloading)");
+			return;
+		}
 		if (Ranged->GetCurrentAmmo() <= 0)
 		{
+			PD_SOLDIER_FIRE_LOG("RELOAD (ammo=0)");
 			Ranged->Reload();
 			return;
 		}
 	}
 
+	// 우군 사선 안전망 — BT 외 자율 발사 경로에서도 프렌들리 파이어 차단. 타이머는 유지(우군 이동 시 즉시 재개).
+	if (Combat->IsFriendlyInLineOfFire())
+	{
+		PD_SOLDIER_FIRE_LOG("SKIP (friendly in LOF)");
+		return;
+	}
+
+	PD_SOLDIER_FIRE_LOG("FIRE");
 	EquippedWeapon->Fire();
 }

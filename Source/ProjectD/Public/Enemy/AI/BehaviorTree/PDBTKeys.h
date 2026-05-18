@@ -34,4 +34,10 @@ namespace PDBTKeys
 
 	// ─── Elite: LOS Occlusion ───
 	static const FName TimeSinceLastLOS  = TEXT("TimeSinceLastLOS");   // Float   (Service 누적)
+
+	// ─── Flanking ───
+	static const FName FlankLocation     = TEXT("FlankLocation");      // Vector  (LOS 차단 시 측면 우회 좌표)
+
+	// ─── Friendly Fire ───
+	static const FName bFriendlyInLineOfFire = TEXT("bFriendlyInLineOfFire"); // Bool (사선에 우군 → Flank 트리거)
 }

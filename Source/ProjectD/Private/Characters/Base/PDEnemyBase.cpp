@@ -11,6 +11,7 @@
 #include "GameFramework/Pawn.h"
 
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Items/PDItemBase.h"
 #include "Items/PDLootItem.h"
 #include "Enemy/Components/PDCombatComponent.h"
@@ -298,6 +299,12 @@ void APDEnemyBase::HandleDeath(AActor* Killer)
 	}
 
 	Super::HandleDeath(Killer);
+
+	// AI 의사결정 즉시 정지 — 컨트롤러는 보존(사망 몽타주/후속 처리 안전), 액터 소멸 시 OnUnPossess 가 일괄 정리.
+	if (APDEnemyAIControllerBase* AICon = Cast<APDEnemyAIControllerBase>(GetController()))
+	{
+		AICon->NotifyPawnDied();
+	}
 }
 
 void APDEnemyBase::OnVisionExposureChanged_Implementation(AActor* Observer, float Exposure)

@@ -40,13 +40,26 @@ void UPDPerceptionComponent::BeginPlay()
 		SightConfig->LoseSightRadius = FMath::Max(LoseSightRadius, SightRadius);
 		SightConfig->PeripheralVisionAngleDegrees = PeripheralVisionAngleDegrees;
 		SightConfig->SetMaxAge(SightMaxAge);
+
+		// Affiliation 강제 덮어쓰기 — BP CDO 가 옛 디폴트(친구 detect=true) 를 들고 있어도 무력화.
+		SightConfig->DetectionByAffiliation.bDetectEnemies    = true;
+		SightConfig->DetectionByAffiliation.bDetectNeutrals   = false;
+		SightConfig->DetectionByAffiliation.bDetectFriendlies = false;
 	}
 
 	if (HearingConfig)
 	{
 		HearingConfig->HearingRange = HearingRange;
 		HearingConfig->SetMaxAge(HearingMaxAge);
+
+		HearingConfig->DetectionByAffiliation.bDetectEnemies    = true;
+		HearingConfig->DetectionByAffiliation.bDetectNeutrals   = false;
+		HearingConfig->DetectionByAffiliation.bDetectFriendlies = false;
 	}
+
+	// 위에서 SenseConfig 를 직접 수정했으므로 perception 시스템이 변경된 설정을 다시 등록하도록 강제.
+	if (SightConfig)   { ConfigureSense(*SightConfig); }
+	if (HearingConfig) { ConfigureSense(*HearingConfig); }
 
 	RequestStimuliListenerUpdate();
 

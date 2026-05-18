@@ -77,6 +77,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Squad")
 	void NotifyAlliesInRadius(float Radius, AActor* SharedTarget);
 
+	/** Owner→CurrentTarget 사선에 같은 팀(우군)이 끼어 있으면 true. 발사 게이트로 사용 — 프렌들리 파이어 방지. */
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|FriendlyFire")
+	bool IsFriendlyInLineOfFire(float ZOffset = 64.f) const;
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Combat")
 	FPDOnTargetChanged OnTargetChanged;
 

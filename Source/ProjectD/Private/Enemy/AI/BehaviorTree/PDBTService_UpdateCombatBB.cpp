@@ -1,10 +1,22 @@
 #include "Enemy/AI/BehaviorTree/PDBTService_UpdateCombatBB.h"
 
 #include "AIController.h"
+#include "BehaviorTree/BehaviorTreeComponent.h"
 #include "BehaviorTree/BlackboardComponent.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
+#include "HAL/IConsoleManager.h"
+
+#if ENABLE_DRAW_DEBUG
+static IConsoleVariable* GetPDAIDebugCVar()
+{
+	static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
+	return CVar;
+}
+#endif
 
 UPDBTService_UpdateCombatBB::UPDBTService_UpdateCombatBB()
 {
@@ -34,14 +46,17 @@ void UPDBTService_UpdateCombatBB::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 	AActor* Target = Cast<AActor>(BB->GetValueAsObject(PDBTKeys::TargetActor));
 	bool bInRange = false;
 	bool bHasLOS  = false;
+	AActor* Blocker = nullptr;
+	float   Dist    = -1.f;
 
 	if (Target)
 	{
 		const float Range = Combat->GetAttackRange();
+		Dist = FVector::Dist(Pawn->GetActorLocation(), Target->GetActorLocation());
+
 		if (Range > 0.f)
 		{
-			const float DistSq = FVector::DistSquared(Pawn->GetActorLocation(), Target->GetActorLocation());
-			bInRange = DistSq <= (Range * Range);
+			bInRange = Dist <= Range;
 		}
 
 		// 사거리 밖이면 LineTrace 비용 절약.
@@ -54,13 +69,39 @@ void UPDBTService_UpdateCombatBB::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 				Params.AddIgnoredActor(Target);
 				const bool bBlocked = World->LineTraceSingleByChannel(
 					Hit, Pawn->GetActorLocation(), Target->GetActorLocation(), ECC_Visibility, Params);
-				bHasLOS = !bBlocked;
+				bHasLOS  = !bBlocked;
+				Blocker  = bBlocked ? Hit.GetActor() : nullptr;
 			}
 		}
 	}
 
 	BB->SetValueAsBool(PDBTKeys::IsTargetInRange, bInRange);
 	BB->SetValueAsBool(PDBTKeys::HasLOSToTarget,  bHasLOS);
+
+	// 우군 사선 평가는 매 틱 갱신 — 우군이 사선에서 빠지면 자동으로 false 로 복귀해
+	// BT 데코레이터가 공격 분기로 재진입 가능. 타겟이 없으면 false 로 강제.
+	const bool bFriendlyInLOF = Target ? Combat->IsFriendlyInLineOfFire() : false;
+	BB->SetValueAsBool(PDBTKeys::bFriendlyInLineOfFire, bFriendlyInLOF);
+
+#if ENABLE_DRAW_DEBUG
+	// pd.ai.debugdraw 1 일 때만 LOS 상태 출력 — 0.2s 마다 1줄.
+	if (Target)
+	{
+		const IConsoleVariable* CVar = GetPDAIDebugCVar();
+		if (CVar && CVar->GetInt() != 0)
+		{
+			UE_LOG(LogPDAI, Log,
+				TEXT("[%s] LOS: Target=%s, Dist=%.0f, Range=%.0f, InRange=%s, HasLOS=%s, Blocker=%s"),
+				*GetNameSafe(Pawn),
+				*GetNameSafe(Target),
+				Dist,
+				Combat->GetAttackRange(),
+				bInRange ? TEXT("Y") : TEXT("N"),
+				bHasLOS  ? TEXT("Y") : TEXT("N"),
+				*GetNameSafe(Blocker));
+		}
+	}
+#endif
 
 	// 시각 타겟이 잡히면 NoiseHint 는 정보가치 낮음 — 자동 만료.
 	if (Combat->HasValidTarget() && Combat->HasNoiseHint())
