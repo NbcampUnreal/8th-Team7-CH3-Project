@@ -8,6 +8,7 @@
 class APDWeaponBase;
 class UAnimInstance;
 class UAnimMontage;
+class UGameplayAbility;
 
 /**
  * 근접 공격형 적 (Scavenger).
@@ -58,13 +59,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Scavenger|Animation")
 	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
 
-	/** 공격 시 재생할 캐릭터 측 휘두름 몽타주. AttackSections 와 함께 사용. */
+	/**
+	 * 휘두름 ability. 몽타주/섹션/sweep/데미지 인가 모두 ability 내부에서 처리.
+	 * 디자이너는 GA_PDMeleeAttack 의 BP 자식(예: GA_PDMeleeAttack_Scavenger)을 만들어 몽타주를 지정 후 여기에 할당.
+	 * 또한 BP_PDScavenger 의 ActiveAbilities 배열에도 같은 클래스를 추가해야 ASC 가 GiveAbility 한다.
+	 */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Combat")
-	TObjectPtr<UAnimMontage> AttackMontage;
-
-	/** AttackMontage 의 섹션 이름 목록. 공격 시 랜덤 한 개 재생. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Scavenger|Combat")
-	TArray<FName> AttackSections;
+	TSubclassOf<UGameplayAbility> MeleeAttackAbilityClass;
 
 private:
 	UFUNCTION()
@@ -74,7 +75,4 @@ private:
 
 	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
 	void LinkDefaultAnimLayer();
-
-	/** 휘두름 sweep + 데미지 인가. friendly fire 차단 포함. */
-	void PerformMeleeAttack();
 };

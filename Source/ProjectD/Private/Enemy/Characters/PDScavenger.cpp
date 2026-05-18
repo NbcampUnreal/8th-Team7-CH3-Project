@@ -2,18 +2,13 @@
 
 #include "AbilitySystemComponent.h"
 #include "Animation/AnimInstance.h"
-#include "Animation/AnimMontage.h"
 #include "Animation/PDAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
-#include "Enemy/Interfaces/PDCombatInterface.h"
 #include "GameplayTag/PDGameplayTags.h"
-#include "Interfaces/PDDamageable.h"
 #include "Items/PDStashActor.h"
 #include "Items/PDStashComponent.h"
-#include "Kismet/GameplayStatics.h"
-#include "Weapons/Base/PDMeleeWeaponBase.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
@@ -160,82 +155,14 @@ void APDScavenger::HandleAttackRequested(AActor* /*Target*/)
 {
 	if (!bAutoFireOnAttackRequested) return;
 
+	// 상태 게이트 — BT 가 Combat 분기에서 SetEnemyState(Combat) 호출했을 때만 휘두름.
+	// Idle/Alert/Chase 단계에서 우발적 RequestAttack 이 와도 무시 (Soldier 의 OnFireTick 게이트와 동일 정책).
+	if (GetEnemyState() != EPDEnemyState::Combat) return;
+
 	if (!EquippedWeapon) return;
+	if (!ASC || !MeleeAttackAbilityClass) return;
 
-	// 휘두름 몽타주 재생 — 시각적 모션. sweep 와 별개 트랙.
-	if (AttackMontage && !AttackSections.IsEmpty())
-	{
-		if (UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
-		{
-			const FName Section = AttackSections[FMath::RandRange(0, AttackSections.Num() - 1)];
-			AnimInst->Montage_Play(AttackMontage);
-			AnimInst->Montage_JumpToSection(Section, AttackMontage);
-		}
-	}
-
-	PerformMeleeAttack();
-}
-
-void APDScavenger::PerformMeleeAttack()
-{
-	APDMeleeWeaponBase* MeleeWeapon = Cast<APDMeleeWeaponBase>(EquippedWeapon);
-	if (!MeleeWeapon) return;
-
-	UWorld* World = GetWorld();
-	USkeletalMeshComponent* MeshComp = GetMesh();
-	if (!World || !MeshComp) return;
-
-	// Swing 사운드 (휘두름 시작).
-	if (USoundBase* Sound = MeleeWeapon->GetSwingSound())
-	{
-		UGameplayStatics::SpawnSoundAttached(Sound, MeshComp);
-	}
-
-	const float Damage      = MeleeWeapon->GetCurrentStats().Damage;
-	const float SweepRadius = MeleeWeapon->GetSweepRadius();
-	const float SweepRange  = MeleeWeapon->GetSweepRange();
-	const FName HitSocket   = MeleeWeapon->GetHitSocketName();
-
-	const FVector Start = MeshComp->GetSocketLocation(HitSocket);
-	const FVector End   = Start + GetActorForwardVector() * SweepRange;
-
-	TArray<FHitResult> Hits;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_ScavengerMeleeSweep), false, this);
-	World->SweepMultiByChannel(
-		Hits, Start, End, FQuat::Identity,
-		ECC_Pawn, FCollisionShape::MakeSphere(SweepRadius), Params);
-
-	const uint8 MyTeam = TeamID;
-	TSet<AActor*> HitOnce;
-	bool bPlayedHitSound = false;
-
-	for (const FHitResult& Hit : Hits)
-	{
-		AActor* HitActor = Hit.GetActor();
-		if (!IsValid(HitActor) || HitOnce.Contains(HitActor)) continue;
-		if (!HitActor->Implements<UPDDamageable>()) continue;
-
-		// Friendly fire 차단 — 같은 팀이면 sweep 명중해도 무시.
-		if (HitActor->Implements<UPDCombatInterface>())
-		{
-			if (IPDCombatInterface::Execute_GetTeamID(HitActor) == MyTeam) continue;
-		}
-
-		HitOnce.Add(HitActor);
-
-		if (!bPlayedHitSound)
-		{
-			if (USoundBase* HitSnd = MeleeWeapon->GetHitSound())
-			{
-				UGameplayStatics::PlaySoundAtLocation(World, HitSnd, Hit.ImpactPoint);
-			}
-			bPlayedHitSound = true;
-		}
-
-		FPDDamageInfo Info;
-		Info.BaseDamage     = Damage;
-		Info.Instigator     = this;
-		Info.HitResult      = Hit;
-		IPDDamageable::Execute_ApplyDamage(HitActor, Info);
-	}
+	// Ability 활성화 — 몽타주 재생/Anim Notify 대기/sweep/데미지 인가는 GA 내부에서 처리.
+	// 디자이너 노트: BP_PDScavenger 의 ActiveAbilities 배열에 같은 클래스가 등록돼 있어야 GiveAbility 됨.
+	ASC->TryActivateAbilityByClass(MeleeAttackAbilityClass);
 }

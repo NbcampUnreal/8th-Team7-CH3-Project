@@ -1,6 +1,5 @@
 #include "Ability/PDMeleeAttackAbility.h"
 #include "Characters/Base/PDCharacterBase.h"
-#include "Characters/PDPlayerCharacter.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDMeleeWeaponBase.h"
 #include "Interfaces/PDDamageable.h"
@@ -35,8 +34,8 @@ void UPDMeleeAttackAbility::ActivateAbility(const FGameplayAbilitySpecHandle Han
 
 	HitActors.Reset();
 
-	// 공격 시작 — Swing 사운드
-	APDPlayerCharacter* SwingChar = Cast<APDPlayerCharacter>(GetPDCharacter());
+	// 공격 시작 — Swing 사운드. PDCharacterBase 기준으로 동작 (Player/Scavenger/Soldier 공용).
+	APDCharacterBase* SwingChar = GetPDCharacter();
 	if (APDMeleeWeaponBase* SwingWeapon = SwingChar
 		? Cast<APDMeleeWeaponBase>(SwingChar->GetCurrentWeapon()) : nullptr)
 	{
@@ -81,7 +80,7 @@ void UPDMeleeAttackAbility::OnMontageFinished()
 
 void UPDMeleeAttackAbility::PerformSweep()
 {
-	APDPlayerCharacter* Char=Cast<APDPlayerCharacter>(GetPDCharacter());
+	APDCharacterBase* Char = GetPDCharacter();
 	if (!Char) return;
 
 	APDWeaponBase* WeaponBase=Char->GetCurrentWeapon();
