@@ -51,7 +51,7 @@ protected:
 	float LoseSightRadius = SightRadius * 1.3f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0", ClampMax = "180.0"))
-	float PeripheralVisionAngleDegrees = 55.f;
+	float PeripheralVisionAngleDegrees = 90.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
 	float SightMaxAge = 4.f;
