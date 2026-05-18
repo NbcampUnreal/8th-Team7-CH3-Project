@@ -16,9 +16,11 @@ class UPDDebuffIconBarWidget;
 class UPDCrosshairWidget;
 class UPDGasMaskWidget;
 class UPDActionPromptListWidget;
+class UPDInteractPromptWidget;
 class UPDSkillSlotBarWidget;
 class UPDCircularProgressWidget;
 class UPDQuickSlotComponent;
+class UPDInteractionComponent;
 class UAbilitySystemComponent;
 struct FOnAttributeChangeData;
 enum class EWeaponType : uint8;
@@ -66,6 +68,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDActionPromptListWidget> Bar_ActionPrompts;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDInteractPromptWidget> WBP_InteractPrompt;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDSkillSlotBarWidget> Bar_SkillSlots;
@@ -136,8 +141,20 @@ private:
 	UPDQuickSlotComponent* FindOwningQuickSlotComponent() const;
 	void RefreshUseProgressBinding(UPDQuickSlotComponent* NewComponent);
 
+	UPDInteractionComponent* FindOwningInteractionComponent() const;
+	void RefreshInteractPromptBinding(UPDInteractionComponent* NewComponent);
+
+	UFUNCTION()
+	void HandleInteractTargetChanged(AActor* NewTarget);
+
+	// 매 프레임 호출되는 위치 갱신(타이머 기반).
+	void UpdateInteractPromptPosition();
+
 	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
 	TWeakObjectPtr<UPDQuickSlotComponent> CachedQuickSlot;
+	TWeakObjectPtr<UPDInteractionComponent> CachedInteraction;
+	TWeakObjectPtr<AActor> CachedInteractTarget;
+	FTimerHandle InteractPromptUpdateTimer;
 	TArray<FBoundAttributeHandle> BoundAttributeHandles;
 	TArray<FBoundTagHandle> BoundTagHandles;
 };

@@ -4,10 +4,37 @@
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
 #include "CollisionShape.h"
+#include "TimerManager.h"
 
 UPDInteractionComponent::UPDInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+}
+
+void UPDInteractionComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			PollTimerHandle,
+			this,
+			&UPDInteractionComponent::PollTarget,
+			PollInterval,
+			true,
+			0.f);
+	}
+}
+
+void UPDInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PollTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void UPDInteractionComponent::Interact()
@@ -84,4 +111,18 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 	}
 
 	return ClosestInteractable;
+}
+
+void UPDInteractionComponent::PollTarget()
+{
+	AActor* NewTarget = FindInteractTarget();
+	AActor* OldTarget = CachedTarget.Get();
+
+	if (NewTarget == OldTarget)
+	{
+		return;
+	}
+
+	CachedTarget = NewTarget;
+	OnInteractTargetChanged.Broadcast(NewTarget);
 }
