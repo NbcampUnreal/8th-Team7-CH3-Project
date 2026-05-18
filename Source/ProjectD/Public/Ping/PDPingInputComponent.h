@@ -9,6 +9,8 @@ class UPDInputConfig;
 class UPDPingSubsystem;
 class UPDPingWheelBase;
 class APDPingMarker;
+class APDMapMarkerActor;
+class APDFaintMarkActor;
 
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class PROJECTD_API UPDPingInputComponent : public UActorComponent
@@ -29,6 +31,14 @@ public:
 	
 	UPROPERTY(EditDefaultsOnly, Category="Ping", meta=(ClampMin="0.0"))
 	float WheelActivationDelay = 0.15f;
+	
+	//마커 액터 클래스 (월드에 스폰될 비주얼)
+	UPROPERTY(EditDefaultsOnly, Category="Ping")
+	TSubclassOf<APDMapMarkerActor> MapMarkerActorClass;
+
+	//잔존표식 액터 클래스
+	UPROPERTY(EditDefaultsOnly, Category="Ping")
+	TSubclassOf<APDFaintMarkActor> FaintMarkActorClass;
 	
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

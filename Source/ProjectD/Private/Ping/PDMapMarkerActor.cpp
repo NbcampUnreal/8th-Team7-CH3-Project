@@ -1,27 +1,25 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Ping/PDMapMarkerActor.h"
+#include "Components/StaticMeshComponent.h"
 
-// Sets default values
 APDMapMarkerActor::APDMapMarkerActor()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
+	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
+	SetRootComponent(MeshComp);
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-// Called when the game starts or when spawned
-void APDMapMarkerActor::BeginPlay()
+void APDMapMarkerActor::InitializeMarker(int32 InMarkerId, int32 InDisplayIndex)
 {
-	Super::BeginPlay();
-	
+	MarkerId = InMarkerId;
+	DisplayIndex = InDisplayIndex;
+	OnMarkerInitialized(MarkerId, DisplayIndex);
 }
 
-// Called every frame
-void APDMapMarkerActor::Tick(float DeltaTime)
+void APDMapMarkerActor::UpdateDisplayIndex(int32 InDisplayIndex)
 {
-	Super::Tick(DeltaTime);
-
+	if (DisplayIndex == InDisplayIndex) return;
+	DisplayIndex = InDisplayIndex;
+	OnDisplayIndexUpdated(DisplayIndex);
 }
-

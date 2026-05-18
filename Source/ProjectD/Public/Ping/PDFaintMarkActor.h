@@ -1,26 +1,35 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "PDFaintMarkActor.generated.h"
 
-UCLASS()
+class UStaticMeshComponent;
+
+UCLASS(Blueprintable)
 class PROJECTD_API APDFaintMarkActor : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
+
+public:
 	APDFaintMarkActor();
 
+	//Subsystem이 스폰 직후 호출
+	UFUNCTION(BlueprintCallable, Category="FaintMark")
+	void InitializeFaintMark(int32 InFaintId);
+
+	UFUNCTION(BlueprintPure, Category="FaintMark")
+	FORCEINLINE int32 GetFaintId() const { return FaintId; }
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+	//BP에서 구현
+	UFUNCTION(BlueprintImplementableEvent, Category="FaintMark")
+	void OnFaintMarkInitialized(int32 InFaintId);
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	TObjectPtr<UStaticMeshComponent> MeshComp;
 
+private:
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="FaintMark", meta=(AllowPrivateAccess="true"))
+	int32 FaintId = -1;
 };

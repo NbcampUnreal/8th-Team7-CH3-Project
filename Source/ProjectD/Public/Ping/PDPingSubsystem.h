@@ -6,7 +6,7 @@
 #include "PDPingSubsystem.generated.h"
 
 class APDPingMarker;
-
+class APDFaintMarkActor;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPingAdded, const FPDPingData&, PingData); //핑 추가 시
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPingRemoved, int32, PingId); //핑 제거 시
@@ -22,6 +22,10 @@ struct FPDFaintMark
 
     UPROPERTY(BlueprintReadOnly, Category="Ping")
     FVector WorldLocation = FVector::ZeroVector;
+    
+    //월드 액터
+    UPROPERTY(BlueprintReadOnly, Category="Ping")
+    TWeakObjectPtr<APDFaintMarkActor> MarkerActor;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFaintMarkAdded, const FPDFaintMark&, Mark); //표식 추가 시
@@ -60,12 +64,15 @@ public:
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ping")
     TSubclassOf<APDPingMarker> DefaultMarkerClass;
+    
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ping")
+    TSubclassOf<APDFaintMarkActor> DefaultFaintMarkActorClass;
 
     //핑 자동 만료 시간
     UPROPERTY(EditDefaultsOnly, Category="Ping")
     float DefaultPingLifetime = 5.f;
 
-    ////-------------------잔존 표식-------------------
+    //-------------------잔존 표식-------------------
     UFUNCTION(BlueprintCallable, Category="Ping")
     int32 AddFaintMark(const FVector& InWorldLocation);
 
