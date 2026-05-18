@@ -1,4 +1,6 @@
 #include "Ping/PDMapMarkerSubsystem.h"
+#include "Ping/PDMapMarkerActor.h"  
+#include "Engine/World.h"
 
 bool UPDMapMarkerSubsystem::DoesSupportWorldType(EWorldType::Type WorldType) const
 {
@@ -22,22 +24,51 @@ int32 UPDMapMarkerSubsystem::AddMarker(const FVector& InWorldLocation)
             RemoveMarker(OldestId);
         }
     }
-    
+
     FPDMapMarker NewMarker;
     NewMarker.MarkerId = NextMarkerId++;
     NewMarker.WorldLocation = InWorldLocation;
 
+    //월드 액터 스폰
+    if (UWorld* World = GetWorld())
+    {
+        if (UClass* ActorClass = DefaultMarkerActorClass)
+        {
+            FActorSpawnParameters Params;
+            Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            if (APDMapMarkerActor* Spawned = World->SpawnActor<APDMapMarkerActor>(
+                    ActorClass, InWorldLocation, FRotator::ZeroRotator, Params))
+            {
+                NewMarker.MarkerActor = Spawned;
+            }
+        }
+    }
+
     ActiveMarkers.Add(NewMarker.MarkerId, NewMarker);
     RecalculateDisplayIndices();
 
-    //재계산 후 갱신된 데이터
+    //재계산 후 갱신된 데이터로 액터 초기화
     const FPDMapMarker& Added = ActiveMarkers[NewMarker.MarkerId];
+    if (Added.MarkerActor.IsValid())
+    {
+        Added.MarkerActor->InitializeMarker(Added.MarkerId, Added.DisplayIndex);
+    }
+
     OnMarkerAdded.Broadcast(Added);
     return NewMarker.MarkerId;
 }
 
 bool UPDMapMarkerSubsystem::RemoveMarker(int32 InMarkerId)
 {
+    //액터 먼저 Destroy
+    if (FPDMapMarker* Marker = ActiveMarkers.Find(InMarkerId))
+    {
+        if (Marker->MarkerActor.IsValid())
+        {
+            Marker->MarkerActor->Destroy();
+        }
+    }
+
     if (ActiveMarkers.Remove(InMarkerId) > 0)
     {
         RecalculateDisplayIndices();
@@ -101,8 +132,15 @@ void UPDMapMarkerSubsystem::RecalculateDisplayIndices()
     for (int32 i = 0; i < SortedIds.Num(); ++i)
     {
         if (FPDMapMarker* Marker = ActiveMarkers.Find(SortedIds[i]))
-        {
-            Marker->DisplayIndex = i + 1;
+        {   
+            const int32 NewIndex = i + 1;
+            Marker->DisplayIndex = NewIndex;
+            
+            //액터 번호 갱신
+            if (Marker->MarkerActor.IsValid())
+            {
+                Marker->MarkerActor->UpdateDisplayIndex(NewIndex);
+            }
         }
     }
 }

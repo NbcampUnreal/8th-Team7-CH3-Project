@@ -1,27 +1,17 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Ping/PDFaintMarkActor.h"
+#include "Components/StaticMeshComponent.h"
 
-// Sets default values
 APDFaintMarkActor::APDFaintMarkActor()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
+	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
+	SetRootComponent(MeshComp);
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
-// Called when the game starts or when spawned
-void APDFaintMarkActor::BeginPlay()
+void APDFaintMarkActor::InitializeFaintMark(int32 InFaintId)
 {
-	Super::BeginPlay();
-	
+	FaintId = InFaintId;
+	OnFaintMarkInitialized(FaintId);
 }
-
-// Called every frame
-void APDFaintMarkActor::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-

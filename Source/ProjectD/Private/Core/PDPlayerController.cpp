@@ -85,15 +85,7 @@ void APDPlayerController::SetupInputComponent()
 
 	if (!InputConfig)
 	{
-		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
-		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
-		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
-		InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnQuickslot1);
-		InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnQuickslot2);
-		InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnQuickslot3);
-		InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnQuickslot4);
-		InputComponent->BindKey(EKeys::Five, IE_Pressed, this, &APDPlayerController::OnQuickslot5);
-		InputComponent->BindKey(EKeys::Six, IE_Pressed, this, &APDPlayerController::OnQuickslot6);
+		UE_LOG(LogPDCharacter, Warning, TEXT("[Input] InputConfig is not set."));
 		return;
 	}
 
@@ -102,35 +94,12 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Jump,
 		ETriggerEvent::Started, this, &APDPlayerController::OnJump);
 
-	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Inventory))
-	{
-		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Inventory,
-			ETriggerEvent::Started, this, &APDPlayerController::ToggleInventory);
-	}
-	else
-	{
-		InputComponent->BindKey(EKeys::Tab, IE_Pressed, this, &APDPlayerController::ToggleInventory);
-	}
-
-	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Quest))
-	{
-		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quest,
-			ETriggerEvent::Started, this, &APDPlayerController::ToggleQuest);
-	}
-	else
-	{
-		InputComponent->BindKey(EKeys::Q, IE_Pressed, this, &APDPlayerController::ToggleQuest);
-	}
-
-	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_Interact))
-	{
-		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
-			ETriggerEvent::Started, this, &APDPlayerController::TryInteract);
-	}
-	else
-	{
-		InputComponent->BindKey(EKeys::E, IE_Pressed, this, &APDPlayerController::TryInteract);
-	}
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Inventory,
+		ETriggerEvent::Started, this, &APDPlayerController::ToggleInventory);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quest,
+		ETriggerEvent::Started, this, &APDPlayerController::ToggleQuest);
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Interact,
+		ETriggerEvent::Started, this, &APDPlayerController::TryInteract);
 
 
 	UE_LOG(LogPDCharacter, Warning, TEXT("[Input] AbilityInputActions count: %d"), InputConfig->AbilityInputActions.Num());
@@ -159,13 +128,6 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_DropWeapon,
 		ETriggerEvent::Started, this, &APDPlayerController::OnDropWeapon);
 
-	// IA_Quickslot1~6의 IMC 매핑(One~Six)과 충돌. 신규 BindNativeAction 경로로 일원화 (QS-5a).
-	// 안정 검증 후 제거 예정.
-	// InputComponent->BindKey(EKeys::One, IE_Pressed, this, &APDPlayerController::OnSwitchSlot1);
-	// InputComponent->BindKey(EKeys::Two, IE_Pressed, this, &APDPlayerController::OnSwitchSlot2);
-	// InputComponent->BindKey(EKeys::Three, IE_Pressed, this, &APDPlayerController::OnSwitchSlot3);
-	// InputComponent->BindKey(EKeys::Four, IE_Pressed, this, &APDPlayerController::OnUseQuickSlot4);
-
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot1,
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot1);
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot2,
@@ -179,11 +141,8 @@ void APDPlayerController::SetupInputComponent()
 	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_Quickslot6,
 		ETriggerEvent::Started, this, &APDPlayerController::OnQuickslot6);
 
-	if (InputConfig->FindNativeInputActionForTag(PDGameplayTags::Input_CancelConsumableUse))
-	{
-		PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_CancelConsumableUse,
-			ETriggerEvent::Started, this, &APDPlayerController::OnCancelConsumableUse);
-	}
+	PDIC->BindNativeAction(InputConfig, PDGameplayTags::Input_CancelConsumableUse,
+		ETriggerEvent::Started, this, &APDPlayerController::OnCancelConsumableUse);
 
 	if (PingInputComp && InputConfig)
 	{
@@ -563,6 +522,8 @@ void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 
 void APDPlayerController::CloseStashInterface()
 {
+	UPDStashComponent* ClosingStashComponent = ActiveStashComponent.Get();
+
 	if (StashWidgetInstance && StashWidgetInstance->IsInViewport())
 	{
 		StashWidgetInstance->RemoveFromParent();
@@ -576,6 +537,11 @@ void APDPlayerController::CloseStashInterface()
 	InventoryWidgetInstance = nullptr;
 
 	ActiveStashComponent.Reset();
+
+	if (ClosingStashComponent)
+	{
+		OnStashInterfaceClosed.Broadcast(ClosingStashComponent);
+	}
 
 	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{

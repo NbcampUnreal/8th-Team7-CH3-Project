@@ -3,6 +3,7 @@
 #include "Data/PDQuestComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
@@ -23,15 +24,39 @@ bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)
 
 bool UPDInventoryComponent::AddItemByID(FName ItemID, int32 Quantity)
 {
-	if (!ItemDataTable || ItemID.IsNone()) return false;
+	FPDItemData ItemData;
+	return FindItemDataByID(ItemID, ItemData) && AddItem(ItemData, Quantity);
+}
+
+bool UPDInventoryComponent::FindItemDataByID(FName ItemID, FPDItemData& OutItemData) const
+{
+	if (!ItemDataTable || ItemID.IsNone())
+	{
+		return false;
+	}
+
+	if (const FPDItemData* RowByName = ItemDataTable->FindRow<FPDItemData>(ItemID, TEXT("FindItemDataByID"), false))
+	{
+		if (RowByName->ItemID == ItemID || RowByName->ItemID.IsNone())
+		{
+			OutItemData = *RowByName;
+			if (OutItemData.ItemID.IsNone())
+			{
+				OutItemData.ItemID = ItemID;
+			}
+			return true;
+		}
+	}
 
 	TArray<FPDItemData*> Rows;
-	ItemDataTable->GetAllRows<FPDItemData>(TEXT("AddItemByID"), Rows);
-
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("FindItemDataByID"), Rows);
 	for (const FPDItemData* Row : Rows)
 	{
 		if (Row && Row->ItemID == ItemID)
-			return AddItem(*Row, Quantity);
+		{
+			OutItemData = *Row;
+			return true;
+		}
 	}
 
 	return false;
@@ -309,6 +334,7 @@ int32 UPDInventoryComponent::AddItemToSlotPartial(const FPDItemData& ItemData, i
 	const int32 AddedQuantity = FPDItemSlotTransfer::AddItemToSlot(Items[TargetSlotIndex], ItemData, Quantity);
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -336,9 +362,11 @@ bool UPDInventoryComponent::MoveSlotQuantityToSlot(int32 SourceSlotIndex, int32 
 		return false;
 	}
 
+	const FPDItemData MovedItemData = Items[SourceSlotIndex].ItemData;
 	const bool bMoved = FPDItemSlotTransfer::MoveQuantity(Items[SourceSlotIndex], Items[TargetSlotIndex], Quantity);
 	if (bMoved)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, MovedItemData);
 		OnInventoryChanged.Broadcast();
 	}
 
@@ -359,7 +387,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 	{
 		if (UPDEquipmentComponent* EquipmentComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
 		{
-			if (EquipmentComponent->TryEquipNewItem(ItemData))
+			if (EquipmentComponent->TryEquipNewItem(ItemData, false))
 			{
 				RemainingQuantity -= 1;
 				AddedQuantity += 1;
@@ -407,6 +435,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 				if (RemainingQuantity <= 0)
 				{
+					UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 					OnInventoryChanged.Broadcast();
 
 					if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -446,6 +475,7 @@ int32 UPDInventoryComponent::AddItemPartial(const FPDItemData& ItemData, int32 Q
 
 	if (AddedQuantity > 0)
 	{
+		UPDItemSoundLibrary::PlayItemMoveSound(this, ItemData);
 		OnInventoryChanged.Broadcast();
 
 		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
@@ -492,7 +522,18 @@ int32 UPDInventoryComponent::AddSlotPartial(const FPDInventorySlot& SourceSlot)
 		Items[EmptySlot] = SourceSlot;
 		Items[EmptySlot].Quantity = FMath::Max(1, SourceSlot.Quantity);
 		Items[EmptySlot].bIsEmpty = false;
+		UPDItemSoundLibrary::PlayItemMoveSound(this, SourceSlot.ItemData);
 		OnInventoryChanged.Broadcast();
+
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemAcquired(SourceSlot.ItemData.ItemID, Items[EmptySlot].Quantity);
+			if (SourceSlot.ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(SourceSlot.ItemData.ItemID, Items[EmptySlot].Quantity);
+			}
+		}
+
 		return Items[EmptySlot].Quantity;
 	}
 

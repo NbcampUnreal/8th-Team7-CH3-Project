@@ -1,7 +1,10 @@
 #include "Items/PDEquipmentComponent.h"
 
+#include "Data/PDQuestComponent.h"
+
 #include "Characters/PDPlayerCharacter.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDItemSoundLibrary.h"
 
 UPDEquipmentComponent::UPDEquipmentComponent()
 {
@@ -164,6 +167,7 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 		InventoryComponent->Items[InventorySlotIndex].Clear();
 	}
 
+	UPDItemSoundLibrary::PlayItemMoveSound(this, EquippedSlot.ItemData);
 	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
@@ -171,7 +175,7 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 }
 
 
-bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
+bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData, bool bReportQuestProgress)
 {
 	const EPDEquipmentSlotType TargetSlotType = ResolveEquipmentSlotType(ItemData);
 	if (TargetSlotType == EPDEquipmentSlotType::None || IsSlotOccupied(TargetSlotType))
@@ -195,6 +199,18 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData)
 	NewEquippedItem.ItemSlot = NewSlot;
 	EquippedItems.Add(TargetSlotType, NewEquippedItem);
 
+	UPDItemSoundLibrary::PlayItemMoveSound(this, NewSlot.ItemData);
+	if (bReportQuestProgress)
+	{
+		if (UPDQuestComponent* QuestComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDQuestComponent>() : nullptr)
+		{
+			QuestComponent->ReportItemAcquired(ItemData.ItemID, 1);
+			if (ItemData.bIsQuestItem)
+			{
+				QuestComponent->ReportQuestItemAcquired(ItemData.ItemID, 1);
+			}
+		}
+	}
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, NewSlot);
 	return true;

@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Inventory")
 	bool AddItemByID(FName ItemID, int32 Quantity = 1);
 
+	UFUNCTION(BlueprintPure, Category="PD|Inventory")
+	bool FindItemDataByID(FName ItemID, FPDItemData& OutItemData) const;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	bool RemoveItem(FName ItemID, int32 Quantity = 1);
 

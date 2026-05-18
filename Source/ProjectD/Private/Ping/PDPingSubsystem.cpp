@@ -2,6 +2,7 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "Ping/PDPingMarker.h"
+#include "Ping/PDFaintMarkActor.h"
 #include "Characters/Base/PDEnemyBase.h"
 #include "Enemy/Types/EnemyTypes.h"
 #include "Component/PDVisionComponent.h"
@@ -151,13 +152,37 @@ int32 UPDPingSubsystem::AddFaintMark(const FVector& InWorldLocation)
     NewMark.FaintId = NextFaintId++;
     NewMark.WorldLocation = InWorldLocation;
 
+    //월드 액터 스폰
+    if (UWorld* World = GetWorld())
+    {
+        if (UClass* ActorClass = DefaultFaintMarkActorClass)
+        {
+            FActorSpawnParameters Params;
+            Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            if (APDFaintMarkActor* Spawned = World->SpawnActor<APDFaintMarkActor>(
+                    ActorClass, InWorldLocation, FRotator::ZeroRotator, Params))
+            {
+                Spawned->InitializeFaintMark(NewMark.FaintId);
+                NewMark.MarkerActor = Spawned;
+            }
+        }
+    }
+
     ActiveFaintMarks.Add(NewMark.FaintId, NewMark);
     OnFaintMarkAdded.Broadcast(NewMark);
     return NewMark.FaintId;
 }
-
 bool UPDPingSubsystem::RemoveFaintMark(int32 InFaintId)
 {
+    //액터 먼저 Destroy
+    if (FPDFaintMark* Mark = ActiveFaintMarks.Find(InFaintId))
+    {
+        if (Mark->MarkerActor.IsValid())
+        {
+            Mark->MarkerActor->Destroy();
+        }
+    }
+
     if (ActiveFaintMarks.Remove(InFaintId) > 0)
     {
         OnFaintMarkRemoved.Broadcast(InFaintId);
