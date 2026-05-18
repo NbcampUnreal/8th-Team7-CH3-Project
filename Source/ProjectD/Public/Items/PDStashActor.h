@@ -7,7 +7,6 @@
 
 class APDPlayerController;
 class UBoxComponent;
-class UPoseableMeshComponent;
 class UPDStashComponent;
 class USoundBase;
 
@@ -32,9 +31,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UBoxComponent> InteractionCollision;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
-	TObjectPtr<UPoseableMeshComponent> StashMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UPDStashComponent> StashComponent;

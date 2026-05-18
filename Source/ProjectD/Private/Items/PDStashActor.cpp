@@ -1,7 +1,6 @@
 #include "Items/PDStashActor.h"
 
 #include "Components/BoxComponent.h"
-#include "Components/PoseableMeshComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
@@ -18,9 +17,6 @@ APDStashActor::APDStashActor()
 	InteractionCollision->SetBoxExtent(FVector(80.f, 80.f, 80.f));
 	ConfigureInteractionCollision();
 
-	StashMesh = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("StashMesh"));
-	StashMesh->SetupAttachment(InteractionCollision);
-	StashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
 
@@ -43,7 +39,6 @@ void APDStashActor::OnConstruction(const FTransform& Transform)
 	ConfigureInteractionCollision();
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
-	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -65,7 +60,6 @@ void APDStashActor::Tick(float DeltaSeconds)
 		SetActorTickEnabled(false);
 	}
 
-	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::Interact_Implementation(AActor* Interactor)
@@ -148,14 +142,6 @@ void APDStashActor::PlayDoorSound(bool bOpen) const
 
 void APDStashActor::ApplyDoorAngle(float Angle)
 {
-	if (!StashMesh || DoorBoneName.IsNone())
-	{
-		return;
-	}
-
-	const FVector Axis = DoorRotationAxis.IsNearlyZero() ? FVector::UpVector : DoorRotationAxis.GetSafeNormal();
-	const FQuat Rotation(Axis, FMath::DegreesToRadians(Angle));
-	StashMesh->SetBoneRotationByName(DoorBoneName, Rotation.Rotator(), EBoneSpaces::ComponentSpace);
 }
 
 void APDStashActor::BindStashClose(APDPlayerController* PlayerController)
