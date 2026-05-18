@@ -4,23 +4,29 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "PDMapMarkerSubsystem.generated.h"
 
-// 드맵 마커 데이터
+class APDMapMarkerActor;
+
+//월드맵 마커 데이터
 USTRUCT(BlueprintType)
 struct FPDMapMarker
 {
     GENERATED_BODY()
 
-    //고유 식별자. 자동 증가 (변경되지 않음)
+    //고유 식별자 자동 증가(변경되지 않음)
     UPROPERTY(BlueprintReadOnly, Category="Map")
     int32 MarkerId = -1;
 
-    //표시 번호 (1부터, 재정렬됨). 삭제 시 자동 재계산
+    //표시 번호(1부터, 재정렬)
     UPROPERTY(BlueprintReadOnly, Category="Map")
     int32 DisplayIndex = 0;
 
     //마커 월드 좌표
     UPROPERTY(BlueprintReadOnly, Category="Map")
     FVector WorldLocation = FVector::ZeroVector;
+    
+    //월드 액터
+    UPROPERTY(BlueprintReadOnly, Category="Map")
+    TWeakObjectPtr<APDMapMarkerActor> MarkerActor;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMapMarkerAdded, const FPDMapMarker&, Marker);
@@ -57,6 +63,10 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="Map")
     FOnMapMarkerRemoved OnMarkerRemoved;
+    
+    //월드에 스폰할 마커 액터 클래스 (BP에서 지정)
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Map")
+    TSubclassOf<APDMapMarkerActor> DefaultMarkerActorClass;
 
     virtual bool DoesSupportWorldType(EWorldType::Type WorldType) const override;
 

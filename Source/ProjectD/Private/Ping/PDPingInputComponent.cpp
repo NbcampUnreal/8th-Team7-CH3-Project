@@ -9,6 +9,9 @@
 #include "Blueprint/WidgetLayoutLibrary.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
+#include "Ping/PDMapMarkerActor.h"           
+#include "Ping/PDFaintMarkActor.h"          
+#include "Ping/PDMapMarkerSubsystem.h"   
 #include "Ping/PDPingMarker.h"
 
 UPDPingInputComponent::UPDPingInputComponent()
@@ -20,11 +23,34 @@ void UPDPingInputComponent::BindInputs(UPDInputComponent* PDIC, const UPDInputCo
 {
     if (!PDIC || !InputConfig) return;
     
+    //핑 클래스 전달
     if (PingMarkerClass)
     {
         if (UPDPingSubsystem* Sub = GetPingSubsystem())
         {
             Sub->DefaultMarkerClass = PingMarkerClass;
+        }
+    }
+    
+    
+    //마커 액터 클래스 전달
+    if (MapMarkerActorClass)
+    {
+        if (UWorld* World = GetWorld())
+        {
+            if (UPDMapMarkerSubsystem* MarkerSub = World->GetSubsystem<UPDMapMarkerSubsystem>())
+            {
+                MarkerSub->DefaultMarkerActorClass = MapMarkerActorClass;
+            }
+        }
+    }
+
+    //잔존표식 액터 클래스 전달
+    if (FaintMarkActorClass)
+    {
+        if (UPDPingSubsystem* Sub = GetPingSubsystem())
+        {
+            Sub->DefaultFaintMarkActorClass = FaintMarkActorClass;
         }
     }
 
