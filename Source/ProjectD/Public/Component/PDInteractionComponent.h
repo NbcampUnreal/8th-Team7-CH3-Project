@@ -35,12 +35,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Interaction")
 	float PollInterval = 0.1f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Interaction", meta = (ClampMin = "0.0"))
+	float OverlapProbeRadius = 50.f;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 	void PollTarget();
+	AActor* ChooseClosestInteractable(const TArray<AActor*>& Candidates, const FVector& FromLocation) const;
 
 	TWeakObjectPtr<AActor> CachedTarget;
 	FTimerHandle PollTimerHandle;

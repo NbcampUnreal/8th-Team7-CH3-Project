@@ -2,10 +2,11 @@
 
 #include "Interfaces/PDInteractable.h"
 #include "GameFramework/Actor.h"
+#include "Engine/OverlapResult.h"
 #include "Engine/World.h"
+#include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "TimerManager.h"
-
 UPDInteractionComponent::UPDInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
@@ -55,8 +56,9 @@ void UPDInteractionComponent::Interact()
 AActor* UPDInteractionComponent::FindInteractTarget() const
 {
 	AActor* OwnerActor = GetOwner();
+	UWorld* World = GetWorld();
 
-	if (!OwnerActor || !GetWorld())
+	if (!OwnerActor || !World)
 	{
 		return nullptr;
 	}
@@ -66,33 +68,45 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 	TArray<AActor*> OverlappingActors;
 	OwnerActor->GetOverlappingActors(OverlappingActors);
 
-	AActor* ClosestOverlappingInteractable = nullptr;
-	float ClosestOverlappingDistanceSq = TNumericLimits<float>::Max();
-
-	for (AActor* OverlappingActor : OverlappingActors)
+	if (AActor* OverlapTarget = ChooseClosestInteractable(OverlappingActors, Start))
 	{
-		if (!OverlappingActor || OverlappingActor == OwnerActor)
-		{
-			continue;
-		}
-
-		if (!OverlappingActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
-		{
-			continue;
-		}
-
-		const float DistanceSq = FVector::DistSquared(Start, OverlappingActor->GetActorLocation());
-
-		if (DistanceSq < ClosestOverlappingDistanceSq)
-		{
-			ClosestOverlappingDistanceSq = DistanceSq;
-			ClosestOverlappingInteractable = OverlappingActor;
-		}
+		return OverlapTarget;
 	}
 
-	if (ClosestOverlappingInteractable)
+	TArray<FOverlapResult> OverlapResults;
+	FCollisionQueryParams OverlapParams(SCENE_QUERY_STAT(PDInteractionOverlap), false, OwnerActor);
+	OverlapParams.AddIgnoredActor(OwnerActor);
+
+	FCollisionObjectQueryParams ObjectQueryParams;
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectQueryParams.AddObjectTypesToQuery(ECC_WorldStatic);
+
+	const bool bHasOverlap = World->OverlapMultiByObjectType(
+		OverlapResults,
+		Start,
+		FQuat::Identity,
+		ObjectQueryParams,
+		FCollisionShape::MakeSphere(OverlapProbeRadius),
+		OverlapParams);
+
+	if (bHasOverlap)
 	{
-		return ClosestOverlappingInteractable;
+		TArray<AActor*> ProbeActors;
+
+		for (const FOverlapResult& Result : OverlapResults)
+		{
+			AActor* ResultActor = Result.GetActor();
+
+			if (ResultActor && ResultActor != OwnerActor)
+			{
+				ProbeActors.AddUnique(ResultActor);
+			}
+		}
+
+		if (AActor* ProbeTarget = ChooseClosestInteractable(ProbeActors, Start))
+		{
+			return ProbeTarget;
+		}
 	}
 
 	const FVector End = Start + OwnerActor->GetActorForwardVector() * InteractDistance;
@@ -102,7 +116,7 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 	Params.AddIgnoredActor(OwnerActor);
 	const FCollisionShape Shape = FCollisionShape::MakeSphere(80.f);
 
-	const bool bHit = GetWorld()->SweepMultiByChannel(
+	const bool bHit = World->SweepMultiByChannel(
 		Hits,
 		Start,
 		End,
@@ -117,29 +131,45 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 		return nullptr;
 	}
 
-	AActor* ClosestInteractable = nullptr;
-	float ClosestDistanceSq = TNumericLimits<float>::Max();
+	TArray<AActor*> HitActors;
 
 	for (const FHitResult& Hit : Hits)
 	{
 		AActor* HitActor = Hit.GetActor();
 
-		if (!HitActor || HitActor == OwnerActor)
+		if (HitActor && HitActor != OwnerActor)
+		{
+			HitActors.AddUnique(HitActor);
+		}
+	}
+
+	return ChooseClosestInteractable(HitActors, Start);
+}
+
+AActor* UPDInteractionComponent::ChooseClosestInteractable(const TArray<AActor*>& Candidates, const FVector& FromLocation) const
+{
+	AActor* OwnerActor = GetOwner();
+	AActor* ClosestInteractable = nullptr;
+	float ClosestDistanceSq = TNumericLimits<float>::Max();
+
+	for (AActor* Candidate : Candidates)
+	{
+		if (!Candidate || Candidate == OwnerActor)
 		{
 			continue;
 		}
 
-		if (!HitActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+		if (!Candidate->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
 		{
 			continue;
 		}
 
-		const float DistanceSq = FVector::DistSquared(Start, Hit.ImpactPoint);
+		const float DistanceSq = FVector::DistSquared(FromLocation, Candidate->GetActorLocation());
 
 		if (DistanceSq < ClosestDistanceSq)
 		{
 			ClosestDistanceSq = DistanceSq;
-			ClosestInteractable = HitActor;
+			ClosestInteractable = Candidate;
 		}
 	}
 
