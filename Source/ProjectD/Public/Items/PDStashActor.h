@@ -7,7 +7,6 @@
 
 class APDPlayerController;
 class UBoxComponent;
-class UPoseableMeshComponent;
 class UPDStashComponent;
 class USoundBase;
 
@@ -32,9 +31,6 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UBoxComponent> InteractionCollision;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
-	TObjectPtr<UPoseableMeshComponent> StashMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UPDStashComponent> StashComponent;
@@ -67,6 +63,7 @@ protected:
 	float SoundPitchMultiplier = 1.f;
 
 private:
+	void ConfigureInteractionCollision() const;
 	void SetDoorOpen(bool bOpen, bool bInstant = false);
 	void ApplyDoorAngle(float Angle);
 	void PlayDoorSound(bool bOpen) const;

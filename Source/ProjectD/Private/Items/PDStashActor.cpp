@@ -1,7 +1,6 @@
 #include "Items/PDStashActor.h"
 
 #include "Components/BoxComponent.h"
-#include "Components/PoseableMeshComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
@@ -16,15 +15,8 @@ APDStashActor::APDStashActor()
 	InteractionCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionCollision"));
 	SetRootComponent(InteractionCollision);
 	InteractionCollision->SetBoxExtent(FVector(80.f, 80.f, 80.f));
-	InteractionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	InteractionCollision->SetCollisionObjectType(ECC_WorldDynamic);
-	InteractionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-	InteractionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	InteractionCollision->SetGenerateOverlapEvents(false);
+	ConfigureInteractionCollision();
 
-	StashMesh = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("StashMesh"));
-	StashMesh->SetupAttachment(InteractionCollision);
-	StashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
 
@@ -36,6 +28,7 @@ void APDStashActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ConfigureInteractionCollision();
 	SetDoorOpen(false, true);
 }
 
@@ -43,9 +36,9 @@ void APDStashActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	ConfigureInteractionCollision();
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
-	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -67,7 +60,6 @@ void APDStashActor::Tick(float DeltaSeconds)
 		SetActorTickEnabled(false);
 	}
 
-	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::Interact_Implementation(AActor* Interactor)
@@ -97,6 +89,21 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 		BindStashClose(PlayerController);
 		SetDoorOpen(true);
 	}
+}
+
+void APDStashActor::ConfigureInteractionCollision() const
+{
+	if (!InteractionCollision)
+	{
+		return;
+	}
+
+	InteractionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	InteractionCollision->SetCollisionObjectType(ECC_WorldDynamic);
+	InteractionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+	InteractionCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	InteractionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	InteractionCollision->SetGenerateOverlapEvents(true);
 }
 
 void APDStashActor::SetDoorOpen(bool bOpen, bool bInstant)
@@ -135,14 +142,6 @@ void APDStashActor::PlayDoorSound(bool bOpen) const
 
 void APDStashActor::ApplyDoorAngle(float Angle)
 {
-	if (!StashMesh || DoorBoneName.IsNone())
-	{
-		return;
-	}
-
-	const FVector Axis = DoorRotationAxis.IsNearlyZero() ? FVector::UpVector : DoorRotationAxis.GetSafeNormal();
-	const FQuat Rotation(Axis, FMath::DegreesToRadians(Angle));
-	StashMesh->SetBoneRotationByName(DoorBoneName, Rotation.Rotator(), EBoneSpaces::ComponentSpace);
 }
 
 void APDStashActor::BindStashClose(APDPlayerController* PlayerController)

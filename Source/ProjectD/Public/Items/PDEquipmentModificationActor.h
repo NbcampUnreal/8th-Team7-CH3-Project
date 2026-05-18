@@ -16,12 +16,17 @@ class PROJECTD_API APDEquipmentModificationActor : public AActor, public IPDInte
 public:
 	APDEquipmentModificationActor();
 
+	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 protected:
+	virtual void BeginPlay() override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment Modification")
 	TObjectPtr<UBoxComponent> InteractionCollision;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment Modification")
 	TObjectPtr<UStaticMeshComponent> WorkbenchMesh;
+
+private:
+	void ConfigureInteractionCollision() const;
 };
