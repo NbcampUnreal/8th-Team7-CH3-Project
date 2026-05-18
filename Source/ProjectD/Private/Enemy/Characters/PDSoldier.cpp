@@ -243,6 +243,14 @@ void APDSoldier::OnFireTick()
 		return;
 	}
 
+	// 상태 게이트 — BT 가 Combat 분기에서 SetEnemyState(Combat) 호출했을 때만 발사.
+	// Idle/Alert/Chase 등 BT 결정 이전 단계에서 OnTargetChanged 만으로 자동 발사되는 것 차단.
+	if (GetEnemyState() != EPDEnemyState::Combat)
+	{
+		PD_SOLDIER_FIRE_LOG("SKIP (state != Combat, state=%d)", static_cast<int32>(GetEnemyState()));
+		return;
+	}
+
 	if (bRequireInRangeToFire)
 	{
 		if (const AActor* Target = Combat->GetCurrentTarget())
