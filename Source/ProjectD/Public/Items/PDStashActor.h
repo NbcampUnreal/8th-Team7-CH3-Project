@@ -67,6 +67,7 @@ protected:
 	float SoundPitchMultiplier = 1.f;
 
 private:
+	void ConfigureInteractionCollision() const;
 	void SetDoorOpen(bool bOpen, bool bInstant = false);
 	void ApplyDoorAngle(float Angle);
 	void PlayDoorSound(bool bOpen) const;

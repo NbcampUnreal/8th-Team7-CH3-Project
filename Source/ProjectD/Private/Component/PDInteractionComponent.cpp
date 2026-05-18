@@ -35,6 +35,39 @@ AActor* UPDInteractionComponent::FindInteractTarget() const
 	}
 
 	const FVector Start = OwnerActor->GetActorLocation() + FVector(0.f, 0.f, 50.f);
+
+	TArray<AActor*> OverlappingActors;
+	OwnerActor->GetOverlappingActors(OverlappingActors);
+
+	AActor* ClosestOverlappingInteractable = nullptr;
+	float ClosestOverlappingDistanceSq = TNumericLimits<float>::Max();
+
+	for (AActor* OverlappingActor : OverlappingActors)
+	{
+		if (!OverlappingActor || OverlappingActor == OwnerActor)
+		{
+			continue;
+		}
+
+		if (!OverlappingActor->GetClass()->ImplementsInterface(UPDInteractable::StaticClass()))
+		{
+			continue;
+		}
+
+		const float DistanceSq = FVector::DistSquared(Start, OverlappingActor->GetActorLocation());
+
+		if (DistanceSq < ClosestOverlappingDistanceSq)
+		{
+			ClosestOverlappingDistanceSq = DistanceSq;
+			ClosestOverlappingInteractable = OverlappingActor;
+		}
+	}
+
+	if (ClosestOverlappingInteractable)
+	{
+		return ClosestOverlappingInteractable;
+	}
+
 	const FVector End = Start + OwnerActor->GetActorForwardVector() * InteractDistance;
 
 	TArray<FHitResult> Hits;

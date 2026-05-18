@@ -16,11 +16,7 @@ APDStashActor::APDStashActor()
 	InteractionCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionCollision"));
 	SetRootComponent(InteractionCollision);
 	InteractionCollision->SetBoxExtent(FVector(80.f, 80.f, 80.f));
-	InteractionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	InteractionCollision->SetCollisionObjectType(ECC_WorldDynamic);
-	InteractionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
-	InteractionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
-	InteractionCollision->SetGenerateOverlapEvents(false);
+	ConfigureInteractionCollision();
 
 	StashMesh = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("StashMesh"));
 	StashMesh->SetupAttachment(InteractionCollision);
@@ -36,6 +32,7 @@ void APDStashActor::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ConfigureInteractionCollision();
 	SetDoorOpen(false, true);
 }
 
@@ -43,6 +40,7 @@ void APDStashActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 
+	ConfigureInteractionCollision();
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
 	ApplyDoorAngle(CurrentDoorAngle);
@@ -97,6 +95,21 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 		BindStashClose(PlayerController);
 		SetDoorOpen(true);
 	}
+}
+
+void APDStashActor::ConfigureInteractionCollision() const
+{
+	if (!InteractionCollision)
+	{
+		return;
+	}
+
+	InteractionCollision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	InteractionCollision->SetCollisionObjectType(ECC_WorldDynamic);
+	InteractionCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
+	InteractionCollision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	InteractionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	InteractionCollision->SetGenerateOverlapEvents(true);
 }
 
 void APDStashActor::SetDoorOpen(bool bOpen, bool bInstant)
