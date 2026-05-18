@@ -522,6 +522,8 @@ void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 
 void APDPlayerController::CloseStashInterface()
 {
+	UPDStashComponent* ClosingStashComponent = ActiveStashComponent.Get();
+
 	if (StashWidgetInstance && StashWidgetInstance->IsInViewport())
 	{
 		StashWidgetInstance->RemoveFromParent();
@@ -535,6 +537,11 @@ void APDPlayerController::CloseStashInterface()
 	InventoryWidgetInstance = nullptr;
 
 	ActiveStashComponent.Reset();
+
+	if (ClosingStashComponent)
+	{
+		OnStashInterfaceClosed.Broadcast(ClosingStashComponent);
+	}
 
 	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{

@@ -1,14 +1,17 @@
 #include "Items/PDStashActor.h"
 
 #include "Components/BoxComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/PoseableMeshComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 APDStashActor::APDStashActor()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	InteractionCollision = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionCollision"));
 	SetRootComponent(InteractionCollision);
@@ -19,11 +22,52 @@ APDStashActor::APDStashActor()
 	InteractionCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	InteractionCollision->SetGenerateOverlapEvents(false);
 
-	StashMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("StashMesh"));
+	StashMesh = CreateDefaultSubobject<UPoseableMeshComponent>(TEXT("StashMesh"));
 	StashMesh->SetupAttachment(InteractionCollision);
 	StashMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
 	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
+
+	CurrentDoorAngle = ClosedDoorAngle;
+	TargetDoorAngle = ClosedDoorAngle;
+}
+
+void APDStashActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	SetDoorOpen(false, true);
+}
+
+void APDStashActor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	CurrentDoorAngle = ClosedDoorAngle;
+	TargetDoorAngle = ClosedDoorAngle;
+	ApplyDoorAngle(CurrentDoorAngle);
+}
+
+void APDStashActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindStashClose();
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void APDStashActor::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	CurrentDoorAngle = FMath::FInterpTo(CurrentDoorAngle, TargetDoorAngle, DeltaSeconds, DoorInterpSpeed);
+
+	if (FMath::IsNearlyEqual(CurrentDoorAngle, TargetDoorAngle, 0.1f))
+	{
+		CurrentDoorAngle = TargetDoorAngle;
+		SetActorTickEnabled(false);
+	}
+
+	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::Interact_Implementation(AActor* Interactor)
@@ -40,11 +84,96 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 		return;
 	}
 
-	if (PlayerController->IsStashInterfaceOpen())
+	if (PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent)
 	{
 		PlayerController->CloseStashInterface();
 		return;
 	}
 
 	PlayerController->OpenStashInterface(StashComponent);
+
+	if (PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent)
+	{
+		BindStashClose(PlayerController);
+		SetDoorOpen(true);
+	}
+}
+
+void APDStashActor::SetDoorOpen(bool bOpen, bool bInstant)
+{
+	const float NewTargetDoorAngle = bOpen ? OpenDoorAngle : ClosedDoorAngle;
+	const bool bTargetChanged = !FMath::IsNearlyEqual(TargetDoorAngle, NewTargetDoorAngle, 0.1f);
+	TargetDoorAngle = NewTargetDoorAngle;
+
+	if (bTargetChanged && !bInstant)
+	{
+		PlayDoorSound(bOpen);
+	}
+
+	if (bInstant)
+	{
+		CurrentDoorAngle = TargetDoorAngle;
+		ApplyDoorAngle(CurrentDoorAngle);
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	SetActorTickEnabled(true);
+}
+
+void APDStashActor::PlayDoorSound(bool bOpen) const
+{
+	USoundBase* Sound = bOpen ? OpenSound.Get() : CloseSound.Get();
+
+	if (!Sound)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), SoundVolumeMultiplier, SoundPitchMultiplier);
+}
+
+void APDStashActor::ApplyDoorAngle(float Angle)
+{
+	if (!StashMesh || DoorBoneName.IsNone())
+	{
+		return;
+	}
+
+	const FVector Axis = DoorRotationAxis.IsNearlyZero() ? FVector::UpVector : DoorRotationAxis.GetSafeNormal();
+	const FQuat Rotation(Axis, FMath::DegreesToRadians(Angle));
+	StashMesh->SetBoneRotationByName(DoorBoneName, Rotation.Rotator(), EBoneSpaces::ComponentSpace);
+}
+
+void APDStashActor::BindStashClose(APDPlayerController* PlayerController)
+{
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UnbindStashClose();
+	BoundPlayerController = PlayerController;
+	PlayerController->OnStashInterfaceClosed.AddUObject(this, &APDStashActor::HandleStashInterfaceClosed);
+}
+
+void APDStashActor::UnbindStashClose()
+{
+	if (BoundPlayerController.IsValid())
+	{
+		BoundPlayerController->OnStashInterfaceClosed.RemoveAll(this);
+	}
+
+	BoundPlayerController.Reset();
+}
+
+void APDStashActor::HandleStashInterfaceClosed(UPDStashComponent* ClosedStashComponent)
+{
+	if (ClosedStashComponent != StashComponent)
+	{
+		return;
+	}
+
+	UnbindStashClose();
+	SetDoorOpen(false);
 }

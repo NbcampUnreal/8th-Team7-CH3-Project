@@ -31,6 +31,8 @@ class UPDWorldMapWidget;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
+
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -42,6 +44,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Raid")
 	void RequestExtraction();
+
+	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);
