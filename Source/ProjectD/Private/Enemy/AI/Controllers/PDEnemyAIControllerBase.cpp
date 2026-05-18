@@ -5,8 +5,10 @@
 #include "BehaviorTree/BlackboardComponent.h"
 #include "BehaviorTree/BlackboardData.h"
 #include "Characters/Base/PDEnemyBase.h"
+#include "Components/SplineComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/Characters/PDBipedEnemy.h"
 #include "Enemy/Components/PDPerceptionComponent.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameFramework/Controller.h"
@@ -169,6 +171,19 @@ void APDEnemyAIControllerBase::HandleTargetSpotted(AActor* Target)
 
 void APDEnemyAIControllerBase::HandleTargetLost(AActor* Target, FVector LastKnownLocation)
 {
+	// 순서 주의: BB 먼저, Combat 나중.
+	// Combat->ClearCurrentTarget 이 OnTargetChanged.Broadcast(nullptr) 를 통해 HandleCombatTargetChanged 를 즉시 호출하고
+	// 그 안에서 BB.TargetActor 가 null 처리됨. 그 뒤에 본 함수의 BB 검사를 하면 `== Target` 비교가 false 가 되어
+	// LastSeenLocation 갱신이 영구 SKIP 되는 순서 버그 회피.
+	if (UBlackboardComponent* BB = GetBlackboardComponent())
+	{
+		if (BB->GetValueAsObject(PDBTKeys::TargetActor) == Target)
+		{
+			BB->ClearValue(PDBTKeys::TargetActor);
+			BB->SetValueAsVector(PDBTKeys::LastSeenLocation, LastKnownLocation);
+		}
+	}
+
 	APawn* OwnerPawn = GetPawn();
 	if (UPDCombatComponent* Combat = OwnerPawn ? OwnerPawn->FindComponentByClass<UPDCombatComponent>() : nullptr)
 	{
@@ -176,16 +191,6 @@ void APDEnemyAIControllerBase::HandleTargetLost(AActor* Target, FVector LastKnow
 		if (Combat->GetCurrentTarget() == Target)
 		{
 			Combat->ClearCurrentTarget();
-		}
-	}
-
-	if (UBlackboardComponent* BB = GetBlackboardComponent())
-	{
-		// BT 는 LastSeenLocation 으로 Chase 진행 후, TargetActor=null 이면 Idle 복귀 분기.
-		if (BB->GetValueAsObject(PDBTKeys::TargetActor) == Target)
-		{
-			BB->ClearValue(PDBTKeys::TargetActor);
-			BB->SetValueAsVector(PDBTKeys::LastSeenLocation, LastKnownLocation);
 		}
 	}
 
@@ -297,6 +302,36 @@ void APDEnemyAIControllerBase::DrawAIDebug() const
 			const FVector NoiseLoc = Combat->GetLastNoiseLocation();
 			DrawDebugSphere(World, NoiseLoc, 60.f, 16, FColor::Yellow, false, -1.f, SDPG_World, 2.f);
 			DrawDebugLine  (World, Origin, NoiseLoc, FColor::Yellow, false, -1.f, SDPG_World, 1.f);
+		}
+	}
+
+	// Patrol waypoints 시각화 — bUsePatrolRoute=true 인 BipedEnemy 의 캐시된 월드 좌표.
+	// 에디터의 spline 라인은 적과 함께 움직이지만, 캐시된 점들은 런타임 고정 좌표라 patrol 의 진짜 위치 확인용.
+	if (const APDBipedEnemy* Biped = Cast<APDBipedEnemy>(OwnerPawn))
+	{
+		if (Biped->HasPatrolRoute())
+		{
+			const FVector Lift(0.f, 0.f, 30.f);
+			TArray<FVector> Pts;
+			Pts.Reserve(8);
+			// PDBipedEnemy 의 캐시는 private — public 헬퍼 없이도 spline 컴포넌트에서 다시 읽어와 시각화.
+			if (const USplineComponent* Spline = Biped->GetPatrolRouteSpline())
+			{
+				for (int32 i = 0; i < Spline->GetNumberOfSplinePoints(); ++i)
+				{
+					Pts.Add(Spline->GetLocationAtSplinePoint(i, ESplineCoordinateSpace::World));
+				}
+			}
+			for (int32 i = 0; i < Pts.Num(); ++i)
+			{
+				DrawDebugSphere(World, Pts[i] + Lift, 30.f, 12, FColor(0, 200, 255), false, -1.f, SDPG_World, 1.5f);
+				const FString Label = FString::Printf(TEXT("WP%d"), i);
+				DrawDebugString(World, Pts[i] + Lift + FVector(0, 0, 30), Label, nullptr, FColor::White, 0.f, false, 1.f);
+			}
+			for (int32 i = 1; i < Pts.Num(); ++i)
+			{
+				DrawDebugLine(World, Pts[i - 1] + Lift, Pts[i] + Lift, FColor(0, 200, 255), false, -1.f, SDPG_World, 2.f);
+			}
 		}
 	}
 
