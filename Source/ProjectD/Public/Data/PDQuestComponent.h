@@ -108,6 +108,7 @@ private:
 	bool RefreshItemCountObjective(FPDQuestProgress& QuestProgress, const FPDQuestObjective& Objective);
 	void RefreshAllItemCountObjectives(FPDQuestProgress& QuestProgress);
 	int32 RemoveQuestItemsFromStash(FName ItemID, int32 Quantity);
+	bool CanReceiveQuestReward(const FPDQuestProgress& QuestProgress, const UPDInventoryComponent* InventoryComponent) const;
 	bool RemoveQuestObjectiveItems(FPDQuestProgress& QuestProgress, UPDInventoryComponent* InventoryComponent);
 	void RefreshQuestState(FPDQuestProgress& QuestProgress);
 	void BroadcastQuestUpdated(FName QuestID, EPDQuestState PreviousState, EPDQuestState NewState);

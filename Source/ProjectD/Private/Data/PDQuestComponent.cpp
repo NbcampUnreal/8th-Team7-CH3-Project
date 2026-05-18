@@ -2,6 +2,7 @@
 
 #include "Core/PDGameInstance.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDEquipmentComponent.h"
 
 namespace
 {
@@ -192,14 +193,25 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 		return false;
 	}
 
-	if (!RemoveQuestObjectiveItems(*QuestProgress, InventoryComponent))
+	if (!CanReceiveQuestReward(*QuestProgress, InventoryComponent))
 	{
+		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("보상을 받을 수 없습니다. 인벤토리 상태를 확인해주세요.")));
 		return false;
 	}
 
-	for (const FPDItemData& RewardItem : QuestProgress->QuestData.Reward.RewardItems)
+	if (!RemoveQuestObjectiveItems(*QuestProgress, InventoryComponent))
 	{
-		InventoryComponent->AddItemPartial(RewardItem, 1);
+		InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("퀘스트 완료 조건 아이템이 부족합니다.")));
+		return false;
+	}
+
+	for (const FName RewardItemID : QuestProgress->QuestData.Reward.RewardItems)
+	{
+		if (!InventoryComponent->AddItemByID(RewardItemID, 1))
+		{
+			InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("보상 지급에 실패했습니다. 인벤토리 상태를 확인해주세요.")));
+			return false;
+		}
 	}
 
 	InventoryComponent->AddGold(QuestProgress->QuestData.Reward.RewardGold);
@@ -579,6 +591,191 @@ int32 UPDQuestComponent::RemoveQuestItemsFromStash(FName ItemID, int32 Quantity)
 	}
 
 	return RemovedQuantity;
+}
+
+bool UPDQuestComponent::CanReceiveQuestReward(const FPDQuestProgress& QuestProgress, const UPDInventoryComponent* InventoryComponent) const
+{
+	if (!InventoryComponent)
+	{
+		return false;
+	}
+
+	TArray<FPDInventorySlot> SimulatedItems = InventoryComponent->Items;
+	SimulatedItems.SetNum(InventoryComponent->GetMaxSlotCount());
+
+	TMap<EPDEquipmentSlotType, bool> SimulatedOccupiedEquipmentSlots;
+	float SimulatedMaxWeight = FMath::Max(0.f, InventoryComponent->BaseCarryWeight);
+
+	if (const UPDEquipmentComponent* EquipmentComponent = InventoryComponent->GetOwner() ? InventoryComponent->GetOwner()->FindComponentByClass<UPDEquipmentComponent>() : nullptr)
+	{
+		for (const TPair<EPDEquipmentSlotType, FPDEquippedItem>& Pair : EquipmentComponent->GetEquippedItems())
+		{
+			const FPDInventorySlot EquippedSlot = Pair.Value.ItemSlot;
+			if (!EquippedSlot.IsEmpty())
+			{
+				SimulatedOccupiedEquipmentSlots.Add(Pair.Key, true);
+				if (Pair.Key == EPDEquipmentSlotType::Bag)
+				{
+					SimulatedMaxWeight += FMath::Max(0.f, EquippedSlot.ItemData.BagCapacityWeight);
+				}
+			}
+		}
+	}
+
+	auto GetSimulatedWeight = [&SimulatedItems]()
+	{
+		float TotalWeight = 0.f;
+		for (const FPDInventorySlot& Slot : SimulatedItems)
+		{
+			if (!Slot.IsEmpty())
+			{
+				TotalWeight += FMath::Max(0.f, Slot.ItemData.Weight) * FMath::Max(0, Slot.Quantity);
+			}
+		}
+		return TotalWeight;
+	};
+
+	auto RemoveRequiredItem = [&SimulatedItems](FName ItemID, int32 Quantity)
+	{
+		if (ItemID.IsNone() || Quantity <= 0)
+		{
+			return true;
+		}
+
+		int32 RemainingQuantity = Quantity;
+		const bool bRemoveAnyItem = IsAnyQuestTarget(ItemID);
+
+		for (int32 Index = SimulatedItems.Num() - 1; Index >= 0 && RemainingQuantity > 0; --Index)
+		{
+			FPDInventorySlot& Slot = SimulatedItems[Index];
+			if (Slot.IsEmpty() || (!bRemoveAnyItem && Slot.ItemData.ItemID != ItemID))
+			{
+				continue;
+			}
+
+			const int32 RemoveAmount = FMath::Min(RemainingQuantity, Slot.Quantity);
+			Slot.Quantity -= RemoveAmount;
+			RemainingQuantity -= RemoveAmount;
+
+			if (Slot.Quantity <= 0)
+			{
+				Slot.Clear();
+			}
+		}
+
+		return RemainingQuantity <= 0;
+	};
+
+	TMap<FName, int32> RequiredItems;
+	for (const FPDQuestObjective& Objective : QuestProgress.QuestData.Objectives)
+	{
+		if (Objective.ObjectiveType == EPDQuestObjectiveType::QuestItemAcquired && !Objective.TargetID.IsNone())
+		{
+			RequiredItems.FindOrAdd(Objective.TargetID) += FMath::Max(1, Objective.RequiredCount);
+		}
+	}
+
+	for (const TPair<FName, int32>& Pair : RequiredItems)
+	{
+		if (GetInventoryAndStashItemCount(Pair.Key, InventoryComponent) < Pair.Value)
+		{
+			return false;
+		}
+
+		RemoveRequiredItem(Pair.Key, Pair.Value);
+	}
+
+	auto AddRewardItemToInventory = [&SimulatedItems, &SimulatedMaxWeight, &GetSimulatedWeight](const FPDItemData& ItemData, int32 Quantity)
+	{
+		if (Quantity <= 0)
+		{
+			return true;
+		}
+
+		if (GetSimulatedWeight() + FMath::Max(0.f, ItemData.Weight) * Quantity > SimulatedMaxWeight + KINDA_SMALL_NUMBER)
+		{
+			return false;
+		}
+
+		int32 RemainingQuantity = Quantity;
+		const int32 MaxStack = FMath::Max(1, ItemData.MaxStack);
+
+		if (MaxStack > 1)
+		{
+			for (FPDInventorySlot& Slot : SimulatedItems)
+			{
+				if (!Slot.IsEmpty() && Slot.ItemData.ItemID == ItemData.ItemID && Slot.Quantity < MaxStack)
+				{
+					const int32 AddAmount = FMath::Min(RemainingQuantity, MaxStack - Slot.Quantity);
+					Slot.Quantity += AddAmount;
+					RemainingQuantity -= AddAmount;
+
+					if (RemainingQuantity <= 0)
+					{
+						return true;
+					}
+				}
+			}
+		}
+
+		for (FPDInventorySlot& Slot : SimulatedItems)
+		{
+			if (!Slot.IsEmpty())
+			{
+				continue;
+			}
+
+			const int32 AddAmount = FMath::Min(RemainingQuantity, MaxStack);
+			Slot.ItemData = ItemData;
+			Slot.Quantity = AddAmount;
+			Slot.bIsEmpty = false;
+			Slot.ModificationLevel = 0;
+			RemainingQuantity -= AddAmount;
+
+			if (RemainingQuantity <= 0)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	};
+
+	for (const FName RewardItemID : QuestProgress.QuestData.Reward.RewardItems)
+	{
+		FPDItemData RewardItemData;
+		if (!InventoryComponent->FindItemDataByID(RewardItemID, RewardItemData))
+		{
+			return false;
+		}
+
+		int32 RemainingQuantity = 1;
+		if (RewardItemData.ItemType == EPDItemType::Equipment)
+		{
+			EPDEquipmentSlotType TargetSlotType = RewardItemData.EquipmentSlotType;
+			if (TargetSlotType == EPDEquipmentSlotType::None && RewardItemData.WeaponType != EWeaponType::None)
+			{
+				TargetSlotType = EPDEquipmentSlotType::Weapon;
+			}
+
+			if (TargetSlotType != EPDEquipmentSlotType::None && !SimulatedOccupiedEquipmentSlots.Contains(TargetSlotType))
+			{
+				SimulatedOccupiedEquipmentSlots.Add(TargetSlotType, true);
+				if (TargetSlotType == EPDEquipmentSlotType::Bag)
+				{
+					SimulatedMaxWeight += FMath::Max(0.f, RewardItemData.BagCapacityWeight);
+				}
+				--RemainingQuantity;
+			}
+		}
+
+		if (!AddRewardItemToInventory(RewardItemData, RemainingQuantity))
+		{
+			return false;
+		}
+	}
+
+	return true;
 }
 
 bool UPDQuestComponent::RemoveQuestObjectiveItems(FPDQuestProgress& QuestProgress, UPDInventoryComponent* InventoryComponent)
