@@ -5,6 +5,10 @@
 #include "Interfaces/PDInteractable.h"
 #include "PDStashActor.generated.h"
 
+class APDStashActor;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDStashStateChangedSignature, APDStashActor*, StashActor);
+
 class APDPlayerController;
 class UBoxComponent;
 class UPDStashComponent;
@@ -25,6 +29,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	FORCEINLINE UPDStashComponent* GetStashComponent() const { return StashComponent; }
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Stash|Events")
+	FPDStashStateChangedSignature OnStorageOpened;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Stash|Events")
+	FPDStashStateChangedSignature OnStorageClosed;
 
 protected:
 	virtual void BeginPlay() override;

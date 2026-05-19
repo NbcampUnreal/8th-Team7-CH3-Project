@@ -36,6 +36,7 @@ enum class EWidgetInputMode : uint8;
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature,  UPDLootComponent*);
+DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
 
 
 UCLASS(abstract)
@@ -50,6 +51,7 @@ public:
 	void RequestExtraction();
 
 	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
+	FPDEquipmentModificationInterfaceClosedSignature OnEquipmentModificationInterfaceClosed;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
 	void OpenStashInterface(UPDStashComponent* StashSource);

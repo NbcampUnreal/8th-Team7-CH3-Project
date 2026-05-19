@@ -87,7 +87,7 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 	if (PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent)
 	{
 		BindContainerClose(PlayerController);
-		SetDoorOpen(true);
+		OnStorageOpened.Broadcast(this);
 	}
 }
 
@@ -174,5 +174,5 @@ void APDStashActor::HandleContainerClosed(UPDStashComponent* ClosedStashComponen
 	}
 
 	UnbindContainerClose();
-	SetDoorOpen(false);
+	OnStorageClosed.Broadcast(this);
 }
