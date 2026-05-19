@@ -6,9 +6,12 @@
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
 #include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
+#include "Enemy/Components/PDPerceptionComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "HAL/IConsoleManager.h"
+#include "Interfaces/PDDamageable.h"
 
 #if ENABLE_DRAW_DEBUG
 static IConsoleVariable* GetPDAIDebugCVar()
@@ -40,6 +43,40 @@ void UPDBTService_UpdateCombatBB::TickNode(UBehaviorTreeComponent& OwnerComp, ui
 
 	BB->SetValueAsBool (PDBTKeys::CanAttack,    Combat->CanAttack());
 	BB->SetValueAsFloat(PDBTKeys::AttackRange,  Combat->GetAttackRange());
+
+	// ─── Stale Target 강제 해제 ─────────────────────────────────────────────
+	// Squad 통보로 들어온 타겟은 perception 의 Lost 신호가 안 와서 영구 추적되는 버그를 차단.
+	// 거리/생존 둘 중 하나라도 무효면 BB + Combat 양쪽 모두 clear → 아래 분기에서 Target=null 로 진행.
+	if (AActor* CachedTarget = Cast<AActor>(BB->GetValueAsObject(PDBTKeys::TargetActor)))
+	{
+		const bool bDead = CachedTarget->Implements<UPDDamageable>()
+			&& !IPDDamageable::Execute_IsAlive(CachedTarget);
+
+		float MaxDist = MaxTrackDistance;
+		if (MaxDist <= 0.f)
+		{
+			// AIController 의 perception 으로부터 LoseSightRadius 자동 채용 — perception 과 동일 정책.
+			if (const APDEnemyAIControllerBase* PDController = Cast<APDEnemyAIControllerBase>(AIController))
+			{
+				if (const UPDPerceptionComponent* Perception = PDController->GetPDPerception())
+				{
+					MaxDist = Perception->GetLoseSightRadius();
+				}
+			}
+		}
+		MaxDist *= FMath::Max(MaxTrackDistanceMargin, 1.f);
+
+		const float TargetDist = FVector::Dist(Pawn->GetActorLocation(), CachedTarget->GetActorLocation());
+		const bool bOutOfRange = (MaxDist > 0.f) && (TargetDist > MaxDist);
+
+		if (bDead || bOutOfRange)
+		{
+			// 해제 직전 마지막 위치 기록 — BT 가 LastSeenLocation 기반 investigate 분기로 자연 전이.
+			BB->SetValueAsVector(PDBTKeys::LastSeenLocation, CachedTarget->GetActorLocation());
+			BB->ClearValue(PDBTKeys::TargetActor);
+			Combat->ClearCurrentTarget();
+		}
+	}
 
 	// 거리/시야는 매 프레임 변하지만 BB 키 자체는 안 바뀌므로 Decorator 옵저버가 트리거되지 않음.
 	// 결과를 Bool 키에 캐싱해서 표준 Blackboard Decorator 가 변화를 감지하도록 함.
