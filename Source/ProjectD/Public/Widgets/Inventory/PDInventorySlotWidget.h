@@ -8,8 +8,10 @@
 
 class UTextBlock;
 class UImage;
+class UBorder;
 class UMaterialInterface;
 class UPDInventorySlotWidget;
+class UPDItemGradeColorData;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventorySlotClicked, UPDInventorySlotWidget*, SlotWidget, int32, SlotIndex);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPDOnInventorySlotHovered, UPDInventorySlotWidget*, SlotWidget, int32, SlotIndex);
@@ -95,33 +97,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory|Debug")
 	bool bShowDebugSlotIndex = false;
 
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName TextItemNameWidgetName = TEXT("Text_ItemName");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName TextQuantityWidgetName = TEXT("Text_Quantity");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageItemIconWidgetName = TEXT("Image_ItemIcon");
-
 	/* --- 추가 Start--- */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageSlotBGWidgetName = TEXT("Image_SlotBG");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageHoverBorderWidgetName = TEXT("Image_HoverBorder");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageDropValidWidgetName = TEXT("Image_DropValid");
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageDropInvalidWidgetName = TEXT("Image_DropInvalid");
-
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Empty;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
 	TSoftObjectPtr<UMaterialInterface> SlotBGMaterial_Filled;
+
+	/** 등급별 슬롯 배경 틴트. 비어있으면 흰색(원본 머티리얼 그대로). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Widget", meta = (AllowPrivateAccess = "true"))
+	TSoftObjectPtr<UPDItemGradeColorData> GradeColorData;
 	/* --- 추가 End--- */
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory|Tooltip", meta = (AllowPrivateAccess = "true"))
@@ -140,11 +125,7 @@ protected:
 	FName TooltipWeightWidgetName = TEXT("Text_Weight");
 
 private:
-	void ResolveTextWidgets();
-	/* --- 추가 Start--- */
-	void ResolveOverlayWidgets();
 	void ClearDropOverlays();
-	/* --- 추가 End--- */
 	void RefreshVisuals();
 	void ApplyTooltip(const FText& DisplayName, const FText& Description);
 	void ClearTooltip();
@@ -154,20 +135,24 @@ private:
 	FText CachedTooltipDisplayName;
 	FText CachedTooltipDescription;
 
-	TObjectPtr<UTextBlock> TextItemNameWidget = nullptr;
-	TObjectPtr<UTextBlock> TextQuantityWidget = nullptr;
-	TObjectPtr<UImage> ImageItemIconWidget = nullptr;
-	/* --- 추가 Start--- */
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageSlotBGWidget = nullptr;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UTextBlock> Text_ItemName = nullptr;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageHoverBorderWidget = nullptr;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UTextBlock> Text_Quantity = nullptr;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageDropValidWidget = nullptr;
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UImage> Image_ItemIcon = nullptr;
 
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageDropInvalidWidget = nullptr;
-	/* --- 추가 End--- */
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidget, AllowPrivateAccess = "true"))
+	TObjectPtr<UBorder> Border_SlotBG = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UImage> Image_HoverBorder = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UImage> Image_DropValid = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"))
+	TObjectPtr<UImage> Image_DropInvalid = nullptr;
 };

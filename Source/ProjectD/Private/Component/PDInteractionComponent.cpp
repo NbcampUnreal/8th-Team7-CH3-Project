@@ -2,6 +2,7 @@
 
 #include "Interfaces/PDInteractable.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
@@ -16,7 +17,52 @@ void UPDInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn)
+	{
+		return;
+	}
+
+	// 멀티: Controller가 BeginPlay 이후 늦게 replicate되는 경우(클라이언트 폰)를 위해
+	// 변경 시점마다 폴링 상태를 재평가. 첫 호출은 EvaluatePollingState로 즉시 평가.
+	OwnerPawn->ReceiveControllerChangedDelegate.AddDynamic(this, &UPDInteractionComponent::HandleOwnerControllerChanged);
+
+	EvaluatePollingState();
+}
+
+void UPDInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (APawn* OwnerPawn = Cast<APawn>(GetOwner()))
+	{
+		OwnerPawn->ReceiveControllerChangedDelegate.RemoveDynamic(this, &UPDInteractionComponent::HandleOwnerControllerChanged);
+	}
+
 	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PollTimerHandle);
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void UPDInteractionComponent::HandleOwnerControllerChanged(APawn* /*InPawn*/, AController* /*OldController*/, AController* /*NewController*/)
+{
+	EvaluatePollingState();
+}
+
+void UPDInteractionComponent::EvaluatePollingState()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	UWorld* World = GetWorld();
+	if (!OwnerPawn || !World)
+	{
+		return;
+	}
+
+	const bool bShouldPoll = OwnerPawn->IsLocallyControlled();
+	const bool bIsPolling = World->GetTimerManager().IsTimerActive(PollTimerHandle);
+
+	if (bShouldPoll && !bIsPolling)
 	{
 		World->GetTimerManager().SetTimer(
 			PollTimerHandle,
@@ -26,16 +72,17 @@ void UPDInteractionComponent::BeginPlay()
 			true,
 			0.f);
 	}
-}
-
-void UPDInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	if (UWorld* World = GetWorld())
+	else if (!bShouldPoll && bIsPolling)
 	{
 		World->GetTimerManager().ClearTimer(PollTimerHandle);
-	}
 
-	Super::EndPlay(EndPlayReason);
+		// 로컬 제어를 잃은 경우 HUD 프롬프트가 잔존하지 않도록 타겟 클리어.
+		if (CachedTarget.IsValid())
+		{
+			CachedTarget.Reset();
+			OnInteractTargetChanged.Broadcast(nullptr);
+		}
+	}
 }
 
 void UPDInteractionComponent::Interact()
