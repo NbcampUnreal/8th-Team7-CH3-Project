@@ -57,7 +57,7 @@ void UPDPerceptionComponent::BeginPlay()
 		HearingConfig->DetectionByAffiliation.bDetectFriendlies = false;
 	}
 
-	// 위에서 SenseConfig 를 직접 수정했으므로 perception 시스템이 변경된 설정을 다시 등록하도록 강제.
+	// perception 시스템이 변경된 설정을 다시 등록하도록 강제.
 	if (SightConfig)   { ConfigureSense(*SightConfig); }
 	if (HearingConfig) { ConfigureSense(*HearingConfig); }
 

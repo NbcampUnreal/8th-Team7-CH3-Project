@@ -88,6 +88,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot", meta = (ClampMin = "0.0"))
 	float LootSpawnRadius = 50.f;
 
+	/** 적이 들고 있던 무기의 시체 Stash 이전 확률. 0=절대 안 떨어뜨림, 1=항상 보장. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Loot|Weapon", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float WeaponDropChance = 0.8f;
+
 	/** LootTable을 굴려 아이템을 스폰. 호출 시점은 자식이 결정 가능 (기본은 OnEnterState_Dead). */
 	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
 	virtual void DropLootOnDeath();
@@ -98,6 +102,19 @@ protected:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Loot")
 	FORCEINLINE AActor* GetCorpseContainer() const { return CorpseContainerInstance.Get(); }
+
+	// ─── Equipped Weapon Drop ─────────────────────────────────────────────
+	/**
+	 * 사망 시 시체 컨테이너에 추가될 장착 무기의 ItemID. 자식이 override —
+	 * 무기 미장착이거나 비-드랍성 무기면 NAME_None 반환.
+	 */
+	UFUNCTION(BlueprintNativeEvent, Category = "PD|Loot|Weapon")
+	FName GetEquippedWeaponItemID() const;
+	virtual FName GetEquippedWeaponItemID_Implementation() const { return NAME_None; }
+
+	/** WeaponDropChance 굴려 성공 시 GetEquippedWeaponItemID 를 시체 Stash 에 1개 추가. */
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot|Weapon")
+	virtual void TryDropEquippedWeaponToCorpse();
 
 	/** 사망 시 스폰된 컨테이너 — 자식 클래스가 장착무기 등 추가 아이템 이전 시 참조. */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "PD|Loot")

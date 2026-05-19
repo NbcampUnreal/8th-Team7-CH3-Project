@@ -40,7 +40,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetCurrentAmmo()     const { return CurrentAmmo; }
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  IsReloading()        const { return bIsReloading; }
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  CanFire()            const;
-	UFUNCTION(BlueprintPure, Category="Weapon") bool  IsFullAuto()         const { return bFullAuto; }
+	// 자식 클래스가 FireMode(단발/연사) 같은 추가 조건을 더해 override 가능.
+	// Player GA_FireAbility / AI Soldier 양쪽 모두 본 메서드 값으로 연사 루프 진입 여부 결정.
+	UFUNCTION(BlueprintPure, Category="Weapon") virtual bool IsFullAuto() const { return bFullAuto; }
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetAvailableAmmoCount() const;
 	UFUNCTION(BlueprintPure,     Category="Weapon") bool HasInfiniteAmmo() const   { return bInfiniteAmmo; }
 	UFUNCTION(BlueprintCallable, Category="Weapon") void SetInfiniteAmmo(bool bEnabled) { bInfiniteAmmo = bEnabled; }

@@ -43,7 +43,7 @@ void APDStashActor::OnConstruction(const FTransform& Transform)
 
 void APDStashActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	UnbindStashClose();
+	UnbindContainerClose();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -86,7 +86,7 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 
 	if (PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent)
 	{
-		BindStashClose(PlayerController);
+		BindContainerClose(PlayerController);
 		SetDoorOpen(true);
 	}
 }
@@ -144,19 +144,19 @@ void APDStashActor::ApplyDoorAngle(float Angle)
 {
 }
 
-void APDStashActor::BindStashClose(APDPlayerController* PlayerController)
+void APDStashActor::BindContainerClose(APDPlayerController* PlayerController)
 {
 	if (!PlayerController)
 	{
 		return;
 	}
 
-	UnbindStashClose();
+	UnbindContainerClose();
 	BoundPlayerController = PlayerController;
-	PlayerController->OnStashInterfaceClosed.AddUObject(this, &APDStashActor::HandleStashInterfaceClosed);
+	PlayerController->OnStashInterfaceClosed.AddUObject(this, &APDStashActor::HandleContainerClosed);
 }
 
-void APDStashActor::UnbindStashClose()
+void APDStashActor::UnbindContainerClose()
 {
 	if (BoundPlayerController.IsValid())
 	{
@@ -166,13 +166,13 @@ void APDStashActor::UnbindStashClose()
 	BoundPlayerController.Reset();
 }
 
-void APDStashActor::HandleStashInterfaceClosed(UPDStashComponent* ClosedStashComponent)
+void APDStashActor::HandleContainerClosed(UPDStashComponent* ClosedStashComponent)
 {
 	if (ClosedStashComponent != StashComponent)
 	{
 		return;
 	}
 
-	UnbindStashClose();
+	UnbindContainerClose();
 	SetDoorOpen(false);
 }

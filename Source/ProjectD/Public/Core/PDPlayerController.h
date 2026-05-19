@@ -13,7 +13,9 @@ class UPathFollowingComponent;
 class UPDInputConfig;
 class UPDInventoryWidget;
 class UPDStashWidget;
+class UPDLootWidget;
 class UPDStashComponent;
+class UPDLootComponent;
 class UPDMarketWidget;
 class UPDMarketComponent;
 class UPDQuestWindowWidget;
@@ -32,6 +34,7 @@ enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature,  UPDLootComponent*);
 
 
 UCLASS(abstract)
@@ -59,6 +62,23 @@ public:
 	// 현재 열린 박스의 컴포넌트. stash 인터페이스가 닫혀있으면 nullptr.
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	FORCEINLINE UPDStashComponent* GetActiveStashComponent() const { return ActiveStashComponent.Get(); }
+
+	// ─── LootBox 인터페이스 ──────────────────────────────────────────────
+	// Stash 와 완전히 분리된 시스템 — UPDLootComponent 백엔드, 모든 플레이어 공유 컨테이너.
+	FPDLootInterfaceClosedSignature OnLootInterfaceClosed;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	void OpenLootInterface(UPDLootComponent* LootSource);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	void CloseLootInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Loot")
+	bool IsLootInterfaceOpen() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Loot")
+	FORCEINLINE UPDLootComponent* GetActiveLootComponent() const { return ActiveLootComponent.Get(); }
+	// ─── LootBox 인터페이스 끝 ────────────────────────────────────────────
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -122,6 +142,9 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDStashWidget> StashWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDLootWidget> LootWidgetClass; // LootBox용
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
@@ -191,6 +214,9 @@ private:
 	TObjectPtr<UPDStashWidget> StashWidgetInstance;
 
 	UPROPERTY(Transient)
+	TObjectPtr<UPDLootWidget> LootWidgetInstance;
+
+	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketWidget> MarketWidgetInstance;
 
 	UPROPERTY(Transient)
@@ -219,6 +245,8 @@ private:
 
 	// OpenStashInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
 	TWeakObjectPtr<UPDStashComponent> ActiveStashComponent;
+
+	TWeakObjectPtr<UPDLootComponent> ActiveLootComponent;
 
 	bool bIsGameplayInputBlockedByModalUI = false;
 	bool bMouseCursorVisibleBeforeModalUI = false;

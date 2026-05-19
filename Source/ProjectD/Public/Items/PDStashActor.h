@@ -62,17 +62,25 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Stash|Sound", meta = (ClampMin = "0.0"))
 	float SoundPitchMultiplier = 1.f;
 
+protected:
+	// LootBox 등 파생 클래스가 자체 close 델리게이트(OnLootInterfaceClosed 등)에 바인딩하기 위해 protected.
+	void SetDoorOpen(bool bOpen, bool bInstant = false);
+
+	/** 컨테이너 close 델리게이트 구독. 기본 구현은 OnStashInterfaceClosed. 자식은 다른 델리게이트로 override. */
+	virtual void BindContainerClose(APDPlayerController* PlayerController);
+	virtual void UnbindContainerClose();
+
+	/** close 시그널 공통 처리 — 자기 컴포넌트와 매칭되면 문 닫고 unbind. 시그니처는 양쪽 델리게이트가 동일. */
+	UFUNCTION()
+	void HandleContainerClosed(UPDStashComponent* ClosedStashComponent);
+
+	TWeakObjectPtr<APDPlayerController> BoundPlayerController;
+
 private:
 	void ConfigureInteractionCollision() const;
-	void SetDoorOpen(bool bOpen, bool bInstant = false);
 	void ApplyDoorAngle(float Angle);
 	void PlayDoorSound(bool bOpen) const;
-	void BindStashClose(APDPlayerController* PlayerController);
-	void UnbindStashClose();
-	void HandleStashInterfaceClosed(UPDStashComponent* ClosedStashComponent);
 
 	float CurrentDoorAngle = 100.f;
 	float TargetDoorAngle = 100.f;
-
-	TWeakObjectPtr<APDPlayerController> BoundPlayerController;
 };
