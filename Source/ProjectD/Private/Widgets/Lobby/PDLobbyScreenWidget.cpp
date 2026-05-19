@@ -4,6 +4,7 @@
 #include "Widgets/Lobby/PDLobbyScreenWidget.h"
 
 #include "Components/Button.h"
+#include "Core/PDGameInstance.h"
 
 void UPDLobbyScreenWidget::NativeOnActivated()
 {
@@ -57,6 +58,16 @@ UWidget* UPDLobbyScreenWidget::GetDesiredFocusTarget_Implementation() const
 
 void UPDLobbyScreenWidget::HandleNewGameClicked()
 {
+	if (MainLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDLobbyScreenWidget::HandleNewGameClicked: MainLevel is not set."));
+		return;
+	}
+
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!GI) return;
+
+	GI->TravelToLevel(MainLevel, /*bMarkBaseResetPending=*/false);
 }
 
 void UPDLobbyScreenWidget::HandleContinueClicked()

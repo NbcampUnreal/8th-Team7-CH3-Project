@@ -118,15 +118,15 @@ void UPDGameInstance::LoadFromDisk()
 	SecureContainerItems.Reset();
 }
 
-void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)
+void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending)
 {
-	if (BaseLevel.IsNull())
+	if (Level.IsNull())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToBaseLevel: BaseLevel is not set."));
+		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToLevel: Level is not set."));
 		return;
 	}
-	if (bMarkResetPending) bPendingResetToBase=true;
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, BaseLevel);
+	if (bMarkBaseResetPending) bPendingResetToBase=true;
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
 }
 
 bool UPDGameInstance::ConsumePendingResetToBase()
