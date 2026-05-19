@@ -74,7 +74,10 @@ public:
 	void LoadFromDisk();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
-	void TravelToBaseLevel(bool bMarkResetPending);
+	void TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> GetBaseLevel() const { return BaseLevel; }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
 	bool ConsumePendingResetToBase();

@@ -19,6 +19,7 @@ class UPDActionPromptListWidget;
 class UPDInteractPromptWidget;
 class UPDSkillSlotBarWidget;
 class UPDCircularProgressWidget;
+class UPDQuipToastWidget;
 class UPDQuickSlotComponent;
 class UPDInteractionComponent;
 class UAbilitySystemComponent;
@@ -80,6 +81,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDCircularProgressWidget> WBP_UseProgress;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDQuipToastWidget> WBP_QuipToast;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")

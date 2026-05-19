@@ -31,6 +31,10 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> Button_Quit;
 
+	/** Lobby "새 게임" 버튼이 진입할 게임 레벨. WBP에서 지정. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> MainLevel;
+
 private:
 	UFUNCTION() void HandleNewGameClicked();
 	UFUNCTION() void HandleContinueClicked();

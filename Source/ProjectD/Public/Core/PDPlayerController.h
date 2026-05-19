@@ -28,6 +28,7 @@ class APDRifle;
 class UPDRootLayout;
 class UPDPingInputComponent;
 class UPDWorldMapWidget;
+class UPDQuipDataAsset;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
@@ -140,6 +141,10 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDQuestWindowWidget> QuestWindowWidgetClass;
+
+	/** Quip(캐릭터 멘트) 데이터. UPDQuipSubsystem에 주입되어 태그→Line 라우팅에 사용. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSoftObjectPtr<UPDQuipDataAsset> QuipDataAsset;
 
 	virtual void SetupInputComponent() override;
 	virtual void BeginPlay() override;
