@@ -18,7 +18,7 @@
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDQuickSlotComponent.h"
-#include "Widgets/Inventory/PDEquipmentSlotWidget.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "Characters/PDPlayerCharacter.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDStashComponent.h"
@@ -439,16 +439,37 @@ void UPDInventoryWidget::RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotTy
 		return;
 	}
 
-	UPDEquipmentSlotWidget* EquipmentSlotWidget = Cast<UPDEquipmentSlotWidget>(WidgetTree->FindWidget(WidgetName));
+	UPDInventorySlotWidget* EquipmentSlotWidget = Cast<UPDInventorySlotWidget>(WidgetTree->FindWidget(WidgetName));
 	if (!EquipmentSlotWidget)
 	{
 		return;
 	}
 
-	EquipmentSlotWidget->InitializeEquipmentSlot(SlotType);
-	EquipmentSlotWidget->OnEquipmentSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
-			EquipmentSlotWidget->OnEquipmentSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotItemDropped);
+	const int32 SlotIndex = static_cast<int32>(SlotType);
+	EquipmentSlotWidget->SetSlotContainerType(EPDItemContainerType::Equipment);
+	EquipmentSlotWidget->SetEmptySlotLabel(GetEquipmentSlotLabel(SlotType));
+	EquipmentSlotWidget->ClearSlotData(SlotIndex);
+	EquipmentSlotWidget->OnSlotRightClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotRightClicked);
+	EquipmentSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDInventoryWidget::HandleEquipmentSlotItemDropped);
 	EquipmentSlotWidgets.Add(SlotType, EquipmentSlotWidget);
+}
+
+
+FText UPDInventoryWidget::GetEquipmentSlotLabel(EPDEquipmentSlotType SlotType) const
+{
+	switch (SlotType)
+	{
+	case EPDEquipmentSlotType::Weapon:
+		return FText::FromString(TEXT("Weapon"));
+	case EPDEquipmentSlotType::Head:
+		return FText::FromString(TEXT("Head"));
+	case EPDEquipmentSlotType::Armor:
+		return FText::FromString(TEXT("Armor"));
+	case EPDEquipmentSlotType::Bag:
+		return FText::FromString(TEXT("Bag"));
+	default:
+		return FText::FromString(TEXT("Equipment"));
+	}
 }
 
 void UPDInventoryWidget::BindEquipmentChanged()
@@ -479,33 +500,38 @@ void UPDInventoryWidget::UnbindEquipmentChanged()
 void UPDInventoryWidget::RefreshEquipmentSlots()
 {
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
-	for (const TPair<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>>& Pair : EquipmentSlotWidgets)
+	for (const TPair<EPDEquipmentSlotType, TWeakObjectPtr<UPDInventorySlotWidget>>& Pair : EquipmentSlotWidgets)
 	{
-		UPDEquipmentSlotWidget* EquipmentSlotWidget = Pair.Value.Get();
+		UPDInventorySlotWidget* EquipmentSlotWidget = Pair.Value.Get();
 		if (!EquipmentSlotWidget)
 		{
 			continue;
 		}
+
+		const int32 SlotIndex = static_cast<int32>(Pair.Key);
+		EquipmentSlotWidget->SetSlotContainerType(EPDItemContainerType::Equipment);
+		EquipmentSlotWidget->SetEmptySlotLabel(GetEquipmentSlotLabel(Pair.Key));
 
 		if (EquipmentComponent)
 		{
 			const FPDInventorySlot EquippedSlot = EquipmentComponent->GetEquippedSlot(Pair.Key);
 			if (!EquippedSlot.IsEmpty())
 			{
-				EquipmentSlotWidget->SetEquippedItem(EquippedSlot);
+				EquipmentSlotWidget->SetSlotData(EquippedSlot, SlotIndex);
 				continue;
 			}
 		}
 
-		EquipmentSlotWidget->ClearEquippedItem();
+		EquipmentSlotWidget->ClearSlotData(SlotIndex);
 	}
 }
 
-void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType)
+void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex)
 {
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
-	if (!SlotWidget || !InventoryComponent || !EquipmentComponent)
+	const EPDEquipmentSlotType SlotType = static_cast<EPDEquipmentSlotType>(EquipmentSlotIndex);
+	if (!SlotWidget || !InventoryComponent || !EquipmentComponent || SlotType == EPDEquipmentSlotType::None)
 	{
 		return;
 	}
@@ -518,13 +544,26 @@ void UPDInventoryWidget::HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget*
 }
 
 
-void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation)
+void UPDInventoryWidget::HandleEquipmentSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex, UPDInventoryDragDropOperation* DragOperation)
 {
 	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent();
+	const EPDEquipmentSlotType SlotType = static_cast<EPDEquipmentSlotType>(EquipmentSlotIndex);
 
-	if (!SlotWidget || !DragOperation || !InventoryComponent || !EquipmentComponent)
+	if (!SlotWidget || !DragOperation || !InventoryComponent || !EquipmentComponent || SlotType == EPDEquipmentSlotType::None)
 	{
+		return;
+	}
+
+	if (DragOperation->SourceContainerType == EPDItemContainerType::Equipment)
+	{
+		const EPDEquipmentSlotType SourceSlotType = static_cast<EPDEquipmentSlotType>(DragOperation->SourceSlotIndex);
+		if (SourceSlotType != SlotType)
+		{
+			return;
+		}
+
+		RefreshEquipmentSlots();
 		return;
 	}
 
@@ -687,6 +726,16 @@ UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
 	return nullptr;
 }
 
+UPDSecureContainerComponent* UPDInventoryWidget::FindSecureContainerComponent() const
+{
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		return OwningPawn->FindComponentByClass<UPDSecureContainerComponent>();
+	}
+
+	return nullptr;
+}
+
 UPDEquipmentComponent* UPDInventoryWidget::FindEquipmentComponent() const
 {
 	if (APawn* OwningPawn = GetOwningPlayerPawn())
@@ -734,6 +783,14 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
 			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	case EPDItemContainerType::Equipment:
+		return nullptr;
+	case EPDItemContainerType::SecureContainer:
+		if (const UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
+		{
+			return SecureContainerComponent->GetSecureSlot(SlotIndex);
 		}
 		return nullptr;
 	default:
@@ -1111,6 +1168,18 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
 			QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+		break;
+	case EPDItemContainerType::Equipment:
+		if (UPDEquipmentComponent* EquipmentComponent = FindEquipmentComponent())
+		{
+			EquipmentComponent->UnequipItemToInventorySlot(InventoryComponent, static_cast<EPDEquipmentSlotType>(SourceSlotIndex), TargetSlotIndex);
+		}
+		break;
+	case EPDItemContainerType::SecureContainer:
+		if (UPDSecureContainerComponent* SecureContainerComponent = FindSecureContainerComponent())
+		{
+			SecureContainerComponent->TakeSecureSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;
 	default:

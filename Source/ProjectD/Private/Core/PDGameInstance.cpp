@@ -33,6 +33,16 @@ int32 UPDGameInstance::GetStashUpgradeLevel() const
 	return FMath::Max(0, PlayerData.StashUpgradeLevel);
 }
 
+void UPDGameInstance::SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems)
+{
+	SecureContainerItems = InSecureContainerItems;
+}
+
+const TArray<FPDInventorySlot>& UPDGameInstance::GetSecureContainerItems() const
+{
+	return SecureContainerItems;
+}
+
 void UPDGameInstance::SetTraderReputation(int32 InLevel, int32 InExp)
 {
 	PlayerData.TraderReputationLevel = FMath::Max(1, InLevel);
@@ -105,6 +115,7 @@ void UPDGameInstance::LoadFromDisk()
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::LoadGameFromSlot(UPDSaveGame::SlotName, UPDSaveGame::UserIndex));
 	if (!SaveObject) return;
 	PlayerData=SaveObject->PlayerData;
+	SecureContainerItems.Reset();
 }
 
 void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)

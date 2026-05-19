@@ -10,6 +10,7 @@ class UUniformGridPanel;
 class UPDInventoryComponent;
 class UPDStashComponent;
 class UPDQuickSlotComponent;
+class UPDSecureContainerComponent;
 class UPDInventorySlotWidget;
 class UUserWidget;
 class UWidgetTree;
@@ -18,7 +19,6 @@ class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
 class UPDEquipmentComponent;
-class UPDEquipmentSlotWidget;
 class UButton;
 class UWidget;
 class UPDInventoryWeightBarWidget;
@@ -173,10 +173,10 @@ protected:
 	void HandleSortByTypeClicked();
 
 	UFUNCTION()
-	void HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType);
+	void HandleEquipmentSlotRightClicked(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex);
 
 	UFUNCTION()
-	void HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation);
+	void HandleEquipmentSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
 private:
 	void ResolveInventoryGridPanel();
@@ -188,6 +188,7 @@ private:
 	void UnbindEquipmentChanged();
 	void RefreshEquipmentSlots();
 	void RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotType, FName WidgetName);
+	FText GetEquipmentSlotLabel(EPDEquipmentSlotType SlotType) const;
 	int32 CountOccupiedInventorySlotsByType(EPDItemType ItemType) const;
 	int32 GetInventoryDisplaySlotCount() const;
 	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
@@ -217,6 +218,7 @@ private:
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
+	UPDSecureContainerComponent* FindSecureContainerComponent() const;
 	UPDEquipmentComponent* FindEquipmentComponent() const;
 
 	UFUNCTION()
@@ -236,7 +238,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDEquipmentComponent> BoundEquipmentComponent;
 
-	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>> EquipmentSlotWidgets;
+	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDInventorySlotWidget>> EquipmentSlotWidgets;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDStashComponent> ActiveStashComponent;

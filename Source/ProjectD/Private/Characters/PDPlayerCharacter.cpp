@@ -8,6 +8,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Items/PDQuickSlotComponent.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDEquipmentModificationComponent.h"
 #include "Weapons/Base/PDWeaponBase.h"
@@ -44,6 +45,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
 
 	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
+	SecureContainerComponent=CreateDefaultSubobject<UPDSecureContainerComponent>(TEXT("SecureContainerComponent"));
 	EquipmentComponent=CreateDefaultSubobject<UPDEquipmentComponent>(TEXT("EquipmentComponent"));
 	EquipmentModificationComponent=CreateDefaultSubobject<UPDEquipmentModificationComponent>(TEXT("EquipmentModificationComponent"));
 
