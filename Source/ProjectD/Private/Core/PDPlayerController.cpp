@@ -776,6 +776,8 @@ void APDPlayerController::OpenEquipmentModificationInterface()
 
 void APDPlayerController::CloseEquipmentModificationInterface()
 {
+	const bool bWasOpen = IsEquipmentModificationInterfaceOpen();
+
 	if (EquipmentModificationWidgetInstance && EquipmentModificationWidgetInstance->IsInViewport())
 	{
 		EquipmentModificationWidgetInstance->RemoveFromParent();
@@ -791,6 +793,11 @@ void APDPlayerController::CloseEquipmentModificationInterface()
 	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
+	}
+
+	if (bWasOpen)
+	{
+		OnEquipmentModificationInterfaceClosed.Broadcast();
 	}
 }
 
