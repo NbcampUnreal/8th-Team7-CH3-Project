@@ -2,10 +2,62 @@
 #include "Core/PDGameState.h"
 #include "Core/PDGameInstance.h"
 #include "Items/PDInventoryComponent.h"
+#include "Items/PDSecureContainerComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
 #include "Type/Types.h"
 #include "Widgets/PDActivatableBase.h"
+
+namespace
+{
+	void AddSlotToStashItems(TArray<FPDInventorySlot>& StashItems, const FPDInventorySlot& SourceSlot)
+	{
+		if (SourceSlot.IsEmpty())
+		{
+			return;
+		}
+
+		int32 Remaining = SourceSlot.Quantity;
+
+		if (SourceSlot.ItemData.MaxStack > 1)
+		{
+			for (FPDInventorySlot& StashSlot : StashItems)
+			{
+				if (StashSlot.IsEmpty() || StashSlot.ItemData.ItemID != SourceSlot.ItemData.ItemID)
+				{
+					continue;
+				}
+
+				const int32 Space = StashSlot.ItemData.MaxStack - StashSlot.Quantity;
+				if (Space <= 0)
+				{
+					continue;
+				}
+
+				const int32 ToAdd = FMath::Min(Space, Remaining);
+				StashSlot.Quantity += ToAdd;
+				StashSlot.bIsEmpty = false;
+				Remaining -= ToAdd;
+
+				if (Remaining <= 0)
+				{
+					break;
+				}
+			}
+		}
+
+		while (Remaining > 0)
+		{
+			FPDInventorySlot NewSlot;
+			NewSlot.ItemData = SourceSlot.ItemData;
+			NewSlot.ModificationLevel = SourceSlot.ModificationLevel;
+			NewSlot.Quantity = FMath::Min(Remaining, FMath::Max(1, SourceSlot.ItemData.MaxStack));
+			NewSlot.bIsEmpty = false;
+			StashItems.Add(NewSlot);
+			Remaining -= NewSlot.Quantity;
+		}
+	}
+}
 
 APDGameMode::APDGameMode()
 {
@@ -32,11 +84,22 @@ void APDGameMode::EndRaid(bool bSuccess)
 
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 
-	if (bSuccess)
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
-		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		if (bSuccess)
+		{
 			TransferPlayerInventoryToStash(PC);
+		}
+
+		if (APawn* Pawn = PC->GetPawn())
+		{
+			if (UPDSecureContainerComponent* SecureContainer = Pawn->FindComponentByClass<UPDSecureContainerComponent>())
+			{
+				SecureContainer->SaveSecureContainer();
+			}
+		}
 	}
+
 	if (GI) GI->SaveToDisk();
 
 	// BP 연출 훅 — BP에서 결과 UI + OpenLevel 처리
@@ -106,36 +169,7 @@ void APDGameMode::TransferPlayerInventoryToStash(APlayerController* PC)
 
 	for (const FPDInventorySlot& RaidSlot : Inventory->Items)
 	{
-		if (RaidSlot.IsEmpty()) continue;
-
-		int32 Remaining = RaidSlot.Quantity;
-		
-		if (RaidSlot.ItemData.MaxStack > 1)
-		{
-			for (FPDInventorySlot& StashSlot : StashItems)
-			{
-				if (StashSlot.IsEmpty()) continue;
-				if (StashSlot.ItemData.ItemID != RaidSlot.ItemData.ItemID) continue;
-				int32 Space = StashSlot.ItemData.MaxStack - StashSlot.Quantity;
-				if (Space <= 0) continue;
-				int32 ToAdd = FMath::Min(Space, Remaining);
-				StashSlot.Quantity += ToAdd;
-				StashSlot.bIsEmpty  = false;
-				Remaining          -= ToAdd;
-				if (Remaining <= 0) break;
-			}
-		}
-		
-		while (Remaining > 0)
-		{
-			FPDInventorySlot NewSlot;
-			NewSlot.ItemData          = RaidSlot.ItemData;
-			NewSlot.ModificationLevel = RaidSlot.ModificationLevel;
-			NewSlot.Quantity          = FMath::Min(Remaining, FMath::Max(1, RaidSlot.ItemData.MaxStack));
-			NewSlot.bIsEmpty          = false;
-			StashItems.Add(NewSlot);
-			Remaining -= NewSlot.Quantity;
-		}
+		AddSlotToStashItems(StashItems, RaidSlot);
 	}
 
 	GI->SetStashItems(StashItems);

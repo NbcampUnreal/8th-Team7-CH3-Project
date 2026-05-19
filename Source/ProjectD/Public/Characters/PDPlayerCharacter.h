@@ -15,6 +15,7 @@ class UPDAnimInstance;
 class UPDVisionComponent;
 class UPDInteractionComponent;
 class UPDQuickSlotComponent;
+class UPDSecureContainerComponent;
 class UPDEquipmentComponent;
 class UPDEquipmentModificationComponent;
 class UCameraComponent;
@@ -56,6 +57,9 @@ private:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UPDSecureContainerComponent> SecureContainerComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDEquipmentComponent> EquipmentComponent;
@@ -138,6 +142,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
 	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+
+	UFUNCTION(BlueprintPure, Category="PD|SecureContainer")
+	UPDSecureContainerComponent* GetSecureContainerComponent() const { return SecureContainerComponent; }
 
 	UFUNCTION(BlueprintPure, Category="PD|Equipment")
 	UPDEquipmentComponent* GetEquipmentComponent() const { return EquipmentComponent; }

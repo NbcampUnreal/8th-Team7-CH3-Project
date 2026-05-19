@@ -31,6 +31,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	int32 GetStashUpgradeLevel() const;
 
+	UFUNCTION(BlueprintCallable, Category = "PD|SecureContainer")
+	void SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems);
+
+	const TArray<FPDInventorySlot>& GetSecureContainerItems() const;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void SetTraderReputation(int32 InLevel, int32 InExp);
 
@@ -74,7 +79,10 @@ public:
 	void LoadFromDisk();
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
-	void TravelToBaseLevel(bool bMarkResetPending);
+	void TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Levels")
+	TSoftObjectPtr<UWorld> GetBaseLevel() const { return BaseLevel; }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
 	bool ConsumePendingResetToBase();
@@ -82,6 +90,9 @@ public:
 protected:
 	UPROPERTY()
 	FPDPlayerData PlayerData;
+
+	UPROPERTY(Transient)
+	TArray<FPDInventorySlot> SecureContainerItems;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> BaseLevel;

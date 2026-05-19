@@ -4,6 +4,7 @@
 #include "Items/PDItemSlotTransfer.h"
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSoundLibrary.h"
+#include "Items/PDSecureContainerComponent.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
@@ -224,6 +225,11 @@ float UPDInventoryComponent::GetCurrentWeight() const
 		}
 
 		TotalWeight += FMath::Max(0.f, Slot.ItemData.Weight) * FMath::Max(0, Slot.Quantity);
+	}
+
+	if (const UPDSecureContainerComponent* SecureContainerComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDSecureContainerComponent>() : nullptr)
+	{
+		TotalWeight += SecureContainerComponent->GetCurrentWeight();
 	}
 
 	return TotalWeight;

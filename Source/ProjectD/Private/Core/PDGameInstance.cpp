@@ -33,6 +33,16 @@ int32 UPDGameInstance::GetStashUpgradeLevel() const
 	return FMath::Max(0, PlayerData.StashUpgradeLevel);
 }
 
+void UPDGameInstance::SetSecureContainerItems(const TArray<FPDInventorySlot>& InSecureContainerItems)
+{
+	SecureContainerItems = InSecureContainerItems;
+}
+
+const TArray<FPDInventorySlot>& UPDGameInstance::GetSecureContainerItems() const
+{
+	return SecureContainerItems;
+}
+
 void UPDGameInstance::SetTraderReputation(int32 InLevel, int32 InExp)
 {
 	PlayerData.TraderReputationLevel = FMath::Max(1, InLevel);
@@ -105,17 +115,18 @@ void UPDGameInstance::LoadFromDisk()
 	UPDSaveGame* SaveObject=Cast<UPDSaveGame>(UGameplayStatics::LoadGameFromSlot(UPDSaveGame::SlotName, UPDSaveGame::UserIndex));
 	if (!SaveObject) return;
 	PlayerData=SaveObject->PlayerData;
+	SecureContainerItems.Reset();
 }
 
-void UPDGameInstance::TravelToBaseLevel(bool bMarkResetPending)
+void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending)
 {
-	if (BaseLevel.IsNull())
+	if (Level.IsNull())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToBaseLevel: BaseLevel is not set."));
+		UE_LOG(LogTemp, Warning, TEXT("UPDGameInstance::TravelToLevel: Level is not set."));
 		return;
 	}
-	if (bMarkResetPending) bPendingResetToBase=true;
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, BaseLevel);
+	if (bMarkBaseResetPending) bPendingResetToBase=true;
+	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
 }
 
 bool UPDGameInstance::ConsumePendingResetToBase()
