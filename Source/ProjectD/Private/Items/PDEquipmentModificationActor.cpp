@@ -26,6 +26,12 @@ void APDEquipmentModificationActor::BeginPlay()
 	ConfigureInteractionCollision();
 }
 
+void APDEquipmentModificationActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindEquipmentModificationClose();
+	Super::EndPlay(EndPlayReason);
+}
+
 void APDEquipmentModificationActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -69,4 +75,38 @@ void APDEquipmentModificationActor::Interact_Implementation(AActor* Interactor)
 	}
 
 	PlayerController->OpenEquipmentModificationInterface();
+
+	if (PlayerController->IsEquipmentModificationInterfaceOpen())
+	{
+		BindEquipmentModificationClose(PlayerController);
+		OnEquipmentModificationOpened.Broadcast(this);
+	}
+}
+
+void APDEquipmentModificationActor::BindEquipmentModificationClose(APDPlayerController* PlayerController)
+{
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UnbindEquipmentModificationClose();
+	BoundPlayerController = PlayerController;
+	PlayerController->OnEquipmentModificationInterfaceClosed.AddUObject(this, &APDEquipmentModificationActor::HandleEquipmentModificationInterfaceClosed);
+}
+
+void APDEquipmentModificationActor::UnbindEquipmentModificationClose()
+{
+	if (BoundPlayerController.IsValid())
+	{
+		BoundPlayerController->OnEquipmentModificationInterfaceClosed.RemoveAll(this);
+	}
+
+	BoundPlayerController.Reset();
+}
+
+void APDEquipmentModificationActor::HandleEquipmentModificationInterfaceClosed()
+{
+	UnbindEquipmentModificationClose();
+	OnEquipmentModificationClosed.Broadcast(this);
 }
