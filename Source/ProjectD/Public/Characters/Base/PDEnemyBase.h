@@ -44,6 +44,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|AI|Weapon")
 	void ClearAimTarget();
 
+	// 사수 개인별 조준 편향(deg). 무기 GetAimDirectionFromOwner 가 spread 전에 회전 적용 →
+	// Pitch=위아래, Yaw=좌우 — 인스턴스마다 탄착군이 다른 위치에 형성.
+	UFUNCTION(BlueprintPure, Category = "PD|AI|Aim")
+	FORCEINLINE FRotator GetAimBias() const { return AimBias; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -54,6 +59,14 @@ protected:
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
 	EPDEnemyState CurrentState = EPDEnemyState::Idle;
+
+	/** 개인별 조준 편향 최대 크기(deg). BeginPlay 에서 [-Max..+Max] 균등분포로 한 번 굴림. 0=모두 정확. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI|Aim", meta = (ClampMin = "0.0"))
+	float AimBiasMaxDegrees = 2.0f;
+
+	/** 본 인스턴스 고정 Bias. BeginPlay 에서 한 번 굴린 뒤 변하지 않음 — 사수의 "버릇". */
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "PD|AI|Aim")
+	FRotator AimBias = FRotator::ZeroRotator;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Quest")
 	FName QuestEnemyID;

@@ -1,6 +1,7 @@
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Characters/PDPlayerCharacter.h"
+#include "Characters/Base/PDEnemyBase.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
@@ -111,8 +112,24 @@ FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) co
 {
 	if (!WeaponOwner.IsValid()) return FVector::ForwardVector;
 
+	FVector AimDir;
 	if (UPDWeaponComponent* Comp = WeaponOwner->FindComponentByClass<UPDWeaponComponent>())
-		return Comp->GetAimDirection(StartLocation);
+		AimDir = Comp->GetAimDirection(StartLocation);
+	else
+		AimDir = WeaponOwner->GetActorForwardVector();
 
-	return WeaponOwner->GetActorForwardVector();
+	// Enemy 사수의 개인 조준 편향 — Player 는 EnemyBase 가 아니므로 영향 없음.
+	if (const APDEnemyBase* EnemyOwner = Cast<APDEnemyBase>(WeaponOwner.Get()))
+	{
+		const FRotator Bias = EnemyOwner->GetAimBias();
+		if (!Bias.IsNearlyZero())
+		{
+			FRotator AimRot = AimDir.Rotation();
+			AimRot.Pitch += Bias.Pitch;
+			AimRot.Yaw   += Bias.Yaw;
+			AimDir = AimRot.Vector();
+		}
+	}
+
+	return AimDir;
 }

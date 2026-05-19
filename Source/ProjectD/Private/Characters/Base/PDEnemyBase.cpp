@@ -56,6 +56,13 @@ void APDEnemyBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 사수별 개인 조준 편향 — 인스턴스마다 한 번 굴려 게임 내내 고정. 사람마다 탄착군이 위/아래/좌우로 살짝 다름.
+	if (AimBiasMaxDegrees > 0.f)
+	{
+		AimBias.Pitch = FMath::FRandRange(-AimBiasMaxDegrees, AimBiasMaxDegrees);
+		AimBias.Yaw   = FMath::FRandRange(-AimBiasMaxDegrees, AimBiasMaxDegrees);
+	}
+
 	if (UPDCombatComponent* Combat = FindComponentByClass<UPDCombatComponent>())
 		Combat->OnTargetChanged.AddDynamic(this, &APDEnemyBase::OnCombatTargetChanged);
 
