@@ -10,8 +10,6 @@
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "HAL/IConsoleManager.h"
-#include "Items/PDStashActor.h"
-#include "Items/PDStashComponent.h"
 #include "TimerManager.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
@@ -50,9 +48,11 @@ void APDSoldier::BeginPlay()
 	SpawnAndEquipDefaultWeapon();
 
 	// 타겟 획득/상실에 맞춰 풀오토 루프 on/off.
+	// OnAttackRequested 는 단발/비-Rifle 경로 — BT FireAtTarget 매 cycle 1회 발사.
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
-		Combat->OnTargetChanged.AddDynamic(this, &APDSoldier::HandleTargetChanged);
+		Combat->OnTargetChanged  .AddDynamic(this, &APDSoldier::HandleTargetChanged);
+		Combat->OnAttackRequested.AddDynamic(this, &APDSoldier::HandleAttackRequested);
 	}
 }
 
@@ -85,29 +85,20 @@ void APDSoldier::OnEnterState_Dead()
 {
 	StopContinuousFire();
 
+	// 무기 → 시체 Stash 이전은 EnemyBase::OnEnterState_Dead 안의 TryDropEquippedWeaponToCorpse 가
+	// WeaponDropChance 확률로 처리. 본 클래스는 발사 timer 정리 + 무기 액터 정리만 담당.
 	Super::OnEnterState_Dead();
 
 	if (!EquippedWeapon) return;
 
 	EquippedWeapon->OnUnequip();
-
-	// 베이스가 스폰한 시체 컨테이너가 Stash 류면 무기 데이터를 그 안으로 이전. 픽업은 LootBox 상호작용으로만.
-	bool bTransferred = false;
-	if (APDStashActor* Corpse = Cast<APDStashActor>(GetCorpseContainer()))
-	{
-		if (UPDStashComponent* Stash = Corpse->GetStashComponent())
-		{
-			const FName WeaponItemID = EquippedWeapon->GetItemID();
-			if (!WeaponItemID.IsNone() && Stash->AddItemByID(WeaponItemID, 1))
-			{
-				bTransferred = true;
-			}
-		}
-	}
-
-
 	EquippedWeapon->Destroy();
 	EquippedWeapon = nullptr;
+}
+
+FName APDSoldier::GetEquippedWeaponItemID_Implementation() const
+{
+	return EquippedWeapon ? EquippedWeapon->GetItemID() : NAME_None;
 }
 
 void APDSoldier::SpawnAndEquipDefaultWeapon()
@@ -183,18 +174,34 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
 		}
 	}
+
+	// 무기 변경 후 연사 timer 재평가 — Rifle Auto↔비-Rifle/단발 전환 즉시 반영.
+	// OnTargetChanged 는 무기 변경 시 호출되지 않으므로 여기서 강제 재평가.
+	if (UPDCombatComponent* Combat = GetCombatComponent())
+	{
+		if (Combat->HasValidTarget() && EquippedWeapon && IsCurrentWeaponFullAutoMode())
+		{
+			StartContinuousFire();
+		}
+		else
+		{
+			StopContinuousFire();
+		}
+	}
 }
 
 void APDSoldier::HandleTargetChanged(AActor* NewTarget)
 {
-	PD_SOLDIER_FIRE_LOG("HandleTargetChanged NewTarget=%s, bAutoFire=%s, HasWeapon=%s",
+	PD_SOLDIER_FIRE_LOG("HandleTargetChanged NewTarget=%s, bAutoFire=%s, HasWeapon=%s, FullAuto=%s",
 		*GetNameSafe(NewTarget),
 		bAutoFireOnAttackRequested ? TEXT("Y") : TEXT("N"),
-		EquippedWeapon ? TEXT("Y") : TEXT("N"));
+		EquippedWeapon ? TEXT("Y") : TEXT("N"),
+		IsCurrentWeaponFullAutoMode() ? TEXT("Y") : TEXT("N"));
 
 	if (!bAutoFireOnAttackRequested) return;
 
-	if (NewTarget && EquippedWeapon)
+	// 연사 timer 는 Rifle Auto 에서만 사용. 단발/비-Rifle 은 BT 의 RequestAttack 단발 경로로.
+	if (NewTarget && EquippedWeapon && IsCurrentWeaponFullAutoMode())
 	{
 		StartContinuousFire();
 	}
@@ -202,6 +209,66 @@ void APDSoldier::HandleTargetChanged(AActor* NewTarget)
 	{
 		StopContinuousFire();
 	}
+}
+
+void APDSoldier::HandleAttackRequested(AActor* /*Target*/)
+{
+	// 단발/비-Rifle 무기 경로. Rifle Auto 는 timer 가 처리하므로 본 경로는 no-op.
+	if (!bAutoFireOnAttackRequested) return;
+	if (!EquippedWeapon) return;
+	if (GetEnemyState() != EPDEnemyState::Combat) return;
+
+	if (IsCurrentWeaponFullAutoMode())
+	{
+		// Rifle Auto 는 timer 가 발사 — 중복 방지.
+		// 단, BT 진입 직후 timer 가 아직 시작되지 않았을 가능성에 대비해 한 번 보장.
+		UWorld* World = GetWorld();
+		if (World && !World->GetTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			StartContinuousFire();
+		}
+		return;
+	}
+
+	TryFireSingleShot();
+}
+
+bool APDSoldier::IsCurrentWeaponFullAutoMode() const
+{
+	const APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon);
+	return Ranged && Ranged->IsFullAuto();
+}
+
+bool APDSoldier::TryFireSingleShot()
+{
+	// OnFireTick 의 발사 직전 검증과 동일 정책 (장전/우군 사선) — 단발 경로에도 적용.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		if (Ranged->IsReloading())
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE SKIP (reloading)");
+			return false;
+		}
+		if (Ranged->GetCurrentAmmo() <= 0)
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE RELOAD (ammo=0)");
+			Ranged->Reload();
+			return false;
+		}
+	}
+
+	if (UPDCombatComponent* Combat = GetCombatComponent())
+	{
+		if (Combat->IsFriendlyInLineOfFire())
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE SKIP (friendly in LOF)");
+			return false;
+		}
+	}
+
+	PD_SOLDIER_FIRE_LOG("SINGLE FIRE");
+	EquippedWeapon->Fire();
+	return true;
 }
 
 void APDSoldier::StartContinuousFire()
@@ -213,8 +280,16 @@ void APDSoldier::StartContinuousFire()
 	// 첫 발은 지연 없이 즉시 시도.
 	OnFireTick();
 
-	// 0 입력 방지용 최소 1프레임 클램프.
-	const float Interval = FMath::Max(FireInterval, 0.0167f);
+	// 플레이어 GA_FireAbility 와 동일하게 무기 stat 의 FireRate 사용.
+	// 미설정/0 이면 FireInterval(BP 디폴트) 로 폴백.
+	float Interval = FireInterval;
+	if (const APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		const float WeaponRate = Ranged->GetCurrentStats().FireRate;
+		if (WeaponRate > 0.f) Interval = WeaponRate;
+	}
+	Interval = FMath::Max(Interval, 0.0167f); // 1 프레임 클램프.
+
 	World->GetTimerManager().SetTimer(FireTimerHandle, this, &APDSoldier::OnFireTick, Interval, /*bLoop=*/true);
 }
 
@@ -231,6 +306,14 @@ void APDSoldier::OnFireTick()
 	if (!EquippedWeapon)
 	{
 		PD_SOLDIER_FIRE_LOG("STOP (no weapon)");
+		StopContinuousFire();
+		return;
+	}
+
+	// 무기 교체/FireMode 토글로 더 이상 연사 대상이 아니면 timer 정리 — 단발 경로(HandleAttackRequested)로 위임.
+	if (!IsCurrentWeaponFullAutoMode())
+	{
+		PD_SOLDIER_FIRE_LOG("STOP (weapon not full-auto)");
 		StopContinuousFire();
 		return;
 	}

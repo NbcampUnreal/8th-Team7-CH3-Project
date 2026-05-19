@@ -179,6 +179,18 @@ void UPDCombatComponent::NotifyAlliesInRadius(float Radius, AActor* SharedTarget
 	UWorld* World = GetWorld();
 	if (!Owner || !World) return;
 
+	// Cooldown 게이트 — 같은 타겟에 대한 반복 통보 차단.
+	// BT 의 Chase 분기가 매 tick 발화되어도 ally 들의 target 이 무한 재설정되지 않도록.
+	// 새 타겟이면 cooldown 무시하고 즉시 통보.
+	const float Now = World->GetTimeSeconds();
+	const bool bSameTargetAsLast = LastNotifiedTarget.IsValid() && LastNotifiedTarget.Get() == SharedTarget;
+	if (bSameTargetAsLast && LastNotifyTime > 0.f && (Now - LastNotifyTime) < NotifyAlliesCooldown)
+	{
+		return;
+	}
+	LastNotifiedTarget = SharedTarget;
+	LastNotifyTime = Now;
+
 	uint8 OwnerTeam = 0;
 	if (Owner->Implements<UPDCombatInterface>())
 	{

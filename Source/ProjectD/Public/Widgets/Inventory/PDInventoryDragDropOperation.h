@@ -13,7 +13,8 @@ enum class EPDItemContainerType : uint8
 	Stash,
 	QuickSlot,
 	Equipment,
-	SecureContainer
+	SecureContainer,
+	Loot
 };
 
 UCLASS(BlueprintType)

@@ -19,6 +19,8 @@
 #include "InputCoreTypes.h"
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
+#include "Widgets/Inventory/PDLootWidget.h"
+#include "Items/PDLootComponent.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Widgets/Quest/PDQuestWindowWidget.h"
 #include "Items/PDMarketComponent.h"
@@ -434,6 +436,11 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 		CloseStashInterface();
 	}
 
+	if (IsLootInterfaceOpen())
+	{
+		CloseLootInterface();
+	}
+
 	if (IsEquipmentModificationInterfaceOpen())
 	{
 		CloseEquipmentModificationInterface();
@@ -480,7 +487,7 @@ void APDPlayerController::CloseMarketInterface()
 	}
 	InventoryWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -514,6 +521,11 @@ void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
+	}
+
+	if (IsLootInterfaceOpen())
+	{
+		CloseLootInterface();
 	}
 
 	if (IsEquipmentModificationInterfaceOpen())
@@ -578,7 +590,7 @@ void APDPlayerController::CloseStashInterface()
 		OnStashInterfaceClosed.Broadcast(ClosingStashComponent);
 	}
 
-	if (!IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
+	if (!IsMarketInterfaceOpen() && !IsLootInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -587,6 +599,96 @@ void APDPlayerController::CloseStashInterface()
 bool APDPlayerController::IsStashInterfaceOpen() const
 {
 	return StashWidgetInstance && StashWidgetInstance->IsInViewport();
+}
+
+void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
+{
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	if (!LootWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("LootWidgetClass is not set."));
+		return;
+	}
+
+	if (!LootSource)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenLootInterface called with null LootSource."));
+		return;
+	}
+
+	// 다른 인벤토리 계열 인터페이스는 같은 viewport 영역을 점유하므로 먼저 닫음.
+	if (IsStashInterfaceOpen())                CloseStashInterface();
+	if (IsMarketInterfaceOpen())               CloseMarketInterface();
+	if (IsEquipmentModificationInterfaceOpen())CloseEquipmentModificationInterface();
+
+	ActiveLootComponent = LootSource;
+
+	// Player Inventory 위젯은 좌측에 표시 — Loot 전용 API 없이도 인벤토리 자체만 보여줌.
+	// LootBox 로 디포짓하는 시나리오가 아직 없으므로 SetActiveStashComponent 는 호출하지 않음.
+	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (!LootWidgetInstance || !LootWidgetInstance->IsInViewport())
+	{
+		LootWidgetInstance = CreateWidget<UPDLootWidget>(this, LootWidgetClass);
+		if (LootWidgetInstance)
+		{
+			LootWidgetInstance->InitializeLoot(LootSource);
+			LootWidgetInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		// 다른 박스로 재오픈 — 위젯 유지하고 데이터만 교체.
+		LootWidgetInstance->InitializeLoot(LootSource);
+	}
+
+	SetGameplayInputBlockedByModalUI(true, LootWidgetInstance);
+}
+
+void APDPlayerController::CloseLootInterface()
+{
+	UPDLootComponent* ClosingLootComponent = ActiveLootComponent.Get();
+
+	if (LootWidgetInstance && LootWidgetInstance->IsInViewport())
+	{
+		LootWidgetInstance->RemoveFromParent();
+	}
+	LootWidgetInstance = nullptr;
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+	}
+	InventoryWidgetInstance = nullptr;
+
+	ActiveLootComponent.Reset();
+
+	if (ClosingLootComponent)
+	{
+		OnLootInterfaceClosed.Broadcast(ClosingLootComponent);
+	}
+
+	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+}
+
+bool APDPlayerController::IsLootInterfaceOpen() const
+{
+	return LootWidgetInstance && LootWidgetInstance->IsInViewport();
 }
 
 
@@ -623,6 +725,11 @@ void APDPlayerController::OpenEquipmentModificationInterface()
 	if (IsStashInterfaceOpen())
 	{
 		CloseStashInterface();
+	}
+
+	if (IsLootInterfaceOpen())
+	{
+		CloseLootInterface();
 	}
 
 	if (IsMarketInterfaceOpen())
@@ -683,7 +790,7 @@ void APDPlayerController::CloseEquipmentModificationInterface()
 	}
 	InventoryWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -776,6 +883,11 @@ void APDPlayerController::OpenQuestInterface()
 		CloseStashInterface();
 	}
 
+	if (IsLootInterfaceOpen())
+	{
+		CloseLootInterface();
+	}
+
 	if (IsMarketInterfaceOpen())
 	{
 		CloseMarketInterface();
@@ -824,7 +936,7 @@ void APDPlayerController::CloseQuestInterface()
 	}
 	QuestWindowWidgetInstance = nullptr;
 
-	if (!IsStashInterfaceOpen() && !IsMarketInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
+	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsMarketInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
 		SetGameplayInputBlockedByModalUI(false);
 	}
@@ -857,6 +969,12 @@ void APDPlayerController::ToggleInventory()
 	if (IsStashInterfaceOpen())
 	{
 		CloseStashInterface();
+		return;
+	}
+
+	if (IsLootInterfaceOpen())
+	{
+		CloseLootInterface();
 		return;
 	}
 
@@ -917,6 +1035,7 @@ bool APDPlayerController::ShouldAllowMovementWhileUIOpen() const
 {
 	return InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport()
 		&& !IsStashInterfaceOpen()
+		&& !IsLootInterfaceOpen()
 		&& !IsMarketInterfaceOpen()
 		&& !IsEquipmentModificationInterfaceOpen()
 		&& !IsQuestInterfaceOpen();

@@ -1,7 +1,6 @@
 #include "Items/PDStashActor.h"
 
 #include "Components/BoxComponent.h"
-#include "Components/SceneComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
@@ -30,7 +29,6 @@ void APDStashActor::BeginPlay()
 	Super::BeginPlay();
 
 	ConfigureInteractionCollision();
-	CacheLinkedDoorComponents(true);
 	SetDoorOpen(false, true);
 }
 
@@ -39,15 +37,13 @@ void APDStashActor::OnConstruction(const FTransform& Transform)
 	Super::OnConstruction(Transform);
 
 	ConfigureInteractionCollision();
-	CacheLinkedDoorComponents(true);
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
-	ApplyDoorAngle(CurrentDoorAngle);
 }
 
 void APDStashActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-	UnbindStashClose();
+	UnbindContainerClose();
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -57,12 +53,10 @@ void APDStashActor::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 
 	CurrentDoorAngle = FMath::FInterpTo(CurrentDoorAngle, TargetDoorAngle, DeltaSeconds, DoorInterpSpeed);
-	ApplyDoorAngle(CurrentDoorAngle);
 
 	if (FMath::IsNearlyEqual(CurrentDoorAngle, TargetDoorAngle, 0.1f))
 	{
 		CurrentDoorAngle = TargetDoorAngle;
-		ApplyDoorAngle(CurrentDoorAngle);
 		SetActorTickEnabled(false);
 	}
 
@@ -92,8 +86,8 @@ void APDStashActor::Interact_Implementation(AActor* Interactor)
 
 	if (PlayerController->IsStashInterfaceOpen() && PlayerController->GetActiveStashComponent() == StashComponent)
 	{
-		BindStashClose(PlayerController);
-		OnStorageOpened.Broadcast(this);
+		BindContainerClose(PlayerController);
+		SetDoorOpen(true);
 	}
 }
 
@@ -148,99 +142,21 @@ void APDStashActor::PlayDoorSound(bool bOpen) const
 
 void APDStashActor::ApplyDoorAngle(float Angle)
 {
-	CacheLinkedDoorComponents(false);
-
-	const float OpenAlpha = GetDoorOpenAlpha(Angle);
-
-	if (CachedOverDoorComponent.IsValid())
-	{
-		CachedOverDoorComponent->SetRelativeLocation(FMath::Lerp(OverDoorClosedLocation, OverDoorClosedLocation + OverDoorOpenOffset, OpenAlpha));
-	}
-
-	if (CachedUnderDoorComponent.IsValid())
-	{
-		CachedUnderDoorComponent->SetRelativeLocation(FMath::Lerp(UnderDoorClosedLocation, UnderDoorClosedLocation + UnderDoorOpenOffset, OpenAlpha));
-	}
 }
 
-void APDStashActor::CacheLinkedDoorComponents(bool bResetClosedLocations)
-{
-	if (!LinkedStorageDoor)
-	{
-		CachedOverDoorComponent.Reset();
-		CachedUnderDoorComponent.Reset();
-		return;
-	}
-
-	if (!CachedOverDoorComponent.IsValid())
-	{
-		CachedOverDoorComponent = FindLinkedDoorComponent(OverDoorComponentName);
-	}
-
-	if (!CachedUnderDoorComponent.IsValid())
-	{
-		CachedUnderDoorComponent = FindLinkedDoorComponent(UnderDoorComponentName);
-	}
-
-	if (bResetClosedLocations)
-	{
-		if (CachedOverDoorComponent.IsValid())
-		{
-			OverDoorClosedLocation = CachedOverDoorComponent->GetRelativeLocation();
-		}
-
-		if (CachedUnderDoorComponent.IsValid())
-		{
-			UnderDoorClosedLocation = CachedUnderDoorComponent->GetRelativeLocation();
-		}
-	}
-}
-
-USceneComponent* APDStashActor::FindLinkedDoorComponent(FName ComponentName) const
-{
-	if (!LinkedStorageDoor || ComponentName.IsNone())
-	{
-		return nullptr;
-	}
-
-	TArray<USceneComponent*> SceneComponents;
-	LinkedStorageDoor->GetComponents<USceneComponent>(SceneComponents);
-
-	for (USceneComponent* SceneComponent : SceneComponents)
-	{
-		if (SceneComponent && SceneComponent->GetFName() == ComponentName)
-		{
-			return SceneComponent;
-		}
-	}
-
-	return nullptr;
-}
-
-float APDStashActor::GetDoorOpenAlpha(float Angle) const
-{
-	const float Denominator = OpenDoorAngle - ClosedDoorAngle;
-	if (FMath::IsNearlyZero(Denominator))
-	{
-		return 0.f;
-	}
-
-	return FMath::Clamp((Angle - ClosedDoorAngle) / Denominator, 0.f, 1.f);
-}
-
-void APDStashActor::BindStashClose(APDPlayerController* PlayerController)
+void APDStashActor::BindContainerClose(APDPlayerController* PlayerController)
 {
 	if (!PlayerController)
 	{
 		return;
 	}
 
-	UnbindStashClose();
+	UnbindContainerClose();
 	BoundPlayerController = PlayerController;
-	PlayerController->OnStashInterfaceClosed.AddUObject(this, &APDStashActor::HandleStashInterfaceClosed);
+	PlayerController->OnStashInterfaceClosed.AddUObject(this, &APDStashActor::HandleContainerClosed);
 }
 
-void APDStashActor::UnbindStashClose()
+void APDStashActor::UnbindContainerClose()
 {
 	if (BoundPlayerController.IsValid())
 	{
@@ -250,13 +166,13 @@ void APDStashActor::UnbindStashClose()
 	BoundPlayerController.Reset();
 }
 
-void APDStashActor::HandleStashInterfaceClosed(UPDStashComponent* ClosedStashComponent)
+void APDStashActor::HandleContainerClosed(UPDStashComponent* ClosedStashComponent)
 {
 	if (ClosedStashComponent != StashComponent)
 	{
 		return;
 	}
 
-	UnbindStashClose();
-	OnStorageClosed.Broadcast(this);
+	UnbindContainerClose();
+	SetDoorOpen(false);
 }

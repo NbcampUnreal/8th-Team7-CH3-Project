@@ -5,6 +5,7 @@
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Vector.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Float.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "NavigationSystem.h"
 
 UPDBTTask_FindPatrolPoint::UPDBTTask_FindPatrolPoint()
@@ -54,6 +55,15 @@ EBTNodeResult::Type UPDBTTask_FindPatrolPoint::ExecuteTask(UBehaviorTreeComponen
 		return EBTNodeResult::Failed;
 	}
 
-	BB->SetValueAsVector(OutPatrolPoint.SelectedKeyName, Result.Location);
+	const FName KeyName = OutPatrolPoint.SelectedKeyName;
+	if (BB->GetKeyID(KeyName) == FBlackboard::InvalidKey)
+	{
+		UE_LOG(LogPDAI, Warning,
+			TEXT("[%s] FindPatrolPoint FAIL — Blackboard 자산에 Vector 키 '%s' 없음."),
+			*Pawn->GetName(), *KeyName.ToString());
+		return EBTNodeResult::Failed;
+	}
+
+	BB->SetValueAsVector(KeyName, Result.Location);
 	return EBTNodeResult::Succeeded;
 }

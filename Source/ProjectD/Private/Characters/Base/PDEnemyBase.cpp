@@ -14,6 +14,8 @@
 #include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Items/PDItemBase.h"
 #include "Items/PDLootItem.h"
+#include "Items/PDLootBoxActor.h"
+#include "Items/PDLootComponent.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "Component/PDWeaponComponent.h"
 #include "Data/PDQuestComponent.h"
@@ -250,9 +252,13 @@ void APDEnemyBase::OnEnterState_Dead()
 		MoveComp->DisableMovement();
 	}
 
-	// 사망 시 드랍 + 시체 컨테이너. 디자이너가 BP 에서 추가 VFX/사운드는 OnLootDropped 로 확장.
-	DropLootOnDeath();
+	// 사망 시 드랍 흐름 — 순서 중요:
+	//  1) 시체 컨테이너(LootBox) 먼저 스폰 — 후속 단계가 LootBox 의 LootComponent 에 직접 적재.
+	//  2) LootTable 아이템 추가 (LootBox 우선, 컨테이너 없으면 월드 액터로 폴백).
+	//  3) 장착 무기 확률 굴려 LootBox 에 추가.
 	SpawnCorpseContainer();
+	DropLootOnDeath();
+	TryDropEquippedWeaponToCorpse();
 
 	// 사망 모션 재생. 애니메이션이 없는 경우에도 문제 없도록 null 체크.
 	if(DeathMontage)
@@ -320,23 +326,46 @@ void APDEnemyBase::DropLootOnDeath()
 	UWorld* World = GetWorld();
 	if (!World) return;
 
-	TArray<AActor*> Spawned;
+	// LootBox 가 시체 컨테이너로 스폰돼 있으면 LootBox 의 LootComponent 로 직접 적재.
+	// 컨테이너가 LootBox 가 아니거나 없으면 월드 액터로 폴백.
+	UPDLootComponent* CorpseLoot = nullptr;
+	if (APDLootBoxActor* Corpse = Cast<APDLootBoxActor>(GetCorpseContainer()))
+	{
+		CorpseLoot = Corpse->GetLootComponent();
+	}
+
+	TArray<AActor*> SpawnedWorldActors;
 	const FVector Origin = GetActorLocation();
 
 	for (const FPDLootEntry& Entry : LootTable)
 	{
-		if (!Entry.ItemClass) continue;
 		if (FMath::FRand() > Entry.DropChance) continue;
 
 		const int32 MinQ = FMath::Max(1, Entry.MinQuantity);
 		const int32 MaxQ = FMath::Max(MinQ, Entry.MaxQuantity);
 		const int32 Quantity = FMath::RandRange(MinQ, MaxQ);
 
+		// LootBox 우선 — ItemID 만 있으면 컴포넌트가 DT 조회해서 처리.
+		if (CorpseLoot && !Entry.ItemID.IsNone())
+		{
+			const bool bAdded = CorpseLoot->AddItemByID(Entry.ItemID, Quantity);
+			if (!bAdded)
+			{
+				UE_LOG(LogTemp, Warning,
+					TEXT("[%s] DropLootOnDeath: LootComponent->AddItemByID failed for ItemID=%s. "
+					     "LootComponent 의 ItemDataTable 이 설정돼 있고 해당 row 가 존재하는지 확인."),
+					*GetName(), *Entry.ItemID.ToString());
+			}
+			continue;
+		}
+
+		// 폴백: 월드 액터 스폰 (LootBox 컨테이너 없거나 ItemID 미설정 시).
+		if (!Entry.ItemClass) continue;
+
 		const FVector Offset = (LootSpawnRadius > 0.f)
 			? FMath::VRand() * FMath::FRandRange(0.f, LootSpawnRadius)
 			: FVector::ZeroVector;
 
-		// Deferred 스폰: BeginPlay(=LoadItemData) 전에 ItemID 와 Quantity 를 주입.
 		const FTransform SpawnXform(FRotator::ZeroRotator, Origin + FVector(Offset.X, Offset.Y, 0.f));
 
 		APDLootItem* Item = World->SpawnActorDeferred<APDLootItem>(
@@ -354,13 +383,49 @@ void APDEnemyBase::DropLootOnDeath()
 			}
 			Item->Quantity = Quantity;
 			Item->FinishSpawning(SpawnXform);
-			Spawned.Add(Item);
+			SpawnedWorldActors.Add(Item);
 		}
 	}
 
-	if (Spawned.Num() > 0)
+	if (SpawnedWorldActors.Num() > 0)
 	{
-		OnLootDropped(Spawned);
+		OnLootDropped(SpawnedWorldActors);
+	}
+}
+
+void APDEnemyBase::TryDropEquippedWeaponToCorpse()
+{
+	const FName WeaponID = GetEquippedWeaponItemID();
+	if (WeaponID.IsNone()) return;
+
+	// 확률 굴림 — 실패 시 무기는 시체 액터 소멸 시 같이 사라짐 (자식 OnEnterState_Dead 에서 Destroy).
+	if (FMath::FRand() > WeaponDropChance)
+	{
+		UE_LOG(LogTemp, Verbose, TEXT("[%s] Weapon drop rolled out — ItemID=%s, Chance=%.2f"),
+			*GetName(), *WeaponID.ToString(), WeaponDropChance);
+		return;
+	}
+
+	APDLootBoxActor* Corpse = Cast<APDLootBoxActor>(GetCorpseContainer());
+	if (!Corpse)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[%s] TryDropEquippedWeaponToCorpse: CorpseContainer 가 APDLootBoxActor 가 아님. "
+			     "BP_PDEnemy 의 CorpseContainerClass 가 BP_PDLootBoxActor 로 지정됐는지 확인."),
+			*GetName());
+		return;
+	}
+
+	UPDLootComponent* Loot = Corpse->GetLootComponent();
+	if (!Loot) return;
+
+	const bool bAdded = Loot->AddItemByID(WeaponID, 1);
+	if (!bAdded)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[%s] Weapon drop AddItemByID failed — ItemID=%s. "
+			     "LootComponent 의 ItemDataTable 미설정 또는 DT row 부재."),
+			*GetName(), *WeaponID.ToString());
 	}
 }
 

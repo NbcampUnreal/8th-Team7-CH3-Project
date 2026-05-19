@@ -7,8 +7,6 @@
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
-#include "Items/PDStashActor.h"
-#include "Items/PDStashComponent.h"
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 
@@ -63,29 +61,20 @@ void APDScavenger::LinkDefaultAnimLayer()
 
 void APDScavenger::OnEnterState_Dead()
 {
+	// 무기 → 시체 Stash 이전은 EnemyBase::OnEnterState_Dead 안의 TryDropEquippedWeaponToCorpse 가
+	// WeaponDropChance 확률로 처리. 본 클래스는 무기 액터 정리만 담당.
 	Super::OnEnterState_Dead();
 
 	if (!EquippedWeapon) return;
 
 	EquippedWeapon->OnUnequip();
-
-	// 베이스가 스폰한 시체 컨테이너가 Stash 류면 무기 데이터를 그 안으로 이전. 픽업은 LootBox 상호작용으로만.
-	bool bTransferred = false;
-	if (APDStashActor* Corpse = Cast<APDStashActor>(GetCorpseContainer()))
-	{
-		if (UPDStashComponent* Stash = Corpse->GetStashComponent())
-		{
-			const FName WeaponItemID = EquippedWeapon->GetItemID();
-			if (!WeaponItemID.IsNone() && Stash->AddItemByID(WeaponItemID, 1))
-			{
-				bTransferred = true;
-			}
-		}
-	}
-
-
 	EquippedWeapon->Destroy();
 	EquippedWeapon = nullptr;
+}
+
+FName APDScavenger::GetEquippedWeaponItemID_Implementation() const
+{
+	return EquippedWeapon ? EquippedWeapon->GetItemID() : NAME_None;
 }
 
 void APDScavenger::SpawnAndEquipDefaultWeapon()

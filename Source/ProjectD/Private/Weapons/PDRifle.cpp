@@ -41,6 +41,11 @@ void APDRifle::ToggleFireMode()
     OnFireModeChanged.Broadcast(FireMode);
 }
 
+bool APDRifle::IsFullAuto() const
+{
+    return bFullAuto && FireMode == EFireMode::Auto;
+}
+
 bool APDRifle::PerformLineTrace(FHitResult& OutHit)
 {
     const FWeaponLevelStats& Stats = GetCurrentStats();

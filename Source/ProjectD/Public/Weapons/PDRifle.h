@@ -27,6 +27,10 @@ public:
 
     virtual void Fire_Implementation() override;
 
+    // bFullAuto 와 FireMode 두 조건 모두 만족할 때만 true.
+    // FireMode==Single 이면 base 의 bFullAuto 가 true 여도 false 반환 → 연사 루프 진입 차단.
+    virtual bool IsFullAuto() const override;
+
     UFUNCTION(BlueprintCallable, Category = "Weapon")
     void ToggleFireMode();
 
