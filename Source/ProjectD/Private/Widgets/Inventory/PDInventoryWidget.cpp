@@ -24,6 +24,7 @@
 #include "Items/PDStashComponent.h"
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
+#include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
 void UPDInventoryWidget::NativeOnInitialized()
@@ -73,7 +74,7 @@ void UPDInventoryWidget::RefreshInventoryGrid()
 
 	InventoryGridPanel->ClearChildren();
 	RefreshGoldText();
-	RefreshInventoryWeightText();
+	RefreshInventoryWeightBar();
 
 	if (!InventorySlotWidgetClass)
 	{
@@ -610,14 +611,42 @@ void UPDInventoryWidget::RefreshGoldText()
 	GoldTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
 }
 
-void UPDInventoryWidget::RefreshInventoryWeightText()
+void UPDInventoryWidget::ResolveInventoryWeightBarWidget()
 {
-	if (!InventoryWeightTextWidget && WidgetTree && !InventoryWeightTextWidgetName.IsNone())
+	if (InventoryWeightBarWidget)
 	{
-		InventoryWeightTextWidget = Cast<UTextBlock>(WidgetTree->FindWidget(InventoryWeightTextWidgetName));
+		return;
 	}
 
-	if (!InventoryWeightTextWidget)
+	if (!WidgetTree)
+	{
+		return;
+	}
+
+	if (!InventoryWeightBarWidgetName.IsNone())
+	{
+		InventoryWeightBarWidget = Cast<UPDInventoryWeightBarWidget>(WidgetTree->FindWidget(InventoryWeightBarWidgetName));
+	}
+
+	if (InventoryWeightBarWidget)
+	{
+		return;
+	}
+
+	WidgetTree->ForEachWidget([this](UWidget* Widget)
+	{
+		if (!InventoryWeightBarWidget)
+		{
+			InventoryWeightBarWidget = Cast<UPDInventoryWeightBarWidget>(Widget);
+		}
+	});
+}
+
+void UPDInventoryWidget::RefreshInventoryWeightBar()
+{
+	ResolveInventoryWeightBarWidget();
+
+	if (!InventoryWeightBarWidget)
 	{
 		return;
 	}
@@ -625,7 +654,7 @@ void UPDInventoryWidget::RefreshInventoryWeightText()
 	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
 	const float CurrentWeight = InventoryComponent ? InventoryComponent->GetCurrentWeight() : 0.f;
 	const float MaxWeight = InventoryComponent ? InventoryComponent->GetMaxWeight() : 0.f;
-	InventoryWeightTextWidget->SetText(FText::FromString(FString::Printf(TEXT("Weight %.1f / %.1f"), CurrentWeight, MaxWeight)));
+	InventoryWeightBarWidget->SetWeight(CurrentWeight, MaxWeight);
 }
 
 UPDInventoryComponent* UPDInventoryWidget::FindInventoryComponent() const

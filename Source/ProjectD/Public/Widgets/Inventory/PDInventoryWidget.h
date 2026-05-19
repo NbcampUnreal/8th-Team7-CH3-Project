@@ -21,6 +21,7 @@ class UPDEquipmentComponent;
 class UPDEquipmentSlotWidget;
 class UButton;
 class UWidget;
+class UPDInventoryWeightBarWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
@@ -61,7 +62,7 @@ protected:
 	FName GoldTextWidgetName = TEXT("Text_Gold");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	FName InventoryWeightTextWidgetName = TEXT("Text_InventoryWeight");
+	FName InventoryWeightBarWidgetName = TEXT("WBP_WeightBar");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UPDQuantityPopupWidget> QuantityPopupWidgetClass;
@@ -197,7 +198,8 @@ private:
 	void SetSortOptionsVisible(bool bVisible);
 	void ToggleSortOptions();
 	void RefreshGoldText();
-	void RefreshInventoryWeightText();
+	void RefreshInventoryWeightBar();
+	void ResolveInventoryWeightBarWidget();
 	void ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity);
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
@@ -243,7 +245,7 @@ private:
 	TObjectPtr<UTextBlock> GoldTextWidget;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> InventoryWeightTextWidget;
+	TObjectPtr<UPDInventoryWeightBarWidget> InventoryWeightBarWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuantityPopupWidget> ActiveQuantityPopup;
