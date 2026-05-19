@@ -107,7 +107,6 @@ bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 }
 
-/* --- 추가 Start--- */
 bool UPDInventorySlotWidget::NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	const bool bSuperHandled = Super::NativeOnDragOver(InGeometry, InDragDropEvent, InOperation);
@@ -148,7 +147,6 @@ bool UPDInventorySlotWidget::CanAcceptDrop(UDragDropOperation* InOperation) cons
 
 	return true;
 }
-/* --- 추가 End--- */
 
 void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int32 InSlotIndex)
 {
@@ -167,6 +165,12 @@ void UPDInventorySlotWidget::ClearSlotData(int32 InSlotIndex)
 void UPDInventorySlotWidget::SetSlotContainerType(EPDItemContainerType InSlotContainerType)
 {
 	SlotContainerType = InSlotContainerType;
+}
+
+void UPDInventorySlotWidget::SetEmptySlotLabel(const FText& InEmptySlotLabel)
+{
+	EmptySlotLabel = InEmptySlotLabel;
+	RefreshVisuals();
 }
 
 void UPDInventorySlotWidget::ClearDropOverlays()
@@ -194,8 +198,6 @@ void UPDInventorySlotWidget::RefreshVisuals()
 		{
 			Border_SlotBG->SetBrushFromMaterial(TargetMaterial);
 
-			// MID는 GetDynamicMaterial이 자동 생성/wrap. 머티리얼이 TintColor Vector Parameter를 가져야 함.
-			// 빈 슬롯은 흰색(=원본)으로 리셋해 직전 색 잔존 방지.
 			if (UMaterialInstanceDynamic* MID = Border_SlotBG->GetDynamicMaterial())
 			{
 				FLinearColor Tint = FLinearColor::White;
@@ -219,8 +221,8 @@ void UPDInventorySlotWidget::RefreshVisuals()
 
 		if (Text_ItemName)
 		{
-			Text_ItemName->SetText(FText::GetEmpty());
-			Text_ItemName->SetVisibility(ESlateVisibility::Collapsed);
+			Text_ItemName->SetText(EmptySlotLabel);
+			Text_ItemName->SetVisibility(EmptySlotLabel.IsEmpty() ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
 		}
 
 		if (Text_Quantity)

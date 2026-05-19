@@ -10,6 +10,7 @@ class UUniformGridPanel;
 class UPDInventoryComponent;
 class UPDStashComponent;
 class UPDQuickSlotComponent;
+class UPDSecureContainerComponent;
 class UPDInventorySlotWidget;
 class UUserWidget;
 class UWidgetTree;
@@ -18,9 +19,9 @@ class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
 class UPDEquipmentComponent;
-class UPDEquipmentSlotWidget;
 class UButton;
 class UWidget;
+class UPDInventoryWeightBarWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
@@ -61,7 +62,7 @@ protected:
 	FName GoldTextWidgetName = TEXT("Text_Gold");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
-	FName InventoryWeightTextWidgetName = TEXT("Text_InventoryWeight");
+	FName InventoryWeightBarWidgetName = TEXT("WBP_WeightBar");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	TSubclassOf<UPDQuantityPopupWidget> QuantityPopupWidgetClass;
@@ -172,10 +173,10 @@ protected:
 	void HandleSortByTypeClicked();
 
 	UFUNCTION()
-	void HandleEquipmentSlotRightClicked(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType);
+	void HandleEquipmentSlotRightClicked(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex);
 
 	UFUNCTION()
-	void HandleEquipmentSlotItemDropped(UPDEquipmentSlotWidget* SlotWidget, EPDEquipmentSlotType SlotType, UPDInventoryDragDropOperation* DragOperation);
+	void HandleEquipmentSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
 private:
 	void ResolveInventoryGridPanel();
@@ -187,6 +188,7 @@ private:
 	void UnbindEquipmentChanged();
 	void RefreshEquipmentSlots();
 	void RegisterEquipmentSlotWidget(EPDEquipmentSlotType SlotType, FName WidgetName);
+	FText GetEquipmentSlotLabel(EPDEquipmentSlotType SlotType) const;
 	int32 CountOccupiedInventorySlotsByType(EPDItemType ItemType) const;
 	int32 GetInventoryDisplaySlotCount() const;
 	void SetTabButtonLabel(UButton* TargetButton, const FText& BaseLabel, int32 UsedSlots, int32 MaxSlots) const;
@@ -197,7 +199,8 @@ private:
 	void SetSortOptionsVisible(bool bVisible);
 	void ToggleSortOptions();
 	void RefreshGoldText();
-	void RefreshInventoryWeightText();
+	void RefreshInventoryWeightBar();
+	void ResolveInventoryWeightBarWidget();
 	void ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity);
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
@@ -215,6 +218,7 @@ private:
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
+	UPDSecureContainerComponent* FindSecureContainerComponent() const;
 	UPDEquipmentComponent* FindEquipmentComponent() const;
 
 	UFUNCTION()
@@ -234,7 +238,7 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UPDEquipmentComponent> BoundEquipmentComponent;
 
-	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDEquipmentSlotWidget>> EquipmentSlotWidgets;
+	TMap<EPDEquipmentSlotType, TWeakObjectPtr<UPDInventorySlotWidget>> EquipmentSlotWidgets;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDStashComponent> ActiveStashComponent;
@@ -243,7 +247,7 @@ private:
 	TObjectPtr<UTextBlock> GoldTextWidget;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> InventoryWeightTextWidget;
+	TObjectPtr<UPDInventoryWeightBarWidget> InventoryWeightBarWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDQuantityPopupWidget> ActiveQuantityPopup;

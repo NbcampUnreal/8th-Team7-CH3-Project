@@ -12,6 +12,8 @@ enum class EPDItemContainerType : uint8
 	Inventory,
 	Stash,
 	QuickSlot,
+	Equipment,
+	SecureContainer,
 	Loot
 };
 

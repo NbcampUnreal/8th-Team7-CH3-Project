@@ -270,6 +270,7 @@ struct FPDPlayerData
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 StashUpgradeLevel = 0;
 
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 TraderReputationExp = 0;
 
