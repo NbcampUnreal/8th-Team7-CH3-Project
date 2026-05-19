@@ -158,6 +158,13 @@ void APDPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 멀티: 입력모드/HUD/RootLayout/Subsystem 등록은 로컬 PC에서만 의미가 있음.
+	// 서버에 있는 원격 클라이언트의 PC 인스턴스가 여기 들어오면 GI 단일 RootLayout을 마지막 호출이 덮어쓰는 사고가 남.
+	if (!IsLocalController())
+	{
+		return;
+	}
+
 	FInputModeGameAndUI InputMode;
 	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 	InputMode.SetHideCursorDuringCapture(false);
@@ -174,7 +181,7 @@ void APDPlayerController::BeginPlay()
 
 	CreateAndAddHUDWidget();
 	BindInventoryNotifications();
-	
+
 	if (RootLayoutClass)
 	{
 		RootLayoutInstance = CreateWidget<UPDRootLayout>(this, RootLayoutClass);

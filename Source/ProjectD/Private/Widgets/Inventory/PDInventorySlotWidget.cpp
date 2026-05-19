@@ -2,16 +2,17 @@
 
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Border.h"
 #include "Components/Image.h"
 #include "Components/TextBlock.h"
+#include "Data/PDItemGradeColorData.h"
 #include "Input/Events.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 
 void UPDInventorySlotWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
-	ResolveTextWidgets();
-	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -49,9 +50,9 @@ void UPDInventorySlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, con
 		OnSlotHovered.Broadcast(this, SlotIndex);
 	}
 
-	if (ImageHoverBorderWidget)
+	if (Image_HoverBorder)
 	{
-		ImageHoverBorderWidget->SetVisibility(ESlateVisibility::HitTestInvisible);
+		Image_HoverBorder->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 }
 
@@ -60,9 +61,9 @@ void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEven
 	Super::NativeOnMouseLeave(InMouseEvent);
 	OnSlotUnhovered.Broadcast(this, SlotIndex);
 
-	if (ImageHoverBorderWidget)
+	if (Image_HoverBorder)
 	{
-		ImageHoverBorderWidget->SetVisibility(ESlateVisibility::Collapsed);
+		Image_HoverBorder->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
@@ -113,14 +114,14 @@ bool UPDInventorySlotWidget::NativeOnDragOver(const FGeometry& InGeometry, const
 
 	const bool bCanAccept = CanAcceptDrop(InOperation);
 
-	if (ImageDropValidWidget)
+	if (Image_DropValid)
 	{
-		ImageDropValidWidget->SetVisibility(bCanAccept ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+		Image_DropValid->SetVisibility(bCanAccept ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 
-	if (ImageDropInvalidWidget)
+	if (Image_DropInvalid)
 	{
-		ImageDropInvalidWidget->SetVisibility(bCanAccept ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+		Image_DropInvalid->SetVisibility(bCanAccept ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	}
 
 	return bSuperHandled || bCanAccept;
@@ -153,8 +154,6 @@ void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int
 {
 	SlotData = InSlotData;
 	SlotIndex = InSlotIndex;
-	ResolveTextWidgets();
-	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -162,8 +161,6 @@ void UPDInventorySlotWidget::ClearSlotData(int32 InSlotIndex)
 {
 	SlotData.Clear();
 	SlotIndex = InSlotIndex;
-	ResolveTextWidgets();
-	ResolveOverlayWidgets();
 	RefreshVisuals();
 }
 
@@ -172,78 +169,22 @@ void UPDInventorySlotWidget::SetSlotContainerType(EPDItemContainerType InSlotCon
 	SlotContainerType = InSlotContainerType;
 }
 
-void UPDInventorySlotWidget::ResolveTextWidgets()
-{
-	if (!WidgetTree)
-	{
-		return;
-	}
-
-	if (!TextItemNameWidget && !TextItemNameWidgetName.IsNone())
-	{
-		TextItemNameWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TextItemNameWidgetName));
-	}
-
-	if (!TextQuantityWidget && !TextQuantityWidgetName.IsNone())
-	{
-		TextQuantityWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TextQuantityWidgetName));
-	}
-
-	if (!ImageItemIconWidget && !ImageItemIconWidgetName.IsNone())
-	{
-		ImageItemIconWidget = Cast<UImage>(WidgetTree->FindWidget(ImageItemIconWidgetName));
-	}
-}
-
-/* --- 추가 Start--- */
-void UPDInventorySlotWidget::ResolveOverlayWidgets()
-{
-	if (!WidgetTree)
-	{
-		return;
-	}
-
-	if (!ImageSlotBGWidget && !ImageSlotBGWidgetName.IsNone())
-	{
-		ImageSlotBGWidget = Cast<UImage>(WidgetTree->FindWidget(ImageSlotBGWidgetName));
-	}
-
-	if (!ImageHoverBorderWidget && !ImageHoverBorderWidgetName.IsNone())
-	{
-		ImageHoverBorderWidget = Cast<UImage>(WidgetTree->FindWidget(ImageHoverBorderWidgetName));
-	}
-
-	if (!ImageDropValidWidget && !ImageDropValidWidgetName.IsNone())
-	{
-		ImageDropValidWidget = Cast<UImage>(WidgetTree->FindWidget(ImageDropValidWidgetName));
-	}
-
-	if (!ImageDropInvalidWidget && !ImageDropInvalidWidgetName.IsNone())
-	{
-		ImageDropInvalidWidget = Cast<UImage>(WidgetTree->FindWidget(ImageDropInvalidWidgetName));
-	}
-}
-
 void UPDInventorySlotWidget::ClearDropOverlays()
 {
-	if (ImageDropValidWidget)
+	if (Image_DropValid)
 	{
-		ImageDropValidWidget->SetVisibility(ESlateVisibility::Collapsed);
+		Image_DropValid->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
-	if (ImageDropInvalidWidget)
+	if (Image_DropInvalid)
 	{
-		ImageDropInvalidWidget->SetVisibility(ESlateVisibility::Collapsed);
+		Image_DropInvalid->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
-/* --- 추가 End--- */
 
 void UPDInventorySlotWidget::RefreshVisuals()
 {
-	ResolveTextWidgets();
-	ResolveOverlayWidgets();
-
-	if (ImageSlotBGWidget)
+	if (Border_SlotBG)
 	{
 		UMaterialInterface* TargetMaterial = SlotData.IsEmpty()
 			? SlotBGMaterial_Empty.LoadSynchronous()
@@ -251,7 +192,22 @@ void UPDInventorySlotWidget::RefreshVisuals()
 
 		if (TargetMaterial)
 		{
-			ImageSlotBGWidget->SetBrushFromMaterial(TargetMaterial);
+			Border_SlotBG->SetBrushFromMaterial(TargetMaterial);
+
+			// MID는 GetDynamicMaterial이 자동 생성/wrap. 머티리얼이 TintColor Vector Parameter를 가져야 함.
+			// 빈 슬롯은 흰색(=원본)으로 리셋해 직전 색 잔존 방지.
+			if (UMaterialInstanceDynamic* MID = Border_SlotBG->GetDynamicMaterial())
+			{
+				FLinearColor Tint = FLinearColor::White;
+				if (!SlotData.IsEmpty())
+				{
+					if (UPDItemGradeColorData* ColorData = GradeColorData.LoadSynchronous())
+					{
+						Tint = ColorData->ResolveColor(SlotData.ItemData.ItemGrade);
+					}
+				}
+				MID->SetVectorParameterValue(TEXT("TintColor"), Tint);
+			}
 		}
 	}
 
@@ -261,21 +217,21 @@ void UPDInventorySlotWidget::RefreshVisuals()
 		CachedTooltipDescription = FText::GetEmpty();
 		ClearTooltip();
 
-		if (TextItemNameWidget)
+		if (Text_ItemName)
 		{
-			TextItemNameWidget->SetText(FText::GetEmpty());
-			TextItemNameWidget->SetVisibility(ESlateVisibility::Collapsed);
+			Text_ItemName->SetText(FText::GetEmpty());
+			Text_ItemName->SetVisibility(ESlateVisibility::Collapsed);
 		}
 
-		if (TextQuantityWidget)
+		if (Text_Quantity)
 		{
-			TextQuantityWidget->SetText(FText::GetEmpty());
+			Text_Quantity->SetText(FText::GetEmpty());
 		}
 
-		if (ImageItemIconWidget)
+		if (Image_ItemIcon)
 		{
-			ImageItemIconWidget->SetBrushFromTexture(nullptr);
-			ImageItemIconWidget->SetVisibility(ESlateVisibility::Hidden);
+			Image_ItemIcon->SetBrushFromTexture(nullptr);
+			Image_ItemIcon->SetVisibility(ESlateVisibility::Hidden);
 		}
 
 		return;
@@ -286,21 +242,21 @@ void UPDInventorySlotWidget::RefreshVisuals()
 	CachedTooltipDisplayName = DisplayName;
 	CachedTooltipDescription = Description;
 
-	if (TextItemNameWidget)
+	if (Text_ItemName)
 	{
-		TextItemNameWidget->SetText(DisplayName);
-		TextItemNameWidget->SetVisibility(ESlateVisibility::Visible);
+		Text_ItemName->SetText(DisplayName);
+		Text_ItemName->SetVisibility(ESlateVisibility::Visible);
 	}
 
-	if (TextQuantityWidget)
+	if (Text_Quantity)
 	{
-		TextQuantityWidget->SetText(SlotData.Quantity > 1 ? FText::AsNumber(SlotData.Quantity) : FText::GetEmpty());
+		Text_Quantity->SetText(SlotData.Quantity > 1 ? FText::AsNumber(SlotData.Quantity) : FText::GetEmpty());
 	}
 
-	if (ImageItemIconWidget)
+	if (Image_ItemIcon)
 	{
-		ImageItemIconWidget->SetBrushFromTexture(SlotData.ItemData.Icon);
-		ImageItemIconWidget->SetVisibility(SlotData.ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
+		Image_ItemIcon->SetBrushFromTexture(SlotData.ItemData.Icon);
+		Image_ItemIcon->SetVisibility(SlotData.ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 	}
 
 	ApplyTooltip(DisplayName, Description);
