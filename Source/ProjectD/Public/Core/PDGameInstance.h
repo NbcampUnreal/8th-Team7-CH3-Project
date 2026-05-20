@@ -81,6 +81,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Levels")
 	void TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBaseResetPending);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Multiplayer")
+	bool HostHamachiGame(TSoftObjectPtr<UWorld> Level, int32 Port = 7777);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Multiplayer")
+	bool JoinHamachiGame(const FString& HostAddress, int32 Port = 7777);
+
 	UFUNCTION(BlueprintPure, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> GetBaseLevel() const { return BaseLevel; }
 

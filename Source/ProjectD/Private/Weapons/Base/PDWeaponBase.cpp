@@ -8,10 +8,13 @@
 #include "Component/PDWeaponComponent.h"
 
 #include "Items/PDInventoryComponent.h"
+#include "Net/UnrealNetwork.h"
 
 APDWeaponBase::APDWeaponBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
+	bReplicates = true;
+	SetReplicateMovement(true);
 
 	WeaponMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("WeaponMesh"));
 	SetRootComponent(WeaponMesh);
@@ -25,6 +28,14 @@ APDWeaponBase::APDWeaponBase()
 	PickupCollision->SetCollisionResponseToAllChannels(ECR_Ignore);
 	PickupCollision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 	PickupCollision->SetGenerateOverlapEvents(false);
+}
+
+void APDWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDWeaponBase, CurrentLevel);
+	DOREPLIFETIME(APDWeaponBase, bIsDropped);
 }
 
 void APDWeaponBase::BeginPlay()

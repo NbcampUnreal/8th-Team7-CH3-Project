@@ -14,9 +14,12 @@
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Animation/PDAnimInstance.h"
+#include "Net/UnrealNetwork.h"
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
+	bReplicates = true;
+
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	bUseControllerRotationPitch=false;
@@ -56,6 +59,14 @@ APDPlayerCharacter::APDPlayerCharacter()
 	
 	// Player 팀. AI 의 GetTeamAttitudeTowards 에서 적대 판정의 기준이 됨.
 	TeamID = 1;
+}
+
+void APDPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDPlayerCharacter, WeaponSlots);
+	DOREPLIFETIME(APDPlayerCharacter, CurrentSlot);
 }
 
 void APDPlayerCharacter::BeginPlay()
@@ -194,10 +205,7 @@ void APDPlayerCharacter::SwitchToSlot(EWeaponSlot Slot)
 	NewWeapon->OnEquip(this);
 	if (ASC)
 	{
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
-		ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
+		ClearWeaponTypeTags();
 		ASC->AddLooseGameplayTag(NewWeapon->GetWeaponTypeTag());
 	}
 	NewWeapon->SetActorHiddenInGame(false);
@@ -226,10 +234,12 @@ void APDPlayerCharacter::DropCurrentWeapon()
 	CurWeapon->SetDropped(true);
 	WeaponSlots[static_cast<int32>(CurrentSlot)]=nullptr;
 	CurrentSlot=EWeaponSlot::None;
-	ASC->RemoveLooseGameplayTag(CurWeapon->GetWeaponTypeTag());
-
 	// UI/AnimInstance 등이 현재 무기 변경을 감지하도록 broadcast.
 	OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
+	if (ASC)
+	{
+		ASC->RemoveLooseGameplayTag(CurWeapon->GetWeaponTypeTag());
+	}
 }
 
 APDWeaponBase* APDPlayerCharacter::GetCurrentWeapon() const
@@ -456,4 +466,72 @@ void APDPlayerCharacter::LinkDefaultAnimLayer()
 	if (!DefaultAnimLayerClass) return;
 	if (USkeletalMeshComponent* SkelMesh=GetMesh())
 		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
+}
+
+void APDPlayerCharacter::OnRep_WeaponSlots()
+{
+	RefreshEquippedWeaponVisuals();
+}
+
+void APDPlayerCharacter::OnRep_CurrentSlot()
+{
+	RefreshEquippedWeaponVisuals();
+}
+
+void APDPlayerCharacter::ClearWeaponTypeTags() const
+{
+	if (!ASC)
+	{
+		return;
+	}
+
+	ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Rifle);
+	ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Shotgun);
+	ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Sniper);
+	ASC->RemoveLooseGameplayTag(PDGameplayTags::Weapon_Type_Melee);
+}
+
+void APDPlayerCharacter::RefreshEquippedWeaponVisuals()
+{
+	APDWeaponBase* CurrentWeapon = GetCurrentWeapon();
+
+	for (APDWeaponBase* Weapon : WeaponSlots)
+	{
+		if (!IsValid(Weapon))
+		{
+			continue;
+		}
+
+		const bool bIsCurrentWeapon = Weapon == CurrentWeapon;
+		Weapon->SetActorHiddenInGame(!bIsCurrentWeapon);
+		if (bIsCurrentWeapon)
+		{
+			Weapon->WeaponOwner = this;
+			AttachActorToWeaponSocket(Weapon);
+		}
+	}
+
+	ClearWeaponTypeTags();
+
+	UPDAnimInstance* AnimInst = GetMesh()
+		? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
+	if (!IsValid(CurrentWeapon))
+	{
+		LinkDefaultAnimLayer();
+		OnWeaponSwapped.Broadcast(nullptr, EWeaponSlot::None);
+		return;
+	}
+
+	if (ASC)
+	{
+		ASC->AddLooseGameplayTag(CurrentWeapon->GetWeaponTypeTag());
+	}
+
+	if (AnimInst)
+	{
+		AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(CurrentWeapon));
+	}
+
+	OnWeaponSwapped.Broadcast(CurrentWeapon, CurrentSlot);
 }

@@ -59,9 +59,17 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+	UFUNCTION(Server, Reliable)
+	void ServerEquipItemFromInventoryToSlot(int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType);
+
+	UFUNCTION()
+	void OnRep_ReplicatedEquippedItems();
+
 	void InitializeDefaultSlots();
+	void RefreshReplicatedEquippedItems();
 	bool ApplyCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const;
 	void RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot,
 	                                      FPDWeaponInstanceState* OutWeaponState = nullptr) const;
@@ -71,4 +79,7 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment", meta = (AllowPrivateAccess = "true"))
 	TMap<EPDEquipmentSlotType, FPDEquippedItem> EquippedItems;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedEquippedItems)
+	TArray<FPDEquippedItem> ReplicatedEquippedItems;
 };
