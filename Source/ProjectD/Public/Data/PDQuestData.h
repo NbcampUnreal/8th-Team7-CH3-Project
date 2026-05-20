@@ -70,6 +70,19 @@ public:
 };
 
 USTRUCT(BlueprintType)
+struct FPDQuestRewardItem
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
+	FName ItemID;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward", meta = (ClampMin = "1"))
+	int32 Quantity = 1;
+};
+
+USTRUCT(BlueprintType)
 struct FPDQuestReward
 {
 	GENERATED_BODY()
@@ -79,7 +92,7 @@ public:
 	int32 RewardGold = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
-	TArray<FName> RewardItems;
+	TArray<FPDQuestRewardItem> RewardItems;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Reward")
 	int32 RewardTraderReputationExp = 0;

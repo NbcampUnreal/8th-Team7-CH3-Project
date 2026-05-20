@@ -140,8 +140,13 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 			AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("마켓 경험치 +%d"), QuestData.Reward.RewardTraderReputationExp)));
 		}
 
-		for (const FName ItemID : QuestData.Reward.RewardItems)
+		for (const FPDQuestRewardItem& RewardItem : QuestData.Reward.RewardItems)
 		{
+			if (RewardItem.ItemID.IsNone())
+			{
+				continue;
+			}
+
 			const FPDItemData* ItemData = nullptr;
 
 			if (InventoryComponent && InventoryComponent->ItemDataTable)
@@ -151,7 +156,7 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 
 				for (const FPDItemData* Row : Rows)
 				{
-					if (Row && Row->ItemID == ItemID)
+					if (Row && Row->ItemID == RewardItem.ItemID)
 					{
 						ItemData = Row;
 						break;
@@ -161,7 +166,7 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 
 			if (!ItemData)
 			{
-				AddDetailLine(VB_Rewards, FText::FromName(ItemID));
+				AddDetailLine(VB_Rewards, FText::FromString(FString::Printf(TEXT("%s x%d"), *RewardItem.ItemID.ToString(), FMath::Max(1, RewardItem.Quantity))));
 				continue;
 			}
 
@@ -180,7 +185,7 @@ void UPDQuestWindowWidget::RefreshQuestDetail()
 				? FText::FromName(ItemData->ItemID)
 				: ItemData->DisplayName;
 
-			ItemText->SetText(DisplayName);
+			ItemText->SetText(FText::FromString(FString::Printf(TEXT("%s x%d"), *DisplayName.ToString(), FMath::Max(1, RewardItem.Quantity))));
 
 			UHorizontalBoxSlot* IconSlot = RewardRow->AddChildToHorizontalBox(ItemIcon);
 			IconSlot->SetPadding(FMargin(0.f, 0.f, 8.f, 0.f));

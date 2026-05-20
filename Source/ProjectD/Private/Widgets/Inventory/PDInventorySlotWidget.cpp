@@ -97,7 +97,7 @@ bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 
 	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
 	{
-		if (DragOperation->IsValidPayload() && SlotIndex != INDEX_NONE && OnSlotItemDropped.IsBound())
+		if (DragOperation->IsValidPayload() && OnSlotItemDropped.IsBound() && (SlotIndex != INDEX_NONE || SlotContainerType == EPDItemContainerType::None))
 		{
 			OnSlotItemDropped.Broadcast(this, SlotIndex, DragOperation);
 			return true;
