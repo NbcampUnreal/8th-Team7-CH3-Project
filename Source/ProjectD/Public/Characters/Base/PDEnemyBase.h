@@ -60,9 +60,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI")
 	EPDEnemyState CurrentState = EPDEnemyState::Idle;
 
-	/** 개인별 조준 편향 최대 크기(deg). BeginPlay 에서 [-Max..+Max] 균등분포로 한 번 굴림. 0=모두 정확. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI|Aim", meta = (ClampMin = "0.0"))
-	float AimBiasMaxDegrees = 5.0f;
+	/** Pitch 중심 오프셋(deg). 무기 forward 가 플레이어 머리로 정렬되는 보정용 — 음수=아래로 내려 몸통 기준. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|AI|Aim")
+	float AimBiasPitchOffset = -5.0f;
+
+	/** 위아래(Pitch) 편향 최대(deg). 사람 손은 보통 상하 흔들림이 좌우보다 큼. BeginPlay 에서 [Offset-Max..Offset+Max] 균등분포로 한 번 굴림. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|AI|Aim", meta = (ClampMin = "0.0"))
+	float AimBiasMaxPitchDegrees = 7.0f;
+
+	/** 좌우(Yaw) 편향 최대(deg). BeginPlay 에서 [-Max..+Max] 균등분포로 한 번 굴림. 0=좌우 정확. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|AI|Aim", meta = (ClampMin = "0.0"))
+	float AimBiasMaxYawDegrees = 3.0f;
 
 	/** 본 인스턴스 고정 Bias. BeginPlay 에서 한 번 굴린 뒤 변하지 않음 — 사수의 "버릇". */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "PD|AI|Aim")
