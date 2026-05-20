@@ -6,8 +6,9 @@
 #include "Animation/WidgetAnimation.h"
 #include "Components/TextBlock.h"
 #include "Core/PDGameInstance.h"
+#include "Widgets/Transition/PDRaidSummaryWidget.h"
 
-void UPDRaidEndTransitionWidget::Configure(bool bInSuccess)
+void UPDRaidEndTransitionWidget::Configure(bool bInSuccess, const FPDRaidStats& Stats)
 {
 	bSuccess = bInSuccess;
 
@@ -20,6 +21,12 @@ void UPDRaidEndTransitionWidget::Configure(bool bInSuccess)
 	{
 		Text_Subtitle->SetText(bSuccess ? SuccessSubtitleText : FailureSubtitleText);
 	}
+	if (Summary)
+	{
+		Summary->Configure(Stats);
+	}
+
+	K2_ApplyAccent(bSuccess ? SuccessAccentColor : FailureAccentColor);
 }
 
 void UPDRaidEndTransitionWidget::NativeOnActivated()
@@ -31,7 +38,7 @@ void UPDRaidEndTransitionWidget::NativeOnActivated()
 
 	if (Text_ContinuePrompt)
 	{
-		Text_ContinuePrompt->SetVisibility(ESlateVisibility::Collapsed);
+		Text_ContinuePrompt->SetVisibility(ESlateVisibility::Hidden);
 	}
 
 	if (Anim_IntroSequence)
