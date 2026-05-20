@@ -742,25 +742,10 @@ void APDPlayerController::OpenEquipmentModificationInterface()
 		CloseQuestInterface();
 	}
 
-	if (!InventoryWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
-		return;
-	}
-
 	if (!EquipmentModificationWidgetClass)
 	{
 		UE_LOG(LogPDCharacter, Warning, TEXT("EquipmentModificationWidgetClass is not set."));
 		return;
-	}
-
-	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-		if (InventoryWidgetInstance)
-		{
-			InventoryWidgetInstance->AddToViewport();
-		}
 	}
 
 	EquipmentModificationWidgetInstance = CreateWidget<UUserWidget>(this, EquipmentModificationWidgetClass);
@@ -783,12 +768,6 @@ void APDPlayerController::CloseEquipmentModificationInterface()
 		EquipmentModificationWidgetInstance->RemoveFromParent();
 	}
 	EquipmentModificationWidgetInstance = nullptr;
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-	}
-	InventoryWidgetInstance = nullptr;
 
 	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsMarketInterfaceOpen() && !IsQuestInterfaceOpen())
 	{

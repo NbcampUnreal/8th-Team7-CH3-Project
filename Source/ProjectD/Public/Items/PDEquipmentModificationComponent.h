@@ -82,10 +82,16 @@ public:
 	bool CanModifyInventorySlotWithBoost(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
+	bool CanModifyInventorySlotWithMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	bool TryModifyInventorySlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	bool TryModifyInventorySlotWithBoost(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
+	bool TryModifyInventorySlotWithMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult);
 
 protected:
 	float GetCurveValue(FName RowName, int32 TargetLevel, float DefaultValue) const;
@@ -96,5 +102,7 @@ protected:
 	float GetBoostRate(EPDModificationBoostType BoostType, int32 TargetLevel) const;
 	void FillApplicableBonus(const FPDInventorySlot& TargetSlot, int32 TargetLevel, FPDModificationPreview& OutPreview) const;
 	bool HasRequiredMaterials(const UPDInventoryComponent* InventoryComponent, const TArray<FPDModificationMaterialRequirement>& Materials) const;
+	bool HasRequiredMaterialSlot(const UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const;
 	bool ConsumeRequiredMaterials(UPDInventoryComponent* InventoryComponent, const TArray<FPDModificationMaterialRequirement>& Materials) const;
+	bool ConsumeRequiredMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const;
 };

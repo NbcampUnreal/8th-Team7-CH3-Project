@@ -232,6 +232,41 @@ bool UPDEquipmentModificationComponent::HasRequiredMaterials(const UPDInventoryC
 	return true;
 }
 
+
+bool UPDEquipmentModificationComponent::HasRequiredMaterialSlot(const UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const
+{
+	if (!InventoryComponent)
+	{
+		return false;
+	}
+
+	if (Materials.Num() <= 0)
+	{
+		return true;
+	}
+
+	if (!InventoryComponent->Items.IsValidIndex(MaterialSlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& MaterialSlot = InventoryComponent->Items[MaterialSlotIndex];
+	if (MaterialSlot.IsEmpty())
+	{
+		return false;
+	}
+
+	for (const FPDModificationMaterialRequirement& Material : Materials)
+	{
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
 bool UPDEquipmentModificationComponent::ConsumeRequiredMaterials(UPDInventoryComponent* InventoryComponent, const TArray<FPDModificationMaterialRequirement>& Materials) const
 {
 	if (!InventoryComponent)
@@ -248,6 +283,31 @@ bool UPDEquipmentModificationComponent::ConsumeRequiredMaterials(UPDInventoryCom
 	}
 
 	return true;
+}
+
+
+bool UPDEquipmentModificationComponent::ConsumeRequiredMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const
+{
+	if (!HasRequiredMaterialSlot(InventoryComponent, MaterialSlotIndex, Materials))
+	{
+		return false;
+	}
+
+	if (Materials.Num() <= 0)
+	{
+		return true;
+	}
+
+	const FPDInventorySlot& MaterialSlot = InventoryComponent->Items[MaterialSlotIndex];
+	for (const FPDModificationMaterialRequirement& Material : Materials)
+	{
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		{
+			return InventoryComponent->RemoveItemFromSlot(MaterialSlotIndex, Material.Quantity);
+		}
+	}
+
+	return false;
 }
 
 bool UPDEquipmentModificationComponent::CanModifyInventorySlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const
@@ -296,6 +356,24 @@ bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithBoost(UPDInven
 	return true;
 }
 
+
+bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const
+{
+	if (!CanModifyInventorySlotWithBoost(InventoryComponent, InventorySlotIndex, BoostType, OutPreview, OutResult))
+	{
+		return false;
+	}
+
+	if (!HasRequiredMaterialSlot(InventoryComponent, MaterialSlotIndex, OutPreview.RequiredMaterials))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		return false;
+	}
+
+	OutResult = EPDModificationResult::Success;
+	return true;
+}
+
 bool UPDEquipmentModificationComponent::TryModifyInventorySlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult)
 {
 	return TryModifyInventorySlotWithBoost(InventoryComponent, InventorySlotIndex, EPDModificationBoostType::None, OutPreview, OutResult);
@@ -317,6 +395,53 @@ bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithBoost(UPDInven
 	}
 
 	if (!ConsumeRequiredMaterials(InventoryComponent, OutPreview.RequiredMaterials))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	if (!OutPreview.BoostItemID.IsNone() && OutPreview.BoostItemQuantity > 0 && !InventoryComponent->RemoveItem(OutPreview.BoostItemID, OutPreview.BoostItemQuantity))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	const bool bSuccess = FMath::FRand() <= OutPreview.SuccessRate;
+	FPDInventorySlot& Slot = InventoryComponent->Items[InventorySlotIndex];
+
+	if (bSuccess)
+	{
+		Slot.ModificationLevel = OutPreview.TargetModificationLevel;
+		OutResult = EPDModificationResult::Success;
+	}
+	else
+	{
+		OutResult = EPDModificationResult::FailedByChance;
+	}
+
+	InventoryComponent->OnInventoryChanged.Broadcast();
+	OnModificationFinished.Broadcast(InventorySlotIndex, Slot.ModificationLevel, bSuccess, OutResult);
+	return bSuccess;
+}
+
+bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult)
+{
+	if (!CanModifyInventorySlotWithMaterialSlot(InventoryComponent, InventorySlotIndex, MaterialSlotIndex, BoostType, OutPreview, OutResult))
+	{
+		OnModificationFinished.Broadcast(InventorySlotIndex, 0, false, OutResult);
+		return false;
+	}
+
+	if (!InventoryComponent->SpendGold(OutPreview.GoldCost))
+	{
+		OutResult = EPDModificationResult::NotEnoughGold;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	if (!ConsumeRequiredMaterialSlot(InventoryComponent, MaterialSlotIndex, OutPreview.RequiredMaterials))
 	{
 		OutResult = EPDModificationResult::NotEnoughMaterials;
 		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);

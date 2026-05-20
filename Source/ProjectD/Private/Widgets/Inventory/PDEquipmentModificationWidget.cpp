@@ -2,14 +2,18 @@
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
 #include "Components/Image.h"
 #include "Components/ScrollBox.h"
 #include "Components/TextBlock.h"
+#include "Components/UniformGridPanel.h"
+#include "Components/UniformGridSlot.h"
 #include "Components/VerticalBox.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDEquipmentModificationComponent.h"
 #include "Items/PDInventoryComponent.h"
 #include "Widgets/Inventory/PDEquipmentListItemWidget.h"
+#include "Widgets/Inventory/PDInventorySlotWidget.h"
 
 void UPDEquipmentModificationWidget::NativeConstruct()
 {
@@ -36,6 +40,14 @@ void UPDEquipmentModificationWidget::ResolveComponents()
 
 void UPDEquipmentModificationWidget::BindWidgetEvents()
 {
+	if (Button_EquipmentTab)
+	{
+		Button_EquipmentTab->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleEquipmentTabClicked);
+	}
+	if (Button_MaterialTab)
+	{
+		Button_MaterialTab->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleMaterialTabClicked);
+	}
 	if (Button_Boost_None)
 	{
 		Button_Boost_None->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
@@ -56,10 +68,30 @@ void UPDEquipmentModificationWidget::BindWidgetEvents()
 	{
 		Button_Modify->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
 	}
+	if (BTN_Enhance && BTN_Enhance != Button_Modify)
+	{
+		BTN_Enhance->OnClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
+	}
+	if (EquipmentSlotWidget)
+	{
+		EquipmentSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+	}
+	if (MaterialSlotWidget)
+	{
+		MaterialSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+	}
 }
 
 void UPDEquipmentModificationWidget::UnbindWidgetEvents()
 {
+	if (Button_EquipmentTab)
+	{
+		Button_EquipmentTab->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleEquipmentTabClicked);
+	}
+	if (Button_MaterialTab)
+	{
+		Button_MaterialTab->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleMaterialTabClicked);
+	}
 	if (Button_Boost_None)
 	{
 		Button_Boost_None->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleBoostNoneClicked);
@@ -79,6 +111,18 @@ void UPDEquipmentModificationWidget::UnbindWidgetEvents()
 	if (Button_Modify)
 	{
 		Button_Modify->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
+	}
+	if (BTN_Enhance && BTN_Enhance != Button_Modify)
+	{
+		BTN_Enhance->OnClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleModifyClicked);
+	}
+	if (EquipmentSlotWidget)
+	{
+		EquipmentSlotWidget->OnSlotLeftClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+	}
+	if (MaterialSlotWidget)
+	{
+		MaterialSlotWidget->OnSlotLeftClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
 	}
 }
 
@@ -110,7 +154,10 @@ void UPDEquipmentModificationWidget::RefreshAll()
 {
 	RefreshEquipmentList();
 	SelectFirstEquipmentSlotIfNeeded();
+	RefreshSelectedSlots();
+	RefreshInventoryGrid();
 	RefreshPreview();
+	SetText(Text_PlayerGold, FText::FromString(FString::Printf(TEXT("Inventory Gold : %d"), InventoryComponent ? InventoryComponent->GetGold() : 0)));
 }
 
 void UPDEquipmentModificationWidget::RefreshEquipmentList()
@@ -148,6 +195,82 @@ void UPDEquipmentModificationWidget::RefreshEquipmentList()
 	}
 }
 
+void UPDEquipmentModificationWidget::RefreshInventoryGrid()
+{
+	if (!InventoryGrid)
+	{
+		return;
+	}
+
+	InventoryGrid->ClearChildren();
+
+	if (!InventorySlotWidgetClass)
+	{
+		return;
+	}
+
+	const int32 SafeColumns = FMath::Max(1, InventoryGridColumns);
+	const int32 SafeRows = FMath::Max(1, InventoryGridRows);
+	const int32 MaxVisibleSlots = SafeColumns * SafeRows;
+	TArray<int32> DisplaySlotIndices;
+	DisplaySlotIndices.Reserve(MaxVisibleSlots);
+
+	if (InventoryComponent)
+	{
+		for (int32 SlotIndex = 0; SlotIndex < InventoryComponent->Items.Num() && DisplaySlotIndices.Num() < MaxVisibleSlots; ++SlotIndex)
+		{
+			const FPDInventorySlot& SlotData = InventoryComponent->Items[SlotIndex];
+			if (!SlotData.IsEmpty() && SlotData.ItemData.ItemType == CurrentInventoryFilter)
+			{
+				DisplaySlotIndices.Add(SlotIndex);
+			}
+		}
+	}
+
+	for (int32 DisplayIndex = 0; DisplayIndex < MaxVisibleSlots; ++DisplayIndex)
+	{
+		UPDInventorySlotWidget* SlotWidget = CreateWidget<UPDInventorySlotWidget>(GetOwningPlayer(), InventorySlotWidgetClass);
+		if (!SlotWidget)
+		{
+			continue;
+		}
+
+		SlotWidget->SetSlotContainerType(EPDItemContainerType::Inventory);
+		SlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+
+		if (DisplaySlotIndices.IsValidIndex(DisplayIndex))
+		{
+			const int32 SlotIndex = DisplaySlotIndices[DisplayIndex];
+			SlotWidget->SetSlotData(InventoryComponent->Items[SlotIndex], SlotIndex);
+		}
+		else
+		{
+			SlotWidget->ClearSlotData(INDEX_NONE);
+		}
+
+		UWidget* GridChild = SlotWidget;
+
+		if (InventoryGridSlotPadding > 0.f)
+		{
+			UBorder* SlotPaddingWrapper = NewObject<UBorder>(this);
+			if (SlotPaddingWrapper)
+			{
+				SlotPaddingWrapper->SetBrushColor(FLinearColor::Transparent);
+				SlotPaddingWrapper->SetPadding(FMargin(InventoryGridSlotPadding));
+				SlotPaddingWrapper->AddChild(SlotWidget);
+				GridChild = SlotPaddingWrapper;
+			}
+		}
+
+		UUniformGridSlot* GridSlot = InventoryGrid->AddChildToUniformGrid(GridChild, DisplayIndex / SafeColumns, DisplayIndex % SafeColumns);
+		if (GridSlot)
+		{
+			GridSlot->SetHorizontalAlignment(HAlign_Left);
+			GridSlot->SetVerticalAlignment(VAlign_Top);
+		}
+	}
+}
+
 void UPDEquipmentModificationWidget::SelectFirstEquipmentSlotIfNeeded()
 {
 	if (SelectedSlotIndex != INDEX_NONE || !InventoryComponent)
@@ -157,8 +280,7 @@ void UPDEquipmentModificationWidget::SelectFirstEquipmentSlotIfNeeded()
 
 	for (int32 Index = 0; Index < InventoryComponent->Items.Num(); ++Index)
 	{
-		const FPDInventorySlot& InventorySlotData = InventoryComponent->Items[Index];
-		if (!InventorySlotData.IsEmpty() && InventorySlotData.ItemData.ItemType == EPDItemType::Equipment)
+		if (IsValidEquipmentSlotIndex(Index))
 		{
 			SelectedSlotIndex = Index;
 			return;
@@ -168,9 +290,35 @@ void UPDEquipmentModificationWidget::SelectFirstEquipmentSlotIfNeeded()
 
 void UPDEquipmentModificationWidget::SelectInventorySlot(int32 SlotIndex)
 {
+	if (!IsValidEquipmentSlotIndex(SlotIndex))
+	{
+		return;
+	}
+
 	SelectedSlotIndex = SlotIndex;
 	SetText(Text_Result, ModifyReadyText);
+	RefreshEquipmentList();
+	RefreshSelectedSlots();
 	RefreshPreview();
+}
+
+void UPDEquipmentModificationWidget::SelectMaterialSlot(int32 SlotIndex)
+{
+	if (!IsValidMaterialSlotIndex(SlotIndex))
+	{
+		return;
+	}
+
+	SelectedMaterialSlotIndex = SlotIndex;
+	SetText(Text_Result, ModifyReadyText);
+	RefreshSelectedSlots();
+	RefreshPreview();
+}
+
+void UPDEquipmentModificationWidget::SetInventoryFilter(EPDItemType ItemType)
+{
+	CurrentInventoryFilter = ItemType;
+	RefreshInventoryGrid();
 }
 
 void UPDEquipmentModificationWidget::SetBoostType(EPDModificationBoostType BoostType)
@@ -178,6 +326,12 @@ void UPDEquipmentModificationWidget::SetBoostType(EPDModificationBoostType Boost
 	SelectedBoostType = BoostType;
 	SetText(Text_Result, ModifyReadyText);
 	RefreshPreview();
+}
+
+void UPDEquipmentModificationWidget::RefreshSelectedSlots()
+{
+	SetSlotWidgetData(EquipmentSlotWidget, SelectedSlotIndex, EmptySelectionText);
+	SetSlotWidgetData(MaterialSlotWidget, SelectedMaterialSlotIndex, EmptyMaterialText);
 }
 
 void UPDEquipmentModificationWidget::RefreshPreview()
@@ -199,8 +353,8 @@ void UPDEquipmentModificationWidget::RefreshPreview()
 		return;
 	}
 
-	bCurrentPreviewValid = ModificationComponent->CanModifyInventorySlotWithBoost(InventoryComponent, SelectedSlotIndex, SelectedBoostType, CurrentPreview, CurrentPreviewResult);
-	if (!bCurrentPreviewValid && CurrentPreviewResult == EPDModificationResult::AlreadyMaxLevel)
+	bCurrentPreviewValid = ModificationComponent->CanModifyInventorySlotWithMaterialSlot(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostType, CurrentPreview, CurrentPreviewResult);
+	if (!bCurrentPreviewValid && (CurrentPreviewResult == EPDModificationResult::AlreadyMaxLevel || CurrentPreviewResult == EPDModificationResult::NotEnoughMaterials))
 	{
 		ModificationComponent->GetModificationPreviewWithBoost(InventorySlotData, SelectedBoostType, CurrentPreview, CurrentPreviewResult);
 	}
@@ -216,6 +370,8 @@ void UPDEquipmentModificationWidget::ClearPreview()
 	SetText(Text_StatType, FText::FromString(TEXT("-")));
 	SetText(Text_StatPreview, FText::FromString(TEXT("-")));
 	SetText(Text_GoldCost, FText::FromString(TEXT("-")));
+	SetText(Text_SuccessRate, FText::FromString(TEXT("-")));
+	SetText(Text_RequiredGold, FText::FromString(TEXT("-")));
 	SetText(Text_BaseSuccessRate, FText::FromString(TEXT("-")));
 	SetText(Text_BoostSuccessRate, FText::FromString(TEXT("-")));
 	SetText(Text_FinalSuccessRate, FText::FromString(TEXT("-")));
@@ -230,6 +386,10 @@ void UPDEquipmentModificationWidget::ClearPreview()
 	if (Button_Modify)
 	{
 		Button_Modify->SetIsEnabled(false);
+	}
+	if (BTN_Enhance)
+	{
+		BTN_Enhance->SetIsEnabled(false);
 	}
 }
 
@@ -270,6 +430,8 @@ void UPDEquipmentModificationWidget::ApplyPreview(const FPDModificationPreview& 
 	}
 
 	SetText(Text_GoldCost, FText::FromString(FString::Printf(TEXT("%d / %d"), InventoryComponent ? InventoryComponent->GetGold() : 0, Preview.GoldCost)));
+	SetText(Text_RequiredGold, FText::FromString(FString::Printf(TEXT("%d"), Preview.GoldCost)));
+	SetText(Text_SuccessRate, FormatPercent(Preview.SuccessRate));
 	SetText(Text_BaseSuccessRate, FormatPercent(Preview.BaseSuccessRate));
 	SetText(Text_BoostSuccessRate, FText::FromString(FString::Printf(TEXT("+%s"), *FormatPercent(Preview.BoostSuccessRate).ToString())));
 	SetText(Text_FinalSuccessRate, FormatPercent(Preview.SuccessRate));
@@ -278,6 +440,10 @@ void UPDEquipmentModificationWidget::ApplyPreview(const FPDModificationPreview& 
 	if (Button_Modify)
 	{
 		Button_Modify->SetIsEnabled(bCurrentPreviewValid);
+	}
+	if (BTN_Enhance)
+	{
+		BTN_Enhance->SetIsEnabled(bCurrentPreviewValid);
 	}
 }
 
@@ -316,7 +482,38 @@ void UPDEquipmentModificationWidget::RefreshMaterialList(const FPDModificationPr
 void UPDEquipmentModificationWidget::HandleEquipmentListItemClicked(UPDEquipmentListItemWidget* ItemWidget, int32 SlotIndex)
 {
 	SelectInventorySlot(SlotIndex);
-	RefreshEquipmentList();
+}
+
+void UPDEquipmentModificationWidget::HandleInventorySlotClicked(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
+{
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex))
+	{
+		return;
+	}
+
+	const FPDInventorySlot& SlotData = InventoryComponent->Items[SlotIndex];
+	if (SlotData.IsEmpty())
+	{
+		return;
+	}
+
+	if (SlotData.ItemData.ItemType == EPDItemType::Equipment)
+	{
+		SelectInventorySlot(SlotIndex);
+		return;
+	}
+
+	SelectMaterialSlot(SlotIndex);
+}
+
+void UPDEquipmentModificationWidget::HandleEquipmentTabClicked()
+{
+	SetInventoryFilter(EPDItemType::Equipment);
+}
+
+void UPDEquipmentModificationWidget::HandleMaterialTabClicked()
+{
+	SetInventoryFilter(EPDItemType::Misc);
 }
 
 void UPDEquipmentModificationWidget::HandleBoostNoneClicked()
@@ -349,17 +546,20 @@ void UPDEquipmentModificationWidget::HandleModifyClicked()
 
 	FPDModificationPreview Preview;
 	EPDModificationResult Result = EPDModificationResult::InvalidSlot;
-	const bool bSuccess = ModificationComponent->TryModifyInventorySlotWithBoost(InventoryComponent, SelectedSlotIndex, SelectedBoostType, Preview, Result);
+	const bool bSuccess = ModificationComponent->TryModifyInventorySlotWithMaterialSlot(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostType, Preview, Result);
 	SetText(Text_Result, GetResultText(Result, bSuccess));
-	RefreshEquipmentList();
-	RefreshPreview();
+	RefreshAll();
 }
 
 void UPDEquipmentModificationWidget::HandleInventoryChanged()
 {
-	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SelectedSlotIndex) || InventoryComponent->Items[SelectedSlotIndex].IsEmpty())
+	if (!IsValidEquipmentSlotIndex(SelectedSlotIndex))
 	{
 		SelectedSlotIndex = INDEX_NONE;
+	}
+	if (!IsValidMaterialSlotIndex(SelectedMaterialSlotIndex))
+	{
+		SelectedMaterialSlotIndex = INDEX_NONE;
 	}
 	RefreshAll();
 }
@@ -375,6 +575,64 @@ void UPDEquipmentModificationWidget::SetText(UTextBlock* TextBlock, const FText&
 	{
 		TextBlock->SetText(Text);
 	}
+}
+
+void UPDEquipmentModificationWidget::SetSlotWidgetData(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex, const FText& EmptyLabel) const
+{
+	if (!SlotWidget)
+	{
+		return;
+	}
+
+	SlotWidget->SetSlotContainerType(EPDItemContainerType::None);
+	SlotWidget->SetEmptySlotLabel(EmptyLabel);
+
+	if (InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty())
+	{
+		SlotWidget->SetSlotData(InventoryComponent->Items[SlotIndex], SlotIndex);
+		return;
+	}
+
+	SlotWidget->ClearSlotData(SlotIndex);
+}
+
+bool UPDEquipmentModificationWidget::IsValidEquipmentSlotIndex(int32 SlotIndex) const
+{
+	return InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty() && InventoryComponent->Items[SlotIndex].ItemData.ItemType == EPDItemType::Equipment;
+}
+
+bool UPDEquipmentModificationWidget::IsValidMaterialSlotIndex(int32 SlotIndex) const
+{
+	return InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty() && InventoryComponent->Items[SlotIndex].ItemData.ItemType != EPDItemType::Equipment;
+}
+
+bool UPDEquipmentModificationWidget::DoesSelectedMaterialMatchPreview(const FPDModificationPreview& Preview) const
+{
+	if (Preview.RequiredMaterials.Num() <= 0)
+	{
+		return true;
+	}
+
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SelectedMaterialSlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& MaterialSlot = InventoryComponent->Items[SelectedMaterialSlotIndex];
+	if (MaterialSlot.IsEmpty())
+	{
+		return false;
+	}
+
+	for (const FPDModificationMaterialRequirement& Material : Preview.RequiredMaterials)
+	{
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		{
+			return true;
+		}
+	}
+
+	return false;
 }
 
 int32 UPDEquipmentModificationWidget::CountItem(FName ItemID) const
