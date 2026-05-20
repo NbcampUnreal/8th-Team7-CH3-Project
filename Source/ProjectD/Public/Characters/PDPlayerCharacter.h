@@ -35,6 +35,7 @@ class APDPlayerCharacter : public APDCharacterBase,
 public:
 	APDPlayerCharacter();
 	virtual void InitAbilitySystem() override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// IPDInteractable — 현재 미사용. 멀티 협동 소생/팀원 인터렉트 등 미래 확장 자리.
 	virtual void Interact_Implementation(AActor* Interactor) override {}
@@ -97,10 +98,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Survival")
 	TSubclassOf<UGameplayEffect> GasExposureEffectClass;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
+	UPROPERTY(ReplicatedUsing = OnRep_WeaponSlots, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
 	TArray<TObjectPtr<APDWeaponBase>> WeaponSlots;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentSlot, VisibleAnywhere, BlueprintReadOnly, Category="PD|Player|Weapon")
 	EWeaponSlot CurrentSlot=EWeaponSlot::None;
 
 	void OnStaminaChanged(const FOnAttributeChangeData& Data);
@@ -187,6 +188,15 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Player|Animation")
 	TSubclassOf<UAnimInstance> DefaultAnimLayerClass;
 private:
+	UFUNCTION()
+	void OnRep_WeaponSlots();
+
+	UFUNCTION()
+	void OnRep_CurrentSlot();
+
+	void RefreshEquippedWeaponVisuals();
+	void ClearWeaponTypeTags() const;
+
 	void OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount);
 	void LinkDefaultAnimLayer();
 

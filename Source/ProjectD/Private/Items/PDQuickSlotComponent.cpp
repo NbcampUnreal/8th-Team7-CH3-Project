@@ -17,6 +17,7 @@
 UPDQuickSlotComponent::UPDQuickSlotComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UPDQuickSlotComponent::SetWeaponSlotCount(int32 NewCount)
@@ -535,6 +536,12 @@ bool UPDQuickSlotComponent::EquipInventoryWeaponSlot(int32 InventorySlotIndex)
 		return false;
 	}
 
+	if (const AActor* Owner = GetOwner(); Owner && !Owner->HasAuthority())
+	{
+		ServerEquipInventoryWeaponSlot(InventorySlotIndex);
+		return true;
+	}
+
 	const int32 CooldownSlotIndex = FindWeaponQuickSlotByItemID(Slot.ItemData.ItemID);
 	return EquipWeaponFromInventorySlot(InventorySlotIndex, CooldownSlotIndex);
 }
@@ -559,6 +566,20 @@ bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
 
 	if (IsWeaponQuickSlot(SlotIndex))
 	{
+		if (const AActor* Owner = GetOwner(); Owner && !Owner->HasAuthority())
+		{
+			const int32 InventorySlotIndex = FindInventorySlotByItemID(Slot.ItemData.ItemID);
+			if (InventorySlotIndex == INDEX_NONE)
+			{
+				SyncQuickSlotsWithInventory();
+				OnQuickSlotsChanged.Broadcast();
+				return false;
+			}
+
+			ServerEquipInventoryWeaponSlot(InventorySlotIndex);
+			return true;
+		}
+
 		return UseWeaponQuickSlot(SlotIndex, Slot);
 	}
 
@@ -573,6 +594,16 @@ bool UPDQuickSlotComponent::UseQuickSlot(int32 SlotIndex)
 	}
 
 	return false;
+}
+
+void UPDQuickSlotComponent::ServerUseQuickSlot_Implementation(int32 SlotIndex)
+{
+	UseQuickSlot(SlotIndex);
+}
+
+void UPDQuickSlotComponent::ServerEquipInventoryWeaponSlot_Implementation(int32 InventorySlotIndex)
+{
+	EquipInventoryWeaponSlot(InventorySlotIndex);
 }
 
 bool UPDQuickSlotComponent::UseWeaponQuickSlot(int32 SlotIndex, const FPDInventorySlot& Slot)

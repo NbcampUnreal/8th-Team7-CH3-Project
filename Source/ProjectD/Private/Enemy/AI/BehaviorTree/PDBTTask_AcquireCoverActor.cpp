@@ -33,7 +33,7 @@ EBTNodeResult::Type UPDBTTask_AcquireCoverActor::ExecuteTask(UBehaviorTreeCompon
 
 	if (APDEliteSoldier* Elite = Cast<APDEliteSoldier>(Pawn))
 	{
-		Elite->SetInCover(Cover);
+		Elite->SetInCover(true);
 	}
 
 	return EBTNodeResult::Succeeded;

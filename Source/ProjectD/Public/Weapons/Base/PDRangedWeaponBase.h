@@ -18,6 +18,7 @@ class PROJECTD_API APDRangedWeaponBase : public APDWeaponBase
 
 public:
 	APDRangedWeaponBase();
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(BlueprintAssignable, Category="Weapon")
 	FOnWeaponFired OnWeaponFired;
@@ -50,6 +51,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetAvailableAmmoCount() const;
 	UFUNCTION(BlueprintPure,     Category="Weapon") bool HasInfiniteAmmo() const   { return bInfiniteAmmo; }
 	UFUNCTION(BlueprintCallable, Category="Weapon") void SetInfiniteAmmo(bool bEnabled) { bInfiniteAmmo = bEnabled; }
+
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category="Weapon")
+	void ServerFire();
 
 	void FinishReload();
 	void CancelReload();
@@ -126,10 +130,10 @@ protected:
 
 	// ── 런타임 상태 ───────────────────────────────────────────────────────────
 	/** 초기 탄 수. 0이면 MaxAmmo(LevelStats)로 가득 채움. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|State", meta=(ClampMin="0"))
+	UPROPERTY(Replicated, EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|State", meta=(ClampMin="0"))
 	int32 CurrentAmmo = 0;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	bool bIsReloading = false;
 
 	/** 무한 탄약. true면 장전 모션은 정상 재생되지만 FinishReload에서 인벤토리 무시하고 MaxAmmo로 풀충. */

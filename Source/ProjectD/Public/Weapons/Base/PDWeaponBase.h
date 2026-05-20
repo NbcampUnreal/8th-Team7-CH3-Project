@@ -22,6 +22,7 @@ class PROJECTD_API APDWeaponBase : public AActor, public IPDInteractable
 
 public:
 	APDWeaponBase();
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -60,10 +61,10 @@ protected:
 	EWeaponType WeaponType = EWeaponType::None;
 
 	// ── 런타임 상태 (읽기 전용) ───────────────────────────────────────────────
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	int32 CurrentLevel = 1;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
+	UPROPERTY(Replicated, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	bool bIsDropped = false;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")

@@ -10,9 +10,18 @@
 #include "Kismet/GameplayStatics.h"
 #include "Core/PDPlayerController.h"
 #include "Perception/AISense_Hearing.h"
+#include "Net/UnrealNetwork.h"
 
 APDRangedWeaponBase::APDRangedWeaponBase()
 {
+}
+
+void APDRangedWeaponBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDRangedWeaponBase, CurrentAmmo);
+	DOREPLIFETIME(APDRangedWeaponBase, bIsReloading);
 }
 
 void APDRangedWeaponBase::BeginPlay()
@@ -31,6 +40,11 @@ void APDRangedWeaponBase::SetCurrentAmmo(int32 NewAmmo)
 }
 
 void APDRangedWeaponBase::Fire_Implementation() {}
+
+void APDRangedWeaponBase::ServerFire_Implementation()
+{
+	Fire();
+}
 
 void APDRangedWeaponBase::Reload_Implementation()
 {

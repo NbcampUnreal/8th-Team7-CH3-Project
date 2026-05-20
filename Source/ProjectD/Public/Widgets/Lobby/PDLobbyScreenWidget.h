@@ -7,6 +7,7 @@
 #include "PDLobbyScreenWidget.generated.h"
 
 class UButton;
+class UEditableTextBox;
 
 
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
@@ -31,13 +32,30 @@ protected:
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidget))
 	TObjectPtr<UButton> Button_Quit;
 
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_HostGame;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UButton> Button_JoinGame;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UEditableTextBox> TextBox_HostAddress;
+
 	/** Lobby "새 게임" 버튼이 진입할 게임 레벨. WBP에서 지정. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Levels")
 	TSoftObjectPtr<UWorld> MainLevel;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Multiplayer")
+	int32 HamachiPort = 7777;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Multiplayer")
+	FString DefaultHostAddress = TEXT("25.0.0.1");
 
 private:
 	UFUNCTION() void HandleNewGameClicked();
 	UFUNCTION() void HandleContinueClicked();
 	UFUNCTION() void HandleSettingsClicked();
 	UFUNCTION() void HandleQuitClicked();
+	UFUNCTION() void HandleHostGameClicked();
+	UFUNCTION() void HandleJoinGameClicked();
 };
