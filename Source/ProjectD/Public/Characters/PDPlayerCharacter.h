@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Characters/Base/PDCharacterBase.h"
 #include "Interfaces/PDSurvivalSource.h"
+#include "Interfaces/PDInteractable.h"
 #include "Type/Types.h"
 #include "GameplayEffectTypes.h"
 #include "ActiveGameplayEffectHandle.h"
@@ -26,6 +27,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnWeaponPickedUp, APDWeaponBase*, W
 
 UCLASS(abstract, Blueprintable)
 class APDPlayerCharacter : public APDCharacterBase,
+						   public IPDInteractable,
 						   public IPDSurvivalSource
 {
 	GENERATED_BODY()
@@ -33,6 +35,9 @@ class APDPlayerCharacter : public APDCharacterBase,
 public:
 	APDPlayerCharacter();
 	virtual void InitAbilitySystem() override;
+
+	// IPDInteractable — 현재 미사용. 멀티 협동 소생/팀원 인터렉트 등 미래 확장 자리.
+	virtual void Interact_Implementation(AActor* Interactor) override {}
 
 	UCameraComponent* GetTopDownCameraComponent() const { return TopDownCameraComponent.Get(); }
 	USpringArmComponent* GetCameraBoom() const { return CameraBoom.Get(); }

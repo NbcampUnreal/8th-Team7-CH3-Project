@@ -69,7 +69,6 @@ bool APDRifle::PerformLineTrace(FHitResult& OutHit)
         if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
             TraceLength = FVector::Dist(Start, CursorHit.Location);
     }
-    // 반동은 캐릭터 회전(RecoilYawOffset)으로 처리됨.
     // 총알 스프레드는 무기 Accuracy 기반 랜덤만 남김.
     const float TotalSpread = FMath::DegreesToRadians((1.f - Stats.Accuracy) * 5.f);
     const FVector ShootDir = FMath::VRandCone(AimDir, TotalSpread);

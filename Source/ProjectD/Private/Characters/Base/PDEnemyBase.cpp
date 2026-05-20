@@ -56,6 +56,13 @@ void APDEnemyBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 사수별 개인 조준 편향 — 인스턴스마다 한 번 굴려 게임 내내 고정.
+	// Pitch 는 Offset(무기 forward→몸통 보정) 중심에 ±Max 산포. Yaw 는 0 중심에 ±Max 산포.
+	AimBias.Pitch = AimBiasPitchOffset
+		+ (AimBiasMaxPitchDegrees > 0.f ? FMath::FRandRange(-AimBiasMaxPitchDegrees, AimBiasMaxPitchDegrees) : 0.f);
+	if (AimBiasMaxYawDegrees > 0.f)
+		AimBias.Yaw = FMath::FRandRange(-AimBiasMaxYawDegrees, AimBiasMaxYawDegrees);
+
 	if (UPDCombatComponent* Combat = FindComponentByClass<UPDCombatComponent>())
 		Combat->OnTargetChanged.AddDynamic(this, &APDEnemyBase::OnCombatTargetChanged);
 

@@ -1,6 +1,7 @@
 #include "Weapons/Base/PDWeaponBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "Characters/PDPlayerCharacter.h"
+#include "Characters/Base/PDEnemyBase.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
@@ -63,6 +64,8 @@ void APDWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 	SetOwner(NewOwner);
 	WeaponMesh->SetSimulatePhysics(false);
 	PickupCollision->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	// 장착된 무기 메시가 인터렉션 sweep(ECC_Visibility) 에 잡혀 위젯이 뜨는 문제 차단.
+	WeaponMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
 
 	if (EquipSound)
 		UGameplayStatics::SpawnSoundAttached(EquipSound, WeaponMesh);
@@ -71,6 +74,8 @@ void APDWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 void APDWeaponBase::OnUnequip_Implementation()
 {
 	WeaponOwner = nullptr;
+	// 떨어진 무기 픽업/카메라 occlusion 등이 정상 동작하도록 디폴트 응답 복구.
+	WeaponMesh->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
 }
 
 void APDWeaponBase::UpgradeLevel()
@@ -111,8 +116,24 @@ FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) co
 {
 	if (!WeaponOwner.IsValid()) return FVector::ForwardVector;
 
+	FVector AimDir;
 	if (UPDWeaponComponent* Comp = WeaponOwner->FindComponentByClass<UPDWeaponComponent>())
-		return Comp->GetAimDirection(StartLocation);
+		AimDir = Comp->GetAimDirection(StartLocation);
+	else
+		AimDir = WeaponOwner->GetActorForwardVector();
 
-	return WeaponOwner->GetActorForwardVector();
+	// Enemy 사수의 개인 조준 편향 — Player 는 EnemyBase 가 아니므로 영향 없음.
+	if (const APDEnemyBase* EnemyOwner = Cast<APDEnemyBase>(WeaponOwner.Get()))
+	{
+		const FRotator Bias = EnemyOwner->GetAimBias();
+		if (!Bias.IsNearlyZero())
+		{
+			FRotator AimRot = AimDir.Rotation();
+			AimRot.Pitch += Bias.Pitch;
+			AimRot.Yaw   += Bias.Yaw;
+			AimDir = AimRot.Vector();
+		}
+	}
+
+	return AimDir;
 }
