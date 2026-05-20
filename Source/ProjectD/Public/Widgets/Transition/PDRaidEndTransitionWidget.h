@@ -4,8 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
+#include "Game/PDRaidStats.h"
 #include "PDRaidEndTransitionWidget.generated.h"
 
+class UPDRaidSummaryWidget;
 class UTextBlock;
 class UWidgetAnimation;
 
@@ -15,9 +17,9 @@ class PROJECTD_API UPDRaidEndTransitionWidget : public UPDActivatableBase
 	GENERATED_BODY()
 
 public:
-	/** BP_PDGameMode::OnRaidEnded(bSuccess)에서 PushToLayer 직후 호출. */
+	/** BP_PDGameMode::OnRaidEnded(bSuccess, Stats)에서 PushToLayer 직후 호출. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
-	void Configure(bool bInSuccess);
+	void Configure(bool bInSuccess, const FPDRaidStats& Stats);
 
 protected:
 	virtual void NativeOnActivated() override;
@@ -31,6 +33,10 @@ protected:
 	/** Anim_BlackFade 끝 Animation Notify에서 호출. BaseLevel 트래블 발동. */
 	UFUNCTION(BlueprintCallable, Category = "PD|Transition")
 	void HandleTravelTrigger();
+
+	/** Configure 시점에 BP가 장식 위젯들에 액센트 컬러를 적용하도록 위임. */
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Transition")
+	void K2_ApplyAccent(FLinearColor AccentColor);
 
 	UPROPERTY(EditDefaultsOnly, Category = "PD|Transition|Success")
 	FLinearColor SuccessAccentColor = FLinearColor(0.357f, 0.753f, 0.922f);
@@ -64,6 +70,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> Text_ContinuePrompt;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDRaidSummaryWidget> Summary;
 
 private:
 	bool bSuccess = false;

@@ -474,18 +474,25 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 
 void APDPlayerController::CloseMarketInterface()
 {
+	UPDMarketComponent* ClosingMarketComponent = ActiveMarketComponent.Get();
+
 	if (MarketWidgetInstance && MarketWidgetInstance->IsInViewport())
 	{
 		MarketWidgetInstance->RemoveFromParent();
 	}
 	MarketWidgetInstance = nullptr;
-	ActiveMarketComponent = nullptr;
+	ActiveMarketComponent.Reset();
 
 	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
 	{
 		InventoryWidgetInstance->RemoveFromParent();
 	}
 	InventoryWidgetInstance = nullptr;
+
+	if (ClosingMarketComponent)
+	{
+		OnMarketInterfaceClosed.Broadcast(ClosingMarketComponent);
+	}
 
 	if (!IsStashInterfaceOpen() && !IsLootInterfaceOpen() && !IsQuestInterfaceOpen() && !IsEquipmentModificationInterfaceOpen())
 	{
@@ -694,7 +701,7 @@ bool APDPlayerController::IsLootInterfaceOpen() const
 
 bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity)
 {
-	if (!ActiveMarketComponent || !IsMarketInterfaceOpen())
+	if (!ActiveMarketComponent.IsValid() || !IsMarketInterfaceOpen())
 	{
 		return false;
 	}
@@ -711,7 +718,13 @@ bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32
 		return false;
 	}
 
-	return ActiveMarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
+	UPDMarketComponent* MarketComponent = ActiveMarketComponent.Get();
+	if (!MarketComponent)
+	{
+		return false;
+	}
+
+	return MarketComponent->SellInventorySlot(InventoryComponent, SlotIndex, Quantity);
 }
 
 

@@ -24,6 +24,12 @@ void APDMarketActor::BeginPlay()
 	ConfigureInteractionCollision();
 }
 
+void APDMarketActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	UnbindMarketClose();
+	Super::EndPlay(EndPlayReason);
+}
+
 void APDMarketActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -60,11 +66,50 @@ void APDMarketActor::Interact_Implementation(AActor* Interactor)
 		return;
 	}
 
-	if (PlayerController->IsMarketInterfaceOpen())
+	if (PlayerController->IsMarketInterfaceOpen() && PlayerController->GetActiveMarketComponent() == MarketComponent)
 	{
 		PlayerController->CloseMarketInterface();
 		return;
 	}
 
 	PlayerController->OpenMarketInterface(MarketComponent);
+
+	if (PlayerController->IsMarketInterfaceOpen() && PlayerController->GetActiveMarketComponent() == MarketComponent)
+	{
+		BindMarketClose(PlayerController);
+		OnMarketOpened.Broadcast(this);
+	}
+}
+
+void APDMarketActor::BindMarketClose(APDPlayerController* PlayerController)
+{
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	UnbindMarketClose();
+	BoundPlayerController = PlayerController;
+	PlayerController->OnMarketInterfaceClosed.AddUObject(this, &APDMarketActor::HandleMarketInterfaceClosed);
+}
+
+void APDMarketActor::UnbindMarketClose()
+{
+	if (BoundPlayerController.IsValid())
+	{
+		BoundPlayerController->OnMarketInterfaceClosed.RemoveAll(this);
+	}
+
+	BoundPlayerController.Reset();
+}
+
+void APDMarketActor::HandleMarketInterfaceClosed(UPDMarketComponent* ClosedMarketComponent)
+{
+	if (ClosedMarketComponent != MarketComponent)
+	{
+		return;
+	}
+
+	UnbindMarketClose();
+	OnMarketClosed.Broadcast(this);
 }
