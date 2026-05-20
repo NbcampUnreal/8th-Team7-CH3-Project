@@ -131,6 +131,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	bool RemoveEquippedWeaponItem(const FPDItemData& ItemData, bool bDestroyWeaponActor = true);
 
+	// 무기 destroy 직전에 런타임 상태(CurrentAmmo 등)를 OutState로 추출.
+	// 인벤토리/장비로 슬롯을 되돌릴 때 호출자가 OutState를 슬롯에 stamp 하도록 함.
+	bool RemoveEquippedWeaponItemPreservingState(const FPDItemData& ItemData,
+	                                              FPDWeaponInstanceState& OutState,
+	                                              bool bDestroyWeaponActor = true);
+
 	UFUNCTION(BlueprintCallable, Category="PD|Player|Weapon")
 	void SwitchToSlot(EWeaponSlot Slot);
 

@@ -24,6 +24,12 @@ void APDRangedWeaponBase::BeginPlay()
 		CurrentAmmo = LevelStats[0].MaxAmmo;
 }
 
+void APDRangedWeaponBase::SetCurrentAmmo(int32 NewAmmo)
+{
+	const int32 Max = LevelStats.IsValidIndex(0) ? GetCurrentStats().MaxAmmo : 0;
+	CurrentAmmo = Max > 0 ? FMath::Clamp(NewAmmo, 0, Max) : FMath::Max(0, NewAmmo);
+}
+
 void APDRangedWeaponBase::Fire_Implementation() {}
 
 void APDRangedWeaponBase::Reload_Implementation()
@@ -55,8 +61,9 @@ void APDRangedWeaponBase::OnEquip_Implementation(AActor* NewOwner)
 {
 	Super::OnEquip_Implementation(NewOwner);
 
-	if (CurrentAmmo == 0 && !LevelStats.IsEmpty())
-		CurrentAmmo = LevelStats[0].MaxAmmo;
+	// 풀충탄 fallback 제거: 호출자(TryAutoEquipWeaponSlot 등)가 spawn 직후 명시적으로
+	// CurrentAmmo를 설정한다. BeginPlay가 fresh actor의 0→Max를 처리하므로 여기선 불필요.
+	// 빈 매그(CurrentAmmo=0) 영속화 보존을 위해 이 경로에서 덮어쓰지 않음.
 
 	// 캐릭터 Equip 몽타주는 PDAnimInstance가 OnWeaponEquipped에서 담당.
 }

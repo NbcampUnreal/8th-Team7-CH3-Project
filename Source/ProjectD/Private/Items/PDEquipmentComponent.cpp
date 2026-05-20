@@ -3,6 +3,7 @@
 #include "Data/PDQuestComponent.h"
 
 #include "Characters/PDPlayerCharacter.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDItemSoundLibrary.h"
 
@@ -121,6 +122,8 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 		PreviousEquippedSlot = CurrentEquippedItem->ItemSlot;
 	}
 
+	FPDWeaponInstanceState CapturedPreviousState;
+
 	const float NewBagCapacityWeight = TargetSlotType == EPDEquipmentSlotType::Bag ? FMath::Max(0.f, InventorySlot.ItemData.BagCapacityWeight) : [&]()
 	{
 		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
@@ -135,13 +138,21 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 
 	if (bHadPreviousItem)
 	{
-		RemoveCharacterEquipSideEffects(PreviousEquippedSlot);
+		RemoveCharacterEquipSideEffects(PreviousEquippedSlot, &CapturedPreviousState);
+		// 추출된 상태를 인벤토리로 반환될 슬롯에 stamp — 이후 분기에서 그대로 사용됨.
+		PreviousEquippedSlot.WeaponState = CapturedPreviousState;
 	}
 
 	if (!ApplyCharacterEquipSideEffects(InventorySlot))
 	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[Equip] ApplyCharacterEquipSideEffects failed for %s. Rolling back to %s."),
+			*InventorySlot.ItemData.ItemID.ToString(),
+			bHadPreviousItem ? *PreviousEquippedSlot.ItemData.ItemID.ToString() : TEXT("(none)"));
+
 		if (bHadPreviousItem)
 		{
+			// 롤백: 캡처한 상태를 함께 복원해 잔탄 손실 방지.
 			ApplyCharacterEquipSideEffects(PreviousEquippedSlot);
 		}
 		return false;
@@ -229,7 +240,18 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 		return false;
 	}
 
-	const FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+	FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+
+	// ★ Destroy 전에 무기 액터에서 런타임 상태 캡처 — 인벤토리로 돌려보낼 슬롯에 stamp.
+	if (APDPlayerCharacter* PC = Cast<APDPlayerCharacter>(GetOwner()))
+	{
+		const EWeaponSlot Ts = PC->GetSlotForWeaponType(ItemToReturn.ItemData.WeaponType);
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(PC->GetWeaponInSlot(Ts)))
+		{
+			ItemToReturn.WeaponState.CurrentAmmo = Ranged->GetCurrentAmmo();
+		}
+	}
+
 	const float NewBagCapacityWeight = SlotType == EPDEquipmentSlotType::Bag ? 0.f : [&]()
 	{
 		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
@@ -268,7 +290,18 @@ bool UPDEquipmentComponent::UnequipItemToInventorySlot(UPDInventoryComponent* In
 		return false;
 	}
 
-	const FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+	FPDInventorySlot ItemToReturn = EquippedItem->ItemSlot;
+
+	// ★ Destroy 전에 무기 액터에서 런타임 상태 캡처.
+	if (APDPlayerCharacter* PC = Cast<APDPlayerCharacter>(GetOwner()))
+	{
+		const EWeaponSlot Ts = PC->GetSlotForWeaponType(ItemToReturn.ItemData.WeaponType);
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(PC->GetWeaponInSlot(Ts)))
+		{
+			ItemToReturn.WeaponState.CurrentAmmo = Ranged->GetCurrentAmmo();
+		}
+	}
+
 	const float NewBagCapacityWeight = SlotType == EPDEquipmentSlotType::Bag ? 0.f : [&]()
 	{
 		const FPDInventorySlot CurrentBagSlot = GetEquippedSlot(EPDEquipmentSlotType::Bag);
@@ -315,7 +348,8 @@ bool UPDEquipmentComponent::ApplyCharacterEquipSideEffects(const FPDInventorySlo
 	return false;
 }
 
-void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot) const
+void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySlot& ItemSlot,
+                                                              FPDWeaponInstanceState* OutWeaponState) const
 {
 	const FPDItemData& ItemData = ItemSlot.ItemData;
 	if (ItemData.WeaponType == EWeaponType::None)
@@ -325,7 +359,14 @@ void UPDEquipmentComponent::RemoveCharacterEquipSideEffects(const FPDInventorySl
 
 	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetOwner()))
 	{
-		PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
+		if (OutWeaponState)
+		{
+			PlayerCharacter->RemoveEquippedWeaponItemPreservingState(ItemData, *OutWeaponState);
+		}
+		else
+		{
+			PlayerCharacter->RemoveEquippedWeaponItem(ItemData);
+		}
 	}
 }
 
