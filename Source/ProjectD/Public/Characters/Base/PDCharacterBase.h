@@ -4,7 +4,6 @@
 #include "GameFramework/Character.h"
 #include "GenericTeamAgentInterface.h"
 #include "Interfaces/PDDamageable.h"
-#include "Interfaces/PDInteractable.h"
 #include "Interfaces/PDStatusEffectSource.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
@@ -21,10 +20,10 @@ class UGameplayEffect;
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDCharacterBase : public ACharacter,
 										public IPDDamageable,
-										public IPDInteractable,
 										public IAbilitySystemInterface,
 										public IPDStatusEffectSource,
 										public IGenericTeamAgentInterface
+// IPDInteractable 은 의도적으로 제외 — Player 만 보유. Enemy 가 인터렉트 후보로 잡혀 위젯 뜨는 문제 방지.
 {
 	GENERATED_BODY()
 
@@ -86,7 +85,6 @@ public:
 	virtual float GetCurrentHealth_Implementation() const override;
 	virtual float GetMaxHealth_Implementation() const override;
 	virtual bool IsAlive_Implementation() const override;
-	virtual void Interact_Implementation(AActor* Interactor) override {}
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return ASC; }
 
 	// 엔진 perception 의 affiliation 시스템에 TeamID 노출.
