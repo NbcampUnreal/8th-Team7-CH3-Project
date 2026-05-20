@@ -4,9 +4,7 @@
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDSecureContainerComponent.h"
 #include "GameFramework/Pawn.h"
-#include "Subsystems/PDFrontendUISubsystem.h"
 #include "Type/Types.h"
-#include "Widgets/PDActivatableBase.h"
 
 namespace
 {
@@ -80,6 +78,7 @@ void APDGameMode::RequestExtraction(APlayerController* PC)
 
 void APDGameMode::EndRaid(bool bSuccess)
 {
+	if (CurrentRaidState == ERaidState::Ended) return;
 	SetRaidState(ERaidState::Ended);
 
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
@@ -109,15 +108,8 @@ void APDGameMode::EndRaid(bool bSuccess)
 void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
 {
 	if (!PC) return;
+	if (CurrentRaidState == ERaidState::Ended) return;
 	EndRaid(false);
-
-	if (DeathScreenClass)
-	{
-		if (UPDFrontendUISubsystem* UI = UPDFrontendUISubsystem::Get(this))
-		{
-			UI->PushToLayer(EUILayer::Frontend, DeathScreenClass);
-		}
-	}
 }
 
 void APDGameMode::SetRaidState(ERaidState NewState)

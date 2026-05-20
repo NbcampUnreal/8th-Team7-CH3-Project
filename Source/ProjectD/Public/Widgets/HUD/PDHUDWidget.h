@@ -20,6 +20,7 @@ class UPDInteractPromptWidget;
 class UPDSkillSlotBarWidget;
 class UPDCircularProgressWidget;
 class UPDQuipToastWidget;
+class UPDMainWeaponAmmoWidget;
 class UPDQuickSlotComponent;
 class UPDInteractionComponent;
 class UAbilitySystemComponent;
@@ -84,6 +85,9 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
 	TObjectPtr<UPDQuipToastWidget> WBP_QuipToast;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional))
+	TObjectPtr<UPDMainWeaponAmmoWidget> WBP_MainWeaponAmmo;
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "PD|HUD")

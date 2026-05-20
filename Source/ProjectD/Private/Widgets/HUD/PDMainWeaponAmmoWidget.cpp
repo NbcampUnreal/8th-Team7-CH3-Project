@@ -1,0 +1,232 @@
+#include "Widgets/HUD/PDMainWeaponAmmoWidget.h"
+
+#include "Components/Image.h"
+#include "Components/TextBlock.h"
+
+#include "Characters/PDPlayerCharacter.h"
+#include "Items/PDEquipmentComponent.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
+
+void UPDMainWeaponAmmoWidget::NativeOnInitialized()
+{
+	Super::NativeOnInitialized();
+	RefreshVisibility();
+}
+
+void UPDMainWeaponAmmoWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+	RefreshAll();
+}
+
+void UPDMainWeaponAmmoWidget::NativeDestruct()
+{
+	UnbindWeapon();
+	UnbindOwner();
+	Super::NativeDestruct();
+}
+
+void UPDMainWeaponAmmoWidget::SetCaliberTextOverride(const FText& InText)
+{
+	CaliberOverride = InText;
+	bCaliberOverrideSet = !InText.IsEmpty();
+	RefreshMetadata();
+}
+
+void UPDMainWeaponAmmoWidget::SetSilhouetteOverride(UTexture2D* InTexture)
+{
+	SilhouetteOverride = InTexture;
+	RefreshMetadata();
+}
+
+void UPDMainWeaponAmmoWidget::RefreshAll()
+{
+	EnsureOwnerBound();
+	BindWeapon(ResolveCurrentRangedWeapon());
+	RefreshAmmoText();
+	RefreshMetadata();
+	RefreshVisibility();
+}
+
+void UPDMainWeaponAmmoWidget::HandleWeaponFired(APDWeaponBase* /*Weapon*/)
+{
+	RefreshAmmoText();
+}
+
+void UPDMainWeaponAmmoWidget::HandleWeaponReloaded(APDWeaponBase* /*Weapon*/)
+{
+	RefreshAmmoText();
+}
+
+void UPDMainWeaponAmmoWidget::HandleWeaponSwapped(APDWeaponBase* /*NewWeapon*/, EWeaponSlot /*WeaponSlot*/)
+{
+	BindWeapon(ResolveCurrentRangedWeapon());
+	RefreshAmmoText();
+	RefreshMetadata();
+	RefreshVisibility();
+}
+
+void UPDMainWeaponAmmoWidget::EnsureOwnerBound()
+{
+	APDPlayerCharacter* Owner = FindOwnerPlayerCharacter();
+	if (!Owner || BoundOwner.Get() == Owner)
+	{
+		return;
+	}
+
+	UnbindOwner();
+	Owner->OnWeaponSwapped.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponSwapped);
+	BoundOwner = Owner;
+}
+
+void UPDMainWeaponAmmoWidget::UnbindOwner()
+{
+	if (APDPlayerCharacter* Owner = BoundOwner.Get())
+	{
+		Owner->OnWeaponSwapped.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponSwapped);
+	}
+	BoundOwner.Reset();
+}
+
+void UPDMainWeaponAmmoWidget::BindWeapon(APDRangedWeaponBase* InWeapon)
+{
+	if (BoundWeapon.Get() == InWeapon)
+	{
+		return;
+	}
+
+	UnbindWeapon();
+
+	if (!InWeapon)
+	{
+		return;
+	}
+
+	InWeapon->OnWeaponFired.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponFired);
+	InWeapon->OnWeaponReloaded.AddDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponReloaded);
+	BoundWeapon = InWeapon;
+}
+
+void UPDMainWeaponAmmoWidget::UnbindWeapon()
+{
+	if (APDRangedWeaponBase* Weapon = BoundWeapon.Get())
+	{
+		Weapon->OnWeaponFired.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponFired);
+		Weapon->OnWeaponReloaded.RemoveDynamic(this, &UPDMainWeaponAmmoWidget::HandleWeaponReloaded);
+	}
+	BoundWeapon.Reset();
+}
+
+void UPDMainWeaponAmmoWidget::RefreshAmmoText()
+{
+	APDRangedWeaponBase* Weapon = BoundWeapon.Get();
+	if (!Weapon)
+	{
+		if (Text_CurrentAmmo) Text_CurrentAmmo->SetText(FText::GetEmpty());
+		if (Text_ReserveAmmo) Text_ReserveAmmo->SetText(FText::GetEmpty());
+		if (Text_Combined)    Text_Combined->SetText(FText::GetEmpty());
+		return;
+	}
+
+	const int32 Current = Weapon->GetCurrentAmmo();
+	const int32 RawReserve = Weapon->GetAvailableAmmoCount();
+	const bool bUnlimitedReserve = Weapon->HasInfiniteAmmo() || RawReserve == INT32_MAX;
+
+	if (Text_CurrentAmmo)
+	{
+		Text_CurrentAmmo->SetText(FText::AsNumber(Current));
+	}
+
+	if (Text_ReserveAmmo)
+	{
+		const FString ReserveStr = bUnlimitedReserve
+			? FString::Printf(TEXT("%s∞"), *ReservePrefix)
+			: FString::Printf(TEXT("%s%d"), *ReservePrefix, RawReserve);
+		Text_ReserveAmmo->SetText(FText::FromString(ReserveStr));
+	}
+
+	if (Text_Combined)
+	{
+		const FString Combined = bUnlimitedReserve
+			? FString::Printf(TEXT("%d / ∞"), Current)
+			: FString::Printf(TEXT("%d / %d"), Current, RawReserve);
+		Text_Combined->SetText(FText::FromString(Combined));
+	}
+}
+
+void UPDMainWeaponAmmoWidget::RefreshMetadata()
+{
+	const FPDInventorySlot WeaponSlot = ResolveEquippedWeaponSlot();
+	const bool bHasSlot = !WeaponSlot.IsEmpty();
+
+	if (Text_Caliber)
+	{
+		if (bCaliberOverrideSet)
+		{
+			Text_Caliber->SetText(CaliberOverride);
+		}
+		else
+		{
+			// 자동 해석 데이터 소스가 아직 없음 → 빈 텍스트. 필요 시 setter로 덮어쓰기.
+			Text_Caliber->SetText(FText::GetEmpty());
+		}
+	}
+
+	if (Text_ModLevel)
+	{
+		if (bHasSlot && WeaponSlot.ModificationLevel > 0)
+		{
+			Text_ModLevel->SetText(FText::AsNumber(WeaponSlot.ModificationLevel));
+			Text_ModLevel->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			Text_ModLevel->SetText(FText::GetEmpty());
+			Text_ModLevel->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+
+	// 실루엣 자동 해석 비활성화 — 별도 데이터 파이프라인(전용 실루엣 텍스처)으로 추후 구현 예정.
+	// 그동안 위젯이 인벤토리 아이콘을 그대로 띄우지 않도록 강제 Collapsed.
+	if (Image_Silhouette)
+	{
+		Image_Silhouette->SetBrushFromTexture(nullptr);
+		Image_Silhouette->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void UPDMainWeaponAmmoWidget::RefreshVisibility()
+{
+	const bool bShow = BoundWeapon.IsValid();
+	SetVisibility(bShow ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
+}
+
+APDPlayerCharacter* UPDMainWeaponAmmoWidget::FindOwnerPlayerCharacter() const
+{
+	return Cast<APDPlayerCharacter>(GetOwningPlayerPawn());
+}
+
+APDRangedWeaponBase* UPDMainWeaponAmmoWidget::ResolveCurrentRangedWeapon() const
+{
+	APDPlayerCharacter* Owner = FindOwnerPlayerCharacter();
+	if (!Owner)
+	{
+		return nullptr;
+	}
+	return Cast<APDRangedWeaponBase>(Owner->GetCurrentWeapon());
+}
+
+UPDEquipmentComponent* UPDMainWeaponAmmoWidget::FindEquipmentComponent() const
+{
+	APDPlayerCharacter* Owner = FindOwnerPlayerCharacter();
+	return Owner ? Owner->GetEquipmentComponent() : nullptr;
+}
+
+FPDInventorySlot UPDMainWeaponAmmoWidget::ResolveEquippedWeaponSlot() const
+{
+	if (UPDEquipmentComponent* Eq = FindEquipmentComponent())
+	{
+		return Eq->GetEquippedSlot(EPDEquipmentSlotType::Weapon);
+	}
+	return FPDInventorySlot();
+}
