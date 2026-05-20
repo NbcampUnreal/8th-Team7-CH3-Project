@@ -62,7 +62,7 @@ protected:
 
 	/** 개인별 조준 편향 최대 크기(deg). BeginPlay 에서 [-Max..+Max] 균등분포로 한 번 굴림. 0=모두 정확. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI|Aim", meta = (ClampMin = "0.0"))
-	float AimBiasMaxDegrees = 2.0f;
+	float AimBiasMaxDegrees = 5.0f;
 
 	/** 본 인스턴스 고정 Bias. BeginPlay 에서 한 번 굴린 뒤 변하지 않음 — 사수의 "버릇". */
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "PD|AI|Aim")
