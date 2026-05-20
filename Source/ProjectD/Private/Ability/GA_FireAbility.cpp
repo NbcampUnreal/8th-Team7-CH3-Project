@@ -30,8 +30,15 @@ void UGA_FireAbility::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		return;
 	}
 
-	// 첫 발 즉시 발사
-	Weapon->Fire();
+	// 첫 발 즉시 발사. 판정/탄약/데미지는 서버 무기에서 확정한다.
+	if (Weapon->HasAuthority())
+	{
+		Weapon->Fire();
+	}
+	else
+	{
+		Weapon->ServerFire();
+	}
 
 	// 자동화기: 무기의 bFullAuto 플래그로 판단
 	if (Weapon->IsFullAuto())
@@ -72,8 +79,15 @@ void UGA_FireAbility::DoAutoFire()
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;
 	}
-	// CanFire()가 false여도 Weapon->Fire() 내부에서 걸러짐 (탄 소진 등)
-	Weapon->Fire();
+	// CanFire()가 false여도 서버 Weapon->Fire() 내부에서 걸러짐 (탄 소진 등)
+	if (Weapon->HasAuthority())
+	{
+		Weapon->Fire();
+	}
+	else
+	{
+		Weapon->ServerFire();
+	}
 }
 
 APDRangedWeaponBase* UGA_FireAbility::GetRangedWeapon() const

@@ -21,7 +21,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Inventory")
 	TObjectPtr<UDataTable> ItemDataTable;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
+	UPROPERTY(ReplicatedUsing = OnRep_Items, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	TArray<FPDInventorySlot> Items;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
@@ -30,7 +30,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 GridRows = 4;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
+	UPROPERTY(ReplicatedUsing = OnRep_Gold, EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory")
 	int32 Gold = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Inventory", meta = (ClampMin = "0.0"))
@@ -125,4 +125,12 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+private:
+	UFUNCTION()
+	void OnRep_Items();
+
+	UFUNCTION()
+	void OnRep_Gold();
 };
