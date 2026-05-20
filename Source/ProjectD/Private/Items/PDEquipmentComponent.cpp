@@ -6,16 +6,25 @@
 #include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Items/PDInventoryComponent.h"
 #include "Items/PDItemSoundLibrary.h"
+#include "Net/UnrealNetwork.h"
 
 UPDEquipmentComponent::UPDEquipmentComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UPDEquipmentComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	InitializeDefaultSlots();
+}
+
+void UPDEquipmentComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDEquipmentComponent, ReplicatedEquippedItems);
 }
 
 void UPDEquipmentComponent::InitializeDefaultSlots()
@@ -37,6 +46,8 @@ void UPDEquipmentComponent::InitializeDefaultSlots()
 			EquippedItems.Add(SlotType, EmptyItem);
 		}
 	}
+
+	RefreshReplicatedEquippedItems();
 }
 
 EPDEquipmentSlotType UPDEquipmentComponent::ResolveEquipmentSlotType(const FPDItemData& ItemData) const
@@ -98,6 +109,16 @@ bool UPDEquipmentComponent::EquipItemFromInventory(UPDInventoryComponent* Invent
 
 bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType)
 {
+	if (AActor* Owner = GetOwner(); Owner && !Owner->HasAuthority())
+	{
+		if (TargetSlotType != EPDEquipmentSlotType::None)
+		{
+			ServerEquipItemFromInventoryToSlot(InventorySlotIndex, TargetSlotType);
+			return true;
+		}
+		return false;
+	}
+
 	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(InventorySlotIndex) || TargetSlotType == EPDEquipmentSlotType::None)
 	{
 		return false;
@@ -182,7 +203,43 @@ bool UPDEquipmentComponent::EquipItemFromInventoryToSlot(UPDInventoryComponent* 
 	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, EquippedSlot);
+	RefreshReplicatedEquippedItems();
 	return true;
+}
+
+void UPDEquipmentComponent::ServerEquipItemFromInventoryToSlot_Implementation(int32 InventorySlotIndex, EPDEquipmentSlotType TargetSlotType)
+{
+	UPDInventoryComponent* InventoryComponent = GetOwner() ? GetOwner()->FindComponentByClass<UPDInventoryComponent>() : nullptr;
+	EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, TargetSlotType);
+}
+
+void UPDEquipmentComponent::OnRep_ReplicatedEquippedItems()
+{
+	EquippedItems.Empty();
+	for (const FPDEquippedItem& EquippedItem : ReplicatedEquippedItems)
+	{
+		EquippedItems.Add(EquippedItem.SlotType, EquippedItem);
+	}
+
+	OnEquipmentChanged.Broadcast();
+	for (const TPair<EPDEquipmentSlotType, FPDEquippedItem>& Pair : EquippedItems)
+	{
+		OnEquipmentSlotChanged.Broadcast(Pair.Key, Pair.Value.ItemSlot);
+	}
+}
+
+void UPDEquipmentComponent::RefreshReplicatedEquippedItems()
+{
+	if (AActor* Owner = GetOwner(); Owner && !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	ReplicatedEquippedItems.Reset();
+	for (const TPair<EPDEquipmentSlotType, FPDEquippedItem>& Pair : EquippedItems)
+	{
+		ReplicatedEquippedItems.Add(Pair.Value);
+	}
 }
 
 
@@ -224,6 +281,7 @@ bool UPDEquipmentComponent::TryEquipNewItem(const FPDItemData& ItemData, bool bR
 	}
 	BroadcastSlotChanged(TargetSlotType);
 	BroadcastModificationApplied(TargetSlotType, NewSlot);
+	RefreshReplicatedEquippedItems();
 	return true;
 }
 
@@ -273,6 +331,7 @@ bool UPDEquipmentComponent::UnequipItemToInventory(UPDInventoryComponent* Invent
 	RemoveCharacterEquipSideEffects(ItemToReturn);
 	EquippedItem->ItemSlot.Clear();
 	BroadcastSlotChanged(SlotType);
+	RefreshReplicatedEquippedItems();
 	return true;
 }
 
@@ -328,6 +387,7 @@ bool UPDEquipmentComponent::UnequipItemToInventorySlot(UPDInventoryComponent* In
 	UPDItemSoundLibrary::PlayItemMoveSound(this, ItemToReturn.ItemData);
 	InventoryComponent->OnInventoryChanged.Broadcast();
 	BroadcastSlotChanged(SlotType);
+	RefreshReplicatedEquippedItems();
 	return true;
 }
 

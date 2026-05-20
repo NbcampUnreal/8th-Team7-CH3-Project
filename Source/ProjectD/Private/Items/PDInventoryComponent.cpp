@@ -5,10 +5,12 @@
 #include "Items/PDEquipmentComponent.h"
 #include "Items/PDItemSoundLibrary.h"
 #include "Items/PDSecureContainerComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UPDInventoryComponent::UPDInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
+	SetIsReplicatedByDefault(true);
 }
 
 void UPDInventoryComponent::BeginPlay()
@@ -16,6 +18,24 @@ void UPDInventoryComponent::BeginPlay()
 	Super::BeginPlay();
 
 	InitializeInventory();
+}
+
+void UPDInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UPDInventoryComponent, Items);
+	DOREPLIFETIME(UPDInventoryComponent, Gold);
+}
+
+void UPDInventoryComponent::OnRep_Items()
+{
+	OnInventoryChanged.Broadcast();
+}
+
+void UPDInventoryComponent::OnRep_Gold()
+{
+	OnInventoryChanged.Broadcast();
 }
 
 bool UPDInventoryComponent::AddItem(const FPDItemData& ItemData, int32 Quantity)

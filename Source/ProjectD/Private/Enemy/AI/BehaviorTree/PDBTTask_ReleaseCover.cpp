@@ -18,7 +18,7 @@ EBTNodeResult::Type UPDBTTask_ReleaseCover::ExecuteTask(UBehaviorTreeComponent& 
 
 	if (APDEliteSoldier* Elite = Cast<APDEliteSoldier>(Pawn))
 	{
-		Elite->SetInCover(nullptr);
+		Elite->SetInCover(false);
 	}
 
 	if (BB)

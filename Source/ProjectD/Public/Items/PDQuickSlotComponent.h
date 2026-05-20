@@ -161,6 +161,12 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+	UFUNCTION(Server, Reliable)
+	void ServerUseQuickSlot(int32 SlotIndex);
+
+	UFUNCTION(Server, Reliable)
+	void ServerEquipInventoryWeaponSlot(int32 InventorySlotIndex);
+
 	UFUNCTION()
 	void HandleInventoryChanged();
 

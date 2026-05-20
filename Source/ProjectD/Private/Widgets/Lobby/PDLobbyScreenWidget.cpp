@@ -4,6 +4,7 @@
 #include "Widgets/Lobby/PDLobbyScreenWidget.h"
 
 #include "Components/Button.h"
+#include "Components/EditableTextBox.h"
 #include "Core/PDGameInstance.h"
 
 void UPDLobbyScreenWidget::NativeOnActivated()
@@ -27,6 +28,18 @@ void UPDLobbyScreenWidget::NativeOnActivated()
 	{
 		Button_Quit->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleQuitClicked);
 	}
+	if (Button_HostGame)
+	{
+		Button_HostGame->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleHostGameClicked);
+	}
+	if (Button_JoinGame)
+	{
+		Button_JoinGame->OnClicked.AddDynamic(this, &UPDLobbyScreenWidget::HandleJoinGameClicked);
+	}
+	if (TextBox_HostAddress && TextBox_HostAddress->GetText().IsEmpty())
+	{
+		TextBox_HostAddress->SetText(FText::FromString(DefaultHostAddress));
+	}
 }
 
 void UPDLobbyScreenWidget::NativeOnDeactivated()
@@ -46,6 +59,14 @@ void UPDLobbyScreenWidget::NativeOnDeactivated()
 	if (Button_Quit)
 	{
 		Button_Quit->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleQuitClicked);
+	}
+	if (Button_HostGame)
+	{
+		Button_HostGame->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleHostGameClicked);
+	}
+	if (Button_JoinGame)
+	{
+		Button_JoinGame->OnClicked.RemoveDynamic(this, &UPDLobbyScreenWidget::HandleJoinGameClicked);
 	}
 
 	Super::NativeOnDeactivated();
@@ -80,4 +101,32 @@ void UPDLobbyScreenWidget::HandleSettingsClicked()
 
 void UPDLobbyScreenWidget::HandleQuitClicked()
 {
+}
+
+void UPDLobbyScreenWidget::HandleHostGameClicked()
+{
+	if (MainLevel.IsNull())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("UPDLobbyScreenWidget::HandleHostGameClicked: MainLevel is not set."));
+		return;
+	}
+
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!GI) return;
+
+	GI->HostHamachiGame(MainLevel, HamachiPort);
+}
+
+void UPDLobbyScreenWidget::HandleJoinGameClicked()
+{
+	FString Address = DefaultHostAddress;
+	if (TextBox_HostAddress)
+	{
+		Address = TextBox_HostAddress->GetText().ToString();
+	}
+
+	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
+	if (!GI) return;
+
+	GI->JoinHamachiGame(Address, HamachiPort);
 }
