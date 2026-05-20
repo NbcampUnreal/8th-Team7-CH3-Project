@@ -14,6 +14,7 @@
 #include "Items/PDInventoryComponent.h"
 #include "Widgets/Inventory/PDEquipmentListItemWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
+#include "Widgets/Inventory/PDInventoryDragDropOperation.h"
 
 void UPDEquipmentModificationWidget::NativeConstruct()
 {
@@ -36,6 +37,11 @@ void UPDEquipmentModificationWidget::ResolveComponents()
 	APawn* OwningPawn = GetOwningPlayerPawn();
 	InventoryComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDInventoryComponent>() : nullptr;
 	ModificationComponent = OwningPawn ? OwningPawn->FindComponentByClass<UPDEquipmentModificationComponent>() : nullptr;
+
+	if (!BoostSlotWidget && BoostMaterialSlotWidget)
+	{
+		BoostSlotWidget = BoostMaterialSlotWidget;
+	}
 }
 
 void UPDEquipmentModificationWidget::BindWidgetEvents()
@@ -75,10 +81,17 @@ void UPDEquipmentModificationWidget::BindWidgetEvents()
 	if (EquipmentSlotWidget)
 	{
 		EquipmentSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		EquipmentSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
 	}
 	if (MaterialSlotWidget)
 	{
 		MaterialSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		MaterialSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
+	}
+	if (BoostSlotWidget)
+	{
+		BoostSlotWidget->OnSlotLeftClicked.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		BoostSlotWidget->OnSlotItemDropped.AddUniqueDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
 	}
 }
 
@@ -119,10 +132,17 @@ void UPDEquipmentModificationWidget::UnbindWidgetEvents()
 	if (EquipmentSlotWidget)
 	{
 		EquipmentSlotWidget->OnSlotLeftClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		EquipmentSlotWidget->OnSlotItemDropped.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
 	}
 	if (MaterialSlotWidget)
 	{
 		MaterialSlotWidget->OnSlotLeftClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		MaterialSlotWidget->OnSlotItemDropped.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
+	}
+	if (BoostSlotWidget)
+	{
+		BoostSlotWidget->OnSlotLeftClicked.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleInventorySlotClicked);
+		BoostSlotWidget->OnSlotItemDropped.RemoveDynamic(this, &UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped);
 	}
 }
 
@@ -177,7 +197,7 @@ void UPDEquipmentModificationWidget::RefreshEquipmentList()
 	for (int32 Index = 0; Index < InventoryComponent->Items.Num(); ++Index)
 	{
 		const FPDInventorySlot& InventorySlotData = InventoryComponent->Items[Index];
-		if (InventorySlotData.IsEmpty() || InventorySlotData.ItemData.ItemType != EPDItemType::Equipment)
+		if (!IsValidEquipmentSlotIndex(Index))
 		{
 			continue;
 		}
@@ -220,7 +240,16 @@ void UPDEquipmentModificationWidget::RefreshInventoryGrid()
 		for (int32 SlotIndex = 0; SlotIndex < InventoryComponent->Items.Num() && DisplaySlotIndices.Num() < MaxVisibleSlots; ++SlotIndex)
 		{
 			const FPDInventorySlot& SlotData = InventoryComponent->Items[SlotIndex];
-			if (!SlotData.IsEmpty() && SlotData.ItemData.ItemType == CurrentInventoryFilter)
+			if (SlotData.IsEmpty())
+			{
+				continue;
+			}
+
+			if (CurrentInventoryFilter == EPDItemType::Equipment && IsValidEquipmentSlotIndex(SlotIndex))
+			{
+				DisplaySlotIndices.Add(SlotIndex);
+			}
+			else if (CurrentInventoryFilter == EPDItemType::Misc && (IsValidMaterialSlotIndex(SlotIndex) || IsRegisteredBoostItem(SlotData.ItemData.ItemID)))
 			{
 				DisplaySlotIndices.Add(SlotIndex);
 			}
@@ -315,6 +344,19 @@ void UPDEquipmentModificationWidget::SelectMaterialSlot(int32 SlotIndex)
 	RefreshPreview();
 }
 
+void UPDEquipmentModificationWidget::SelectBoostSlot(int32 SlotIndex)
+{
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex) || InventoryComponent->Items[SlotIndex].IsEmpty() || !IsRegisteredBoostItem(InventoryComponent->Items[SlotIndex].ItemData.ItemID))
+	{
+		return;
+	}
+
+	SelectedBoostSlotIndex = SlotIndex;
+	SetText(Text_Result, ModifyReadyText);
+	RefreshSelectedSlots();
+	RefreshPreview();
+}
+
 void UPDEquipmentModificationWidget::SetInventoryFilter(EPDItemType ItemType)
 {
 	CurrentInventoryFilter = ItemType;
@@ -332,6 +374,7 @@ void UPDEquipmentModificationWidget::RefreshSelectedSlots()
 {
 	SetSlotWidgetData(EquipmentSlotWidget, SelectedSlotIndex, EmptySelectionText);
 	SetSlotWidgetData(MaterialSlotWidget, SelectedMaterialSlotIndex, EmptyMaterialText);
+	SetSlotWidgetData(BoostSlotWidget, SelectedBoostSlotIndex, FText::FromString(TEXT("부스트 재료를 선택하세요")));
 }
 
 void UPDEquipmentModificationWidget::RefreshPreview()
@@ -353,10 +396,20 @@ void UPDEquipmentModificationWidget::RefreshPreview()
 		return;
 	}
 
-	bCurrentPreviewValid = ModificationComponent->CanModifyInventorySlotWithMaterialSlot(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostType, CurrentPreview, CurrentPreviewResult);
-	if (!bCurrentPreviewValid && (CurrentPreviewResult == EPDModificationResult::AlreadyMaxLevel || CurrentPreviewResult == EPDModificationResult::NotEnoughMaterials))
+	bCurrentPreviewValid = ModificationComponent->CanModifyInventorySlotWithMaterialAndBoostSlots(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostSlotIndex, CurrentPreview, CurrentPreviewResult);
+	if (!bCurrentPreviewValid)
 	{
-		ModificationComponent->GetModificationPreviewWithBoost(InventorySlotData, SelectedBoostType, CurrentPreview, CurrentPreviewResult);
+		EPDModificationBoostType PreviewBoostType = EPDModificationBoostType::None;
+		FName PreviewBoostItemID = NAME_None;
+		int32 PreviewBoostQuantity = 0;
+		ModificationComponent->IsValidBoostSlot(InventoryComponent, SelectedBoostSlotIndex, PreviewBoostType, PreviewBoostItemID, PreviewBoostQuantity);
+		ModificationComponent->GetModificationPreviewWithBoost(InventorySlotData, PreviewBoostType, CurrentPreview, CurrentPreviewResult);
+		if (!PreviewBoostItemID.IsNone())
+		{
+			CurrentPreview.SelectedBoostType = PreviewBoostType;
+			CurrentPreview.BoostItemID = PreviewBoostItemID;
+			CurrentPreview.BoostItemQuantity = PreviewBoostQuantity;
+		}
 	}
 
 	ApplyPreview(CurrentPreview, InventorySlotData);
@@ -478,6 +531,72 @@ void UPDEquipmentModificationWidget::RefreshMaterialList(const FPDModificationPr
 		}
 	}
 }
+bool UPDEquipmentModificationWidget::TryAutoSelectInventoryItem(int32 SlotIndex)
+{
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& SlotData = InventoryComponent->Items[SlotIndex];
+	if (SlotData.IsEmpty())
+	{
+		return false;
+	}
+
+	if (IsValidEquipmentSlotIndex(SlotIndex))
+	{
+		if (SelectedSlotIndex == SlotIndex)
+		{
+			SelectedSlotIndex = INDEX_NONE;
+			SetText(Text_Result, ModifyReadyText);
+			RefreshEquipmentList();
+			RefreshSelectedSlots();
+			RefreshPreview();
+		}
+		else
+		{
+			SelectInventorySlot(SlotIndex);
+		}
+		return true;
+	}
+
+	if (IsRegisteredBoostItem(SlotData.ItemData.ItemID))
+	{
+		if (SelectedBoostSlotIndex == SlotIndex)
+		{
+			SelectedBoostSlotIndex = INDEX_NONE;
+			SetText(Text_Result, ModifyReadyText);
+			RefreshSelectedSlots();
+			RefreshPreview();
+		}
+		else
+		{
+			SelectBoostSlot(SlotIndex);
+		}
+		SetInventoryFilter(EPDItemType::Misc);
+		return true;
+	}
+
+	if (IsValidMaterialSlotIndex(SlotIndex))
+	{
+		if (SelectedMaterialSlotIndex == SlotIndex)
+		{
+			SelectedMaterialSlotIndex = INDEX_NONE;
+			SetText(Text_Result, ModifyReadyText);
+			RefreshSelectedSlots();
+			RefreshPreview();
+		}
+		else
+		{
+			SelectMaterialSlot(SlotIndex);
+		}
+		SetInventoryFilter(EPDItemType::Misc);
+		return true;
+	}
+
+	return false;
+}
 
 void UPDEquipmentModificationWidget::HandleEquipmentListItemClicked(UPDEquipmentListItemWidget* ItemWidget, int32 SlotIndex)
 {
@@ -486,24 +605,72 @@ void UPDEquipmentModificationWidget::HandleEquipmentListItemClicked(UPDEquipment
 
 void UPDEquipmentModificationWidget::HandleInventorySlotClicked(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
 {
-	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex))
+	if (SlotWidget == EquipmentSlotWidget)
+	{
+		SelectedSlotIndex = INDEX_NONE;
+		SetText(Text_Result, ModifyReadyText);
+		RefreshEquipmentList();
+		RefreshSelectedSlots();
+		RefreshPreview();
+		return;
+	}
+
+	if (SlotWidget == MaterialSlotWidget)
+	{
+		SelectedMaterialSlotIndex = INDEX_NONE;
+		SetText(Text_Result, ModifyReadyText);
+		RefreshSelectedSlots();
+		RefreshPreview();
+		return;
+	}
+
+	if (SlotWidget == BoostSlotWidget)
+	{
+		SelectedBoostSlotIndex = INDEX_NONE;
+		SetText(Text_Result, ModifyReadyText);
+		RefreshSelectedSlots();
+		RefreshPreview();
+		return;
+	}
+
+	TryAutoSelectInventoryItem(SlotIndex);
+}
+
+
+void UPDEquipmentModificationWidget::HandleSelectionSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex, UPDInventoryDragDropOperation* DragOperation)
+{
+	if (!DragOperation || !DragOperation->IsValidPayload() || !InventoryComponent || !InventoryComponent->Items.IsValidIndex(DragOperation->SourceSlotIndex))
 	{
 		return;
 	}
 
-	const FPDInventorySlot& SlotData = InventoryComponent->Items[SlotIndex];
-	if (SlotData.IsEmpty())
+	const int32 SourceSlotIndex = DragOperation->SourceSlotIndex;
+	if (SlotWidget == EquipmentSlotWidget)
 	{
+		SelectInventorySlot(SourceSlotIndex);
 		return;
 	}
 
-	if (SlotData.ItemData.ItemType == EPDItemType::Equipment)
+	if (SlotWidget == MaterialSlotWidget)
 	{
-		SelectInventorySlot(SlotIndex);
+		if (IsRegisteredBoostItem(InventoryComponent->Items[SourceSlotIndex].ItemData.ItemID))
+		{
+			SelectBoostSlot(SourceSlotIndex);
+		}
+		else
+		{
+			SelectMaterialSlot(SourceSlotIndex);
+		}
 		return;
 	}
 
-	SelectMaterialSlot(SlotIndex);
+	if (SlotWidget == BoostSlotWidget)
+	{
+		if (IsRegisteredBoostItem(InventoryComponent->Items[SourceSlotIndex].ItemData.ItemID))
+		{
+			SelectBoostSlot(SourceSlotIndex);
+		}
+	}
 }
 
 void UPDEquipmentModificationWidget::HandleEquipmentTabClicked()
@@ -546,8 +713,23 @@ void UPDEquipmentModificationWidget::HandleModifyClicked()
 
 	FPDModificationPreview Preview;
 	EPDModificationResult Result = EPDModificationResult::InvalidSlot;
-	const bool bSuccess = ModificationComponent->TryModifyInventorySlotWithMaterialSlot(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostType, Preview, Result);
+	const bool bSuccess = ModificationComponent->TryModifyInventorySlotWithMaterialAndBoostSlots(InventoryComponent, SelectedSlotIndex, SelectedMaterialSlotIndex, SelectedBoostSlotIndex, Preview, Result);
 	SetText(Text_Result, GetResultText(Result, bSuccess));
+
+	if (Preview.RequiredMaterials.Num() > 0 && (!InventoryComponent->Items.IsValidIndex(SelectedMaterialSlotIndex) || InventoryComponent->Items[SelectedMaterialSlotIndex].IsEmpty()))
+	{
+		const FName RequiredItemID = Preview.RequiredMaterials[0].RequiredItemID;
+		SelectedMaterialSlotIndex = INDEX_NONE;
+		for (int32 Index = 0; Index < InventoryComponent->Items.Num(); ++Index)
+		{
+			if (!InventoryComponent->Items[Index].IsEmpty() && InventoryComponent->Items[Index].ItemData.ItemID == RequiredItemID)
+			{
+				SelectedMaterialSlotIndex = Index;
+				break;
+			}
+		}
+	}
+
 	RefreshAll();
 }
 
@@ -560,6 +742,10 @@ void UPDEquipmentModificationWidget::HandleInventoryChanged()
 	if (!IsValidMaterialSlotIndex(SelectedMaterialSlotIndex))
 	{
 		SelectedMaterialSlotIndex = INDEX_NONE;
+	}
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SelectedBoostSlotIndex) || InventoryComponent->Items[SelectedBoostSlotIndex].IsEmpty() || !IsRegisteredBoostItem(InventoryComponent->Items[SelectedBoostSlotIndex].ItemData.ItemID))
+	{
+		SelectedBoostSlotIndex = INDEX_NONE;
 	}
 	RefreshAll();
 }
@@ -589,7 +775,12 @@ void UPDEquipmentModificationWidget::SetSlotWidgetData(UPDInventorySlotWidget* S
 
 	if (InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty())
 	{
-		SlotWidget->SetSlotData(InventoryComponent->Items[SlotIndex], SlotIndex);
+		FPDInventorySlot DisplaySlot = InventoryComponent->Items[SlotIndex];
+		if (SlotWidget == MaterialSlotWidget && ModificationComponent && ModificationComponent->IsModificationMaterialItemID(DisplaySlot.ItemData.ItemID))
+		{
+			DisplaySlot.Quantity = CountItem(DisplaySlot.ItemData.ItemID);
+		}
+		SlotWidget->SetSlotData(DisplaySlot, SlotIndex);
 		return;
 	}
 
@@ -598,12 +789,28 @@ void UPDEquipmentModificationWidget::SetSlotWidgetData(UPDInventorySlotWidget* S
 
 bool UPDEquipmentModificationWidget::IsValidEquipmentSlotIndex(int32 SlotIndex) const
 {
-	return InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty() && InventoryComponent->Items[SlotIndex].ItemData.ItemType == EPDItemType::Equipment;
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex) || InventoryComponent->Items[SlotIndex].IsEmpty())
+	{
+		return false;
+	}
+
+	const FPDItemData& ItemData = InventoryComponent->Items[SlotIndex].ItemData;
+	return ItemData.ItemType == EPDItemType::Equipment && (ItemData.EquipmentSlotType == EPDEquipmentSlotType::Weapon || ItemData.EquipmentSlotType == EPDEquipmentSlotType::Armor || ItemData.EquipmentSlotType == EPDEquipmentSlotType::Head || ItemData.WeaponType != EWeaponType::None);
 }
 
 bool UPDEquipmentModificationWidget::IsValidMaterialSlotIndex(int32 SlotIndex) const
 {
-	return InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) && !InventoryComponent->Items[SlotIndex].IsEmpty() && InventoryComponent->Items[SlotIndex].ItemData.ItemType != EPDItemType::Equipment;
+	if (!InventoryComponent || !ModificationComponent || !InventoryComponent->Items.IsValidIndex(SlotIndex) || InventoryComponent->Items[SlotIndex].IsEmpty())
+	{
+		return false;
+	}
+
+	return ModificationComponent->IsModificationMaterialItemID(InventoryComponent->Items[SlotIndex].ItemData.ItemID);
+}
+
+bool UPDEquipmentModificationWidget::IsRegisteredBoostItem(FName ItemID) const
+{
+	return ModificationComponent && ModificationComponent->IsRegisteredBoostItemID(ItemID);
 }
 
 bool UPDEquipmentModificationWidget::DoesSelectedMaterialMatchPreview(const FPDModificationPreview& Preview) const
@@ -626,7 +833,7 @@ bool UPDEquipmentModificationWidget::DoesSelectedMaterialMatchPreview(const FPDM
 
 	for (const FPDModificationMaterialRequirement& Material : Preview.RequiredMaterials)
 	{
-		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && CountItem(Material.RequiredItemID) >= Material.Quantity)
 		{
 			return true;
 		}

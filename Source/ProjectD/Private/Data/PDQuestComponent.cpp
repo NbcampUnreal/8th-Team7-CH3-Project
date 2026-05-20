@@ -39,17 +39,6 @@ bool UPDQuestComponent::AddQuest(const FPDQuestData& QuestData)
 		}
 	}
 
-	for (const FPDQuestObjective& Objective : QuestData.Objectives)
-	{
-		if (IsItemCountObjective(Objective) && !Objective.TargetID.IsNone())
-		{
-			const FName ProgressKey = Objective.GetProgressKey();
-			if (!ProgressKey.IsNone())
-			{
-				NewProgress.ObjectiveProgress.FindOrAdd(ProgressKey) = FMath::Clamp(GetInventoryAndStashItemCount(Objective.TargetID), 0, FMath::Max(1, Objective.RequiredCount));
-			}
-		}
-	}
 
 	RefreshQuestState(NewProgress);
 
@@ -111,14 +100,7 @@ bool UPDQuestComponent::ReportQuestObjectiveEvent(EPDQuestObjectiveType Objectiv
 		{
 			if (DoesObjectiveMatchEvent(Objective, ObjectiveType, TargetID))
 			{
-				if (IsItemCountObjective(Objective))
-				{
-					bUpdatedAny |= RefreshItemCountObjective(QuestProgress, Objective);
-				}
-				else
-				{
-					bUpdatedAny |= ApplyObjectiveProgress(QuestProgress, Objective, Amount);
-				}
+				bUpdatedAny |= ApplyObjectiveProgress(QuestProgress, Objective, Amount);
 			}
 		}
 	}
@@ -160,21 +142,6 @@ bool UPDQuestComponent::ReportItemDropped(FName ItemID, int32 Amount)
 {
 	bool bUpdated = ReportQuestObjectiveEvent(EPDQuestObjectiveType::ItemDropped, ItemID, Amount);
 
-	for (FPDQuestProgress& QuestProgress : ActiveQuests)
-	{
-		if (QuestProgress.State != EPDQuestState::Active)
-		{
-			continue;
-		}
-
-		for (const FPDQuestObjective& Objective : QuestProgress.QuestData.Objectives)
-		{
-			if (IsItemCountObjective(Objective) && DoesObjectiveMatchEvent(Objective, Objective.ObjectiveType, ItemID))
-			{
-				bUpdated |= RefreshItemCountObjective(QuestProgress, Objective);
-			}
-		}
-	}
 
 	return bUpdated;
 }
@@ -205,9 +172,14 @@ bool UPDQuestComponent::GiveReward(FName QuestID, UPDInventoryComponent* Invento
 		return false;
 	}
 
-	for (const FName RewardItemID : QuestProgress->QuestData.Reward.RewardItems)
+	for (const FPDQuestRewardItem& RewardItem : QuestProgress->QuestData.Reward.RewardItems)
 	{
-		if (!InventoryComponent->AddItemByID(RewardItemID, 1))
+		if (RewardItem.ItemID.IsNone())
+		{
+			continue;
+		}
+
+		if (!InventoryComponent->AddItemByID(RewardItem.ItemID, FMath::Max(1, RewardItem.Quantity)))
 		{
 			InventoryComponent->BroadcastInventoryMessage(FText::FromString(TEXT("보상 지급에 실패했습니다. 인벤토리 상태를 확인해주세요.")));
 			return false;
@@ -741,15 +713,20 @@ bool UPDQuestComponent::CanReceiveQuestReward(const FPDQuestProgress& QuestProgr
 		return false;
 	};
 
-	for (const FName RewardItemID : QuestProgress.QuestData.Reward.RewardItems)
+	for (const FPDQuestRewardItem& RewardItem : QuestProgress.QuestData.Reward.RewardItems)
 	{
+		if (RewardItem.ItemID.IsNone())
+		{
+			continue;
+		}
+
 		FPDItemData RewardItemData;
-		if (!InventoryComponent->FindItemDataByID(RewardItemID, RewardItemData))
+		if (!InventoryComponent->FindItemDataByID(RewardItem.ItemID, RewardItemData))
 		{
 			return false;
 		}
 
-		int32 RemainingQuantity = 1;
+		int32 RemainingQuantity = FMath::Max(1, RewardItem.Quantity);
 		if (RewardItemData.ItemType == EPDItemType::Equipment)
 		{
 			EPDEquipmentSlotType TargetSlotType = RewardItemData.EquipmentSlotType;

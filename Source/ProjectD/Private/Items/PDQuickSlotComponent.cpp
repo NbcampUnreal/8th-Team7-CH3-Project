@@ -613,15 +613,31 @@ bool UPDQuickSlotComponent::EquipWeaponFromInventorySlot(int32 InventorySlotInde
 		return false;
 	}
 
-	if (IsEquippedItem(InventorySlot.ItemData))
-	{
-		return false;
-	}
-
+	// IsEquippedItem(ItemID) 기반 거부 검사 제거 — 같은 모델 두 자루 사이의 스왑 허용.
+	// 인스턴스 식별은 InventorySlotIndex 단계에서 이미 보장됨.
 	const bool bEquipped = EquipmentComponent->EquipItemFromInventoryToSlot(InventoryComponent, InventorySlotIndex, EPDEquipmentSlotType::Weapon);
 	if (!bEquipped)
 	{
 		return false;
+	}
+
+	// 양방향 스왑: equip 이후 InventoryComponent->Items[InventorySlotIndex]에는
+	// 직전 메인 무기가 들어가 있음. 그 항목을 그대로 퀵슬롯에 stamp 해서
+	// 사용자가 같은 키를 다시 누르면 원래 무기로 되돌아오게 만든다.
+	// 인벤토리에 빈 슬롯이 남았다면 (이전 메인이 없었던 경우) 퀵슬롯도 비움.
+	if (QuickSlotItems.IsValidIndex(CooldownSlotIndex) && InventoryComponent->Items.IsValidIndex(InventorySlotIndex))
+	{
+		const FPDInventorySlot& DisplacedSlot = InventoryComponent->Items[InventorySlotIndex];
+		if (DisplacedSlot.IsEmpty()
+			|| DisplacedSlot.ItemData.ItemType != EPDItemType::Equipment
+			|| DisplacedSlot.ItemData.EquipmentSlotType != EPDEquipmentSlotType::Weapon)
+		{
+			QuickSlotItems[CooldownSlotIndex].Clear();
+		}
+		else
+		{
+			QuickSlotItems[CooldownSlotIndex] = DisplacedSlot;
+		}
 	}
 
 	if (QuickSlotItems.IsValidIndex(CooldownSlotIndex))

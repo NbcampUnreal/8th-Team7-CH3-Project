@@ -1,5 +1,9 @@
 #include "Items/PDEquipmentModificationComponent.h"
 
+#include "Engine/DataTable.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Modules/ModuleManager.h"
+#include "UObject/UObjectIterator.h"
 #include "Items/PDInventoryComponent.h"
 
 UPDEquipmentModificationComponent::UPDEquipmentModificationComponent()
@@ -12,15 +16,156 @@ int32 UPDEquipmentModificationComponent::ConvertModificationLevelToGasLevel(int3
 	return FMath::Max(1, ModificationLevel + 1);
 }
 
+namespace
+{
+	const FName UpgradeMaterialItemID(TEXT("IT_MISC_UpgradeMaterial"));
+	const FName LowBoostItemID(TEXT("IT_MISC_Upgrade_Material_1"));
+	const FName MidBoostItemID(TEXT("IT_MISC_Upgrade_Material_2"));
+	const FName HighBoostItemID(TEXT("IT_MISC_Upgrade_Material_3"));
+
+	int32 ParsePositiveIntegerName(FName RowName)
+	{
+		const FString RowString = RowName.ToString();
+		if (RowString.IsNumeric())
+		{
+			return FMath::Max(0, FCString::Atoi(*RowString));
+		}
+
+		return 0;
+	}
+
+	int32 ResolveRecipeTargetLevel(FName RowName, const FPDModificationRecipeData* Row)
+	{
+		const int32 RowNameLevel = ParsePositiveIntegerName(RowName);
+		if (RowNameLevel > 0)
+		{
+			return RowNameLevel;
+		}
+
+		return Row ? FMath::Max(0, Row->TargetLevel) : 0;
+	}
+
+	void AddFallbackBoostItem(FName ItemID, EPDModificationBoostType BoostType, TArray<FPDModificationBoostData>& Items)
+	{
+		FPDModificationBoostData& Entry = Items.AddDefaulted_GetRef();
+		Entry.BoostItemID = ItemID;
+		Entry.BoostType = BoostType;
+		Entry.Quantity = 1;
+	}
+}
+
+const UDataTable* UPDEquipmentModificationComponent::ResolveDataTable(const UDataTable* AssignedTable, const TCHAR* AssetName) const
+{
+	if (AssignedTable || !AssetName || !AssetName[0])
+	{
+		return AssignedTable;
+	}
+
+	const FName TargetAssetName(AssetName);
+	for (TObjectIterator<UDataTable> It; It; ++It)
+	{
+		const UDataTable* LoadedTable = *It;
+		if (LoadedTable && LoadedTable->GetFName() == TargetAssetName)
+		{
+			return LoadedTable;
+		}
+	}
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	TArray<FAssetData> AssetDataList;
+	AssetRegistryModule.Get().GetAssetsByClass(UDataTable::StaticClass()->GetClassPathName(), AssetDataList, true);
+	for (const FAssetData& AssetData : AssetDataList)
+	{
+		if (AssetData.AssetName == TargetAssetName)
+		{
+			if (UDataTable* Table = Cast<UDataTable>(AssetData.GetAsset()))
+			{
+				return Table;
+			}
+		}
+	}
+
+	const TArray<FString> Paths =
+	{
+		FString::Printf(TEXT("/Game/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Data/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/DataTable/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/DataTables/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Blueprints/Data/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Blueprints/DataTable/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Blueprints/DataTables/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Blueprints/Data/Item/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Blueprints/Data/Items/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Main/Blueprints/Data/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Main/Blueprints/DataTable/%s.%s"), AssetName, AssetName),
+		FString::Printf(TEXT("/Game/Main/Blueprints/DataTables/%s.%s"), AssetName, AssetName)
+	};
+
+	for (const FString& Path : Paths)
+	{
+		if (UDataTable* Table = LoadObject<UDataTable>(nullptr, *Path))
+		{
+			return Table;
+		}
+	}
+
+	return nullptr;
+}
+
+const UCurveTable* UPDEquipmentModificationComponent::ResolveModificationCurveTable() const
+{
+	if (ModificationCurveTable)
+	{
+		return ModificationCurveTable;
+	}
+
+	static const FName TargetAssetName(TEXT("CT_ModificationStats"));
+	for (TObjectIterator<UCurveTable> It; It; ++It)
+	{
+		const UCurveTable* LoadedTable = *It;
+		if (LoadedTable && LoadedTable->GetFName() == TargetAssetName)
+		{
+			return LoadedTable;
+		}
+	}
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	TArray<FAssetData> AssetDataList;
+	AssetRegistryModule.Get().GetAssetsByClass(UCurveTable::StaticClass()->GetClassPathName(), AssetDataList, true);
+	for (const FAssetData& AssetData : AssetDataList)
+	{
+		if (AssetData.AssetName == TargetAssetName)
+		{
+			if (UCurveTable* Table = Cast<UCurveTable>(AssetData.GetAsset()))
+			{
+				return Table;
+			}
+		}
+	}
+
+	return nullptr;
+}
+
+const UDataTable* UPDEquipmentModificationComponent::ResolveRecipeDataTable() const
+{
+	return ResolveDataTable(ModificationRecipeDataTable, TEXT("DT_ModificationRecipeData"));
+}
+
+const UDataTable* UPDEquipmentModificationComponent::ResolveBoostDataTable() const
+{
+	return ResolveDataTable(ModificationBoostDataTable, TEXT("DT_ModificationBoostData"));
+}
+
 float UPDEquipmentModificationComponent::GetCurveValue(FName RowName, int32 TargetLevel, float DefaultValue) const
 {
-	if (!ModificationCurveTable || RowName.IsNone())
+	const UCurveTable* CurveTable = ResolveModificationCurveTable();
+	if (!CurveTable || RowName.IsNone())
 	{
 		return DefaultValue;
 	}
 
 	static const FString Context(TEXT("EquipmentModification"));
-	if (const FRealCurve* Curve = ModificationCurveTable->FindCurve(RowName, Context, false))
+	if (const FRealCurve* Curve = CurveTable->FindCurve(RowName, Context, false))
 	{
 		return Curve->Eval(static_cast<float>(TargetLevel), DefaultValue);
 	}
@@ -28,26 +173,47 @@ float UPDEquipmentModificationComponent::GetCurveValue(FName RowName, int32 Targ
 	return DefaultValue;
 }
 
+int32 UPDEquipmentModificationComponent::GetResolvedMaxModificationLevel() const
+{
+	const UCurveTable* CurveTable = ResolveModificationCurveTable();
+	if (CurveTable && !SuccessRateCurveRowName.IsNone())
+	{
+		static const FString Context(TEXT("EquipmentModificationMaxLevel"));
+		if (const FRealCurve* Curve = CurveTable->FindCurve(SuccessRateCurveRowName, Context, false))
+		{
+			float MinTime = 0.f;
+			float MaxTime = 0.f;
+			Curve->GetTimeRange(MinTime, MaxTime);
+			return FMath::Max(1, FMath::FloorToInt(MaxTime));
+		}
+	}
+
+	return FMath::Max(1, MaxModificationLevel);
+}
 
 int32 UPDEquipmentModificationComponent::GetGoldCostFromRecipe(int32 TargetLevel) const
 {
-	if (!ModificationRecipeDataTable)
+	const UDataTable* RecipeTable = ResolveRecipeDataTable();
+	if (!RecipeTable)
 	{
 		return 0;
 	}
 
-	TArray<FPDModificationRecipeData*> Rows;
-	ModificationRecipeDataTable->GetAllRows<FPDModificationRecipeData>(TEXT("EquipmentModificationRecipeGoldCost"), Rows);
-
-	for (const FPDModificationRecipeData* Row : Rows)
+	int32 GoldCost = 0;
+	bool bFound = false;
+	for (const TPair<FName, uint8*>& Pair : RecipeTable->GetRowMap())
 	{
-		if (Row && Row->TargetLevel == TargetLevel)
+		const FPDModificationRecipeData* Row = reinterpret_cast<const FPDModificationRecipeData*>(Pair.Value);
+		if (!Row || ResolveRecipeTargetLevel(Pair.Key, Row) != TargetLevel)
 		{
-			return FMath::Max(0, Row->GoldCost);
+			continue;
 		}
+
+		GoldCost = FMath::Max(GoldCost, Row->GoldCost);
+		bFound = true;
 	}
 
-	return 0;
+	return bFound ? FMath::Max(0, GoldCost) : 0;
 }
 
 float UPDEquipmentModificationComponent::NormalizeSuccessRate(float RawRate) const
@@ -62,26 +228,28 @@ float UPDEquipmentModificationComponent::NormalizeSuccessRate(float RawRate) con
 
 TArray<FPDModificationMaterialRequirement> UPDEquipmentModificationComponent::GetRequiredMaterials(int32 TargetLevel) const
 {
-	TArray<FPDModificationMaterialRequirement> Result;
-
-	if (!ModificationRecipeDataTable)
+	TMap<FName, int32> QuantityByItemID;
+	const UDataTable* RecipeTable = ResolveRecipeDataTable();
+	if (RecipeTable)
 	{
-		return Result;
+		for (const TPair<FName, uint8*>& Pair : RecipeTable->GetRowMap())
+		{
+			const FPDModificationRecipeData* Row = reinterpret_cast<const FPDModificationRecipeData*>(Pair.Value);
+			if (!Row || ResolveRecipeTargetLevel(Pair.Key, Row) != TargetLevel || Row->RequiredItemID.IsNone() || Row->Quantity <= 0)
+			{
+				continue;
+			}
+
+			QuantityByItemID.FindOrAdd(Row->RequiredItemID) += Row->Quantity;
+		}
 	}
 
-	TArray<FPDModificationRecipeData*> Rows;
-	ModificationRecipeDataTable->GetAllRows<FPDModificationRecipeData>(TEXT("EquipmentModificationRecipe"), Rows);
-
-	for (const FPDModificationRecipeData* Row : Rows)
+	TArray<FPDModificationMaterialRequirement> Result;
+	for (const TPair<FName, int32>& Pair : QuantityByItemID)
 	{
-		if (!Row || Row->TargetLevel != TargetLevel || Row->RequiredItemID.IsNone() || Row->Quantity <= 0)
-		{
-			continue;
-		}
-
 		FPDModificationMaterialRequirement& Entry = Result.AddDefaulted_GetRef();
-		Entry.RequiredItemID = Row->RequiredItemID;
-		Entry.Quantity = Row->Quantity;
+		Entry.RequiredItemID = Pair.Key;
+		Entry.Quantity = Pair.Value;
 	}
 
 	return Result;
@@ -92,27 +260,45 @@ bool UPDEquipmentModificationComponent::GetBoostMaterial(EPDModificationBoostTyp
 	OutItemID = NAME_None;
 	OutQuantity = 0;
 
-	if (BoostType == EPDModificationBoostType::None || !ModificationBoostDataTable)
+	if (BoostType == EPDModificationBoostType::None)
 	{
 		return false;
 	}
 
-	TArray<FPDModificationBoostData*> Rows;
-	ModificationBoostDataTable->GetAllRows<FPDModificationBoostData>(TEXT("EquipmentModificationBoost"), Rows);
-
-	for (const FPDModificationBoostData* Row : Rows)
+	const UDataTable* BoostTable = ResolveBoostDataTable();
+	if (BoostTable)
 	{
-		if (!Row || Row->BoostType != BoostType || Row->BoostItemID.IsNone() || Row->Quantity <= 0)
+		for (const TPair<FName, uint8*>& Pair : BoostTable->GetRowMap())
 		{
-			continue;
-		}
+			const FPDModificationBoostData* Row = reinterpret_cast<const FPDModificationBoostData*>(Pair.Value);
+			if (!Row || Row->BoostType != BoostType || Row->BoostItemID.IsNone() || Row->Quantity <= 0)
+			{
+				continue;
+			}
 
-		OutItemID = Row->BoostItemID;
-		OutQuantity = FMath::Max(0, Row->Quantity);
-		return true;
+			OutItemID = Row->BoostItemID;
+			OutQuantity = Row->Quantity;
+			return true;
+		}
 	}
 
-	return false;
+	switch (BoostType)
+	{
+	case EPDModificationBoostType::Low:
+		OutItemID = LowBoostItemID;
+		OutQuantity = 1;
+		return true;
+	case EPDModificationBoostType::Mid:
+		OutItemID = MidBoostItemID;
+		OutQuantity = 1;
+		return true;
+	case EPDModificationBoostType::High:
+		OutItemID = HighBoostItemID;
+		OutQuantity = 1;
+		return true;
+	default:
+		return false;
+	}
 }
 
 float UPDEquipmentModificationComponent::GetBoostRate(EPDModificationBoostType BoostType, int32 TargetLevel) const
@@ -130,13 +316,153 @@ float UPDEquipmentModificationComponent::GetBoostRate(EPDModificationBoostType B
 	}
 }
 
+bool UPDEquipmentModificationComponent::IsRegisteredBoostItemID(FName ItemID) const
+{
+	EPDModificationBoostType BoostType = EPDModificationBoostType::None;
+	int32 Quantity = 0;
+	return GetBoostMaterialByItemID(ItemID, BoostType, Quantity);
+}
+
+bool UPDEquipmentModificationComponent::IsModificationMaterialItemID(FName ItemID) const
+{
+	if (ItemID.IsNone())
+	{
+		return false;
+	}
+
+	const UDataTable* RecipeTable = ResolveRecipeDataTable();
+	if (RecipeTable)
+	{
+		for (const TPair<FName, uint8*>& Pair : RecipeTable->GetRowMap())
+		{
+			const FPDModificationRecipeData* Row = reinterpret_cast<const FPDModificationRecipeData*>(Pair.Value);
+			if (Row && Row->RequiredItemID == ItemID && Row->Quantity > 0)
+			{
+				return true;
+			}
+		}
+	}
+
+	return ItemID == UpgradeMaterialItemID;
+}
+
+bool UPDEquipmentModificationComponent::IsModifiableEquipmentSlot(const FPDInventorySlot& TargetSlot) const
+{
+	if (TargetSlot.IsEmpty() || TargetSlot.ItemData.ItemType != EPDItemType::Equipment)
+	{
+		return false;
+	}
+
+	const FPDItemData& ItemData = TargetSlot.ItemData;
+	return ItemData.EquipmentSlotType == EPDEquipmentSlotType::Weapon || ItemData.EquipmentSlotType == EPDEquipmentSlotType::Armor || ItemData.EquipmentSlotType == EPDEquipmentSlotType::Head || ItemData.WeaponType != EWeaponType::None;
+}
+
+bool UPDEquipmentModificationComponent::IsUpgradeMaterialSlot(const FPDInventorySlot& MaterialSlot) const
+{
+	return !MaterialSlot.IsEmpty() && IsModificationMaterialItemID(MaterialSlot.ItemData.ItemID);
+}
+
+bool UPDEquipmentModificationComponent::TryInferBoostMaterialByItemID(FName ItemID, EPDModificationBoostType& OutBoostType, int32& OutQuantity) const
+{
+	OutBoostType = EPDModificationBoostType::None;
+	OutQuantity = 0;
+
+	if (ItemID == LowBoostItemID)
+	{
+		OutBoostType = EPDModificationBoostType::Low;
+		OutQuantity = 1;
+		return true;
+	}
+
+	if (ItemID == MidBoostItemID)
+	{
+		OutBoostType = EPDModificationBoostType::Mid;
+		OutQuantity = 1;
+		return true;
+	}
+
+	if (ItemID == HighBoostItemID)
+	{
+		OutBoostType = EPDModificationBoostType::High;
+		OutQuantity = 1;
+		return true;
+	}
+
+	return false;
+}
+
+bool UPDEquipmentModificationComponent::GetBoostMaterialByItemID(FName ItemID, EPDModificationBoostType& OutBoostType, int32& OutQuantity) const
+{
+	OutBoostType = EPDModificationBoostType::None;
+	OutQuantity = 0;
+
+	if (ItemID.IsNone())
+	{
+		return false;
+	}
+
+	const UDataTable* BoostTable = ResolveBoostDataTable();
+	if (BoostTable)
+	{
+		for (const TPair<FName, uint8*>& Pair : BoostTable->GetRowMap())
+		{
+			const FPDModificationBoostData* Row = reinterpret_cast<const FPDModificationBoostData*>(Pair.Value);
+			if (!Row || Row->BoostType == EPDModificationBoostType::None || Row->BoostItemID != ItemID || Row->Quantity <= 0)
+			{
+				continue;
+			}
+
+			OutBoostType = Row->BoostType;
+			OutQuantity = Row->Quantity;
+			return true;
+		}
+	}
+
+	return TryInferBoostMaterialByItemID(ItemID, OutBoostType, OutQuantity);
+}
+
+bool UPDEquipmentModificationComponent::IsValidBoostSlot(const UPDInventoryComponent* InventoryComponent, int32 BoostSlotIndex, EPDModificationBoostType& OutBoostType, FName& OutBoostItemID, int32& OutQuantity) const
+{
+	OutBoostType = EPDModificationBoostType::None;
+	OutBoostItemID = NAME_None;
+	OutQuantity = 0;
+
+	if (BoostSlotIndex == INDEX_NONE)
+	{
+		return true;
+	}
+
+	if (!InventoryComponent || !InventoryComponent->Items.IsValidIndex(BoostSlotIndex))
+	{
+		return false;
+	}
+
+	const FPDInventorySlot& BoostSlot = InventoryComponent->Items[BoostSlotIndex];
+	if (BoostSlot.IsEmpty())
+	{
+		return false;
+	}
+
+	int32 RequiredQuantity = 0;
+	EPDModificationBoostType BoostType = EPDModificationBoostType::None;
+	if (!GetBoostMaterialByItemID(BoostSlot.ItemData.ItemID, BoostType, RequiredQuantity) || BoostSlot.Quantity < RequiredQuantity)
+	{
+		return false;
+	}
+
+	OutBoostType = BoostType;
+	OutBoostItemID = BoostSlot.ItemData.ItemID;
+	OutQuantity = RequiredQuantity;
+	return true;
+}
+
 void UPDEquipmentModificationComponent::FillApplicableBonus(const FPDInventorySlot& TargetSlot, int32 TargetLevel, FPDModificationPreview& OutPreview) const
 {
 	OutPreview.AttackBonus = 0.f;
 	OutPreview.DefenseBonus = 0.f;
 
 	const FPDItemData& ItemData = TargetSlot.ItemData;
-	if (ItemData.ItemType != EPDItemType::Equipment)
+	if (!IsModifiableEquipmentSlot(TargetSlot))
 	{
 		return;
 	}
@@ -147,10 +473,7 @@ void UPDEquipmentModificationComponent::FillApplicableBonus(const FPDInventorySl
 		return;
 	}
 
-	if (ItemData.EquipmentSlotType == EPDEquipmentSlotType::Head || ItemData.EquipmentSlotType == EPDEquipmentSlotType::Armor)
-	{
-		OutPreview.DefenseBonus = GetCurveValue(DefenseBonusCurveRowName, TargetLevel, 0.f);
-	}
+	OutPreview.DefenseBonus = GetCurveValue(DefenseBonusCurveRowName, TargetLevel, 0.f);
 }
 
 bool UPDEquipmentModificationComponent::GetModificationPreview(const FPDInventorySlot& TargetSlot, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const
@@ -168,14 +491,15 @@ bool UPDEquipmentModificationComponent::GetModificationPreviewWithBoost(const FP
 		return false;
 	}
 
-	if (TargetSlot.ItemData.ItemType != EPDItemType::Equipment)
+	if (!IsModifiableEquipmentSlot(TargetSlot))
 	{
 		OutResult = EPDModificationResult::NotEquipment;
 		return false;
 	}
 
 	const int32 CurrentLevel = FMath::Max(0, TargetSlot.ModificationLevel);
-	if (CurrentLevel >= MaxModificationLevel)
+	const int32 MaxLevel = GetResolvedMaxModificationLevel();
+	if (CurrentLevel >= MaxLevel)
 	{
 		OutPreview.CurrentModificationLevel = CurrentLevel;
 		OutPreview.TargetModificationLevel = CurrentLevel;
@@ -193,21 +517,15 @@ bool UPDEquipmentModificationComponent::GetModificationPreviewWithBoost(const FP
 	OutPreview.SelectedBoostType = BoostType;
 	OutPreview.BoostSuccessRate = GetBoostRate(BoostType, TargetLevel);
 	OutPreview.SuccessRate = FMath::Clamp(OutPreview.BaseSuccessRate + OutPreview.BoostSuccessRate, 0.f, 1.f);
-	FillApplicableBonus(TargetSlot, TargetLevel, OutPreview);
 	OutPreview.RequiredMaterials = GetRequiredMaterials(TargetLevel);
+	FillApplicableBonus(TargetSlot, TargetLevel, OutPreview);
 
-	FName BoostItemID;
+	FName BoostItemID = NAME_None;
 	int32 BoostItemQuantity = 0;
 	if (GetBoostMaterial(BoostType, BoostItemID, BoostItemQuantity))
 	{
 		OutPreview.BoostItemID = BoostItemID;
 		OutPreview.BoostItemQuantity = BoostItemQuantity;
-	}
-
-	if (!ModificationCurveTable)
-	{
-		OutResult = EPDModificationResult::MissingCurveTable;
-		return false;
 	}
 
 	OutResult = EPDModificationResult::Success;
@@ -232,7 +550,6 @@ bool UPDEquipmentModificationComponent::HasRequiredMaterials(const UPDInventoryC
 	return true;
 }
 
-
 bool UPDEquipmentModificationComponent::HasRequiredMaterialSlot(const UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const
 {
 	if (!InventoryComponent)
@@ -251,16 +568,16 @@ bool UPDEquipmentModificationComponent::HasRequiredMaterialSlot(const UPDInvento
 	}
 
 	const FPDInventorySlot& MaterialSlot = InventoryComponent->Items[MaterialSlotIndex];
-	if (MaterialSlot.IsEmpty())
+	if (!IsUpgradeMaterialSlot(MaterialSlot))
 	{
 		return false;
 	}
 
 	for (const FPDModificationMaterialRequirement& Material : Materials)
 	{
-		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID)
 		{
-			return true;
+			return InventoryComponent->HasItem(Material.RequiredItemID, Material.Quantity);
 		}
 	}
 
@@ -269,7 +586,7 @@ bool UPDEquipmentModificationComponent::HasRequiredMaterialSlot(const UPDInvento
 
 bool UPDEquipmentModificationComponent::ConsumeRequiredMaterials(UPDInventoryComponent* InventoryComponent, const TArray<FPDModificationMaterialRequirement>& Materials) const
 {
-	if (!InventoryComponent)
+	if (!InventoryComponent || !HasRequiredMaterials(InventoryComponent, Materials))
 	{
 		return false;
 	}
@@ -284,7 +601,6 @@ bool UPDEquipmentModificationComponent::ConsumeRequiredMaterials(UPDInventoryCom
 
 	return true;
 }
-
 
 bool UPDEquipmentModificationComponent::ConsumeRequiredMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 MaterialSlotIndex, const TArray<FPDModificationMaterialRequirement>& Materials) const
 {
@@ -301,9 +617,9 @@ bool UPDEquipmentModificationComponent::ConsumeRequiredMaterialSlot(UPDInventory
 	const FPDInventorySlot& MaterialSlot = InventoryComponent->Items[MaterialSlotIndex];
 	for (const FPDModificationMaterialRequirement& Material : Materials)
 	{
-		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID && MaterialSlot.Quantity >= Material.Quantity)
+		if (MaterialSlot.ItemData.ItemID == Material.RequiredItemID)
 		{
-			return InventoryComponent->RemoveItemFromSlot(MaterialSlotIndex, Material.Quantity);
+			return InventoryComponent->RemoveItem(Material.RequiredItemID, Material.Quantity);
 		}
 	}
 
@@ -346,16 +662,9 @@ bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithBoost(UPDInven
 		return false;
 	}
 
-	if (!OutPreview.BoostItemID.IsNone() && OutPreview.BoostItemQuantity > 0 && !InventoryComponent->HasItem(OutPreview.BoostItemID, OutPreview.BoostItemQuantity))
-	{
-		OutResult = EPDModificationResult::NotEnoughMaterials;
-		return false;
-	}
-
 	OutResult = EPDModificationResult::Success;
 	return true;
 }
-
 
 bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithMaterialSlot(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, EPDModificationBoostType BoostType, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const
 {
@@ -368,6 +677,33 @@ bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithMaterialSlot(U
 	{
 		OutResult = EPDModificationResult::NotEnoughMaterials;
 		return false;
+	}
+
+	OutResult = EPDModificationResult::Success;
+	return true;
+}
+
+bool UPDEquipmentModificationComponent::CanModifyInventorySlotWithMaterialAndBoostSlots(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, int32 BoostSlotIndex, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult) const
+{
+	EPDModificationBoostType BoostType = EPDModificationBoostType::None;
+	FName BoostItemID = NAME_None;
+	int32 BoostQuantity = 0;
+	if (BoostSlotIndex != INDEX_NONE && !IsValidBoostSlot(InventoryComponent, BoostSlotIndex, BoostType, BoostItemID, BoostQuantity))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		return false;
+	}
+
+	if (!CanModifyInventorySlotWithMaterialSlot(InventoryComponent, InventorySlotIndex, MaterialSlotIndex, BoostType, OutPreview, OutResult))
+	{
+		return false;
+	}
+
+	if (!BoostItemID.IsNone())
+	{
+		OutPreview.SelectedBoostType = BoostType;
+		OutPreview.BoostItemID = BoostItemID;
+		OutPreview.BoostItemQuantity = BoostQuantity;
 	}
 
 	OutResult = EPDModificationResult::Success;
@@ -410,7 +746,6 @@ bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithBoost(UPDInven
 
 	const bool bSuccess = FMath::FRand() <= OutPreview.SuccessRate;
 	FPDInventorySlot& Slot = InventoryComponent->Items[InventorySlotIndex];
-
 	if (bSuccess)
 	{
 		Slot.ModificationLevel = OutPreview.TargetModificationLevel;
@@ -457,7 +792,52 @@ bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithMaterialSlot(U
 
 	const bool bSuccess = FMath::FRand() <= OutPreview.SuccessRate;
 	FPDInventorySlot& Slot = InventoryComponent->Items[InventorySlotIndex];
+	if (bSuccess)
+	{
+		Slot.ModificationLevel = OutPreview.TargetModificationLevel;
+		OutResult = EPDModificationResult::Success;
+	}
+	else
+	{
+		OutResult = EPDModificationResult::FailedByChance;
+	}
 
+	InventoryComponent->OnInventoryChanged.Broadcast();
+	OnModificationFinished.Broadcast(InventorySlotIndex, Slot.ModificationLevel, bSuccess, OutResult);
+	return bSuccess;
+}
+
+bool UPDEquipmentModificationComponent::TryModifyInventorySlotWithMaterialAndBoostSlots(UPDInventoryComponent* InventoryComponent, int32 InventorySlotIndex, int32 MaterialSlotIndex, int32 BoostSlotIndex, FPDModificationPreview& OutPreview, EPDModificationResult& OutResult)
+{
+	if (!CanModifyInventorySlotWithMaterialAndBoostSlots(InventoryComponent, InventorySlotIndex, MaterialSlotIndex, BoostSlotIndex, OutPreview, OutResult))
+	{
+		OnModificationFinished.Broadcast(InventorySlotIndex, 0, false, OutResult);
+		return false;
+	}
+
+	if (!InventoryComponent->SpendGold(OutPreview.GoldCost))
+	{
+		OutResult = EPDModificationResult::NotEnoughGold;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	if (!ConsumeRequiredMaterialSlot(InventoryComponent, MaterialSlotIndex, OutPreview.RequiredMaterials))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	if (!OutPreview.BoostItemID.IsNone() && OutPreview.BoostItemQuantity > 0 && !InventoryComponent->RemoveItemFromSlot(BoostSlotIndex, OutPreview.BoostItemQuantity))
+	{
+		OutResult = EPDModificationResult::NotEnoughMaterials;
+		OnModificationFinished.Broadcast(InventorySlotIndex, InventoryComponent->Items[InventorySlotIndex].ModificationLevel, false, OutResult);
+		return false;
+	}
+
+	const bool bSuccess = FMath::FRand() <= OutPreview.SuccessRate;
+	FPDInventorySlot& Slot = InventoryComponent->Items[InventorySlotIndex];
 	if (bSuccess)
 	{
 		Slot.ModificationLevel = OutPreview.TargetModificationLevel;

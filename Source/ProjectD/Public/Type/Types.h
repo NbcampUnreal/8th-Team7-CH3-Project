@@ -121,6 +121,27 @@ struct FPDItemData : public FTableRowBase
 	float UseDuration = 0.f;
 };
 
+/**
+ * 무기 인스턴스의 휘발성 런타임 상태 — 인벤토리/장비/퀵슬롯 사이를 이동할 때 보존되어야 함.
+ * 액터(`APDRangedWeaponBase`)는 스왑 시 destroy/spawn 되므로 이 구조체가 영속 매개체.
+ * CurrentAmmo = -1 은 "아직 저장된 값 없음" 센티넬 — spawn 측이 기본(풀충탄) 동작 유지.
+ */
+USTRUCT(BlueprintType)
+struct FPDWeaponInstanceState
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int32 CurrentAmmo = -1;
+
+	bool HasPersistedAmmo() const { return CurrentAmmo >= 0; }
+
+	void Reset()
+	{
+		CurrentAmmo = -1;
+	}
+};
+
 USTRUCT(BlueprintType)
 struct FPDInventorySlot
 {
@@ -138,6 +159,9 @@ struct FPDInventorySlot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int32 ModificationLevel = 0;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FPDWeaponInstanceState WeaponState;
+
 	bool IsEmpty() const
 	{
 		return bIsEmpty || Quantity <= 0 || ItemData.ItemID.IsNone();
@@ -149,6 +173,7 @@ struct FPDInventorySlot
 		Quantity = 0;
 		bIsEmpty = true;
 		ModificationLevel = 0;
+		WeaponState.Reset();
 	}
 };
 

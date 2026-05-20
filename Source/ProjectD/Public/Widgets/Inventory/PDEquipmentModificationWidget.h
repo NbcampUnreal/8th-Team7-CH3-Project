@@ -16,6 +16,7 @@ class UVerticalBox;
 class UPDInventoryComponent;
 class UPDEquipmentListItemWidget;
 class UPDInventorySlotWidget;
+class UPDInventoryDragDropOperation;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDEquipmentModificationWidget : public UUserWidget
@@ -40,6 +41,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	void SelectMaterialSlot(int32 SlotIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
+	void SelectBoostSlot(int32 SlotIndex);
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Equipment Modification")
 	void SetInventoryFilter(EPDItemType ItemType);
@@ -84,6 +88,8 @@ private:
 	void SelectFirstEquipmentSlotIfNeeded();
 	void RefreshSelectedSlots();
 	void ClearPreview();
+	bool IsRegisteredBoostItem(FName ItemID) const;
+	bool TryAutoSelectInventoryItem(int32 SlotIndex);
 	void ApplyPreview(const FPDModificationPreview& Preview, const FPDInventorySlot& SlotData);
 	void RefreshMaterialList(const FPDModificationPreview& Preview);
 	void SetText(UTextBlock* TextBlock, const FText& Text) const;
@@ -107,6 +113,9 @@ private:
 
 	UFUNCTION()
 	void HandleInventorySlotClicked(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
+
+	UFUNCTION()
+	void HandleSelectionSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
 	UFUNCTION()
 	void HandleEquipmentTabClicked();
@@ -146,6 +155,12 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
 	TObjectPtr<UPDInventorySlotWidget> MaterialSlotWidget;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UPDInventorySlotWidget> BoostSlotWidget;
+
+	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
+	TObjectPtr<UPDInventorySlotWidget> BoostMaterialSlotWidget;
 
 	UPROPERTY(BlueprintReadOnly, meta = (BindWidgetOptional, AllowPrivateAccess = "true"), Category = "PD|Equipment Modification|Widget")
 	TObjectPtr<UImage> Image_SelectedItemIcon;
@@ -218,6 +233,7 @@ private:
 
 	int32 SelectedSlotIndex = INDEX_NONE;
 	int32 SelectedMaterialSlotIndex = INDEX_NONE;
+	int32 SelectedBoostSlotIndex = INDEX_NONE;
 	EPDItemType CurrentInventoryFilter = EPDItemType::Equipment;
 	EPDModificationBoostType SelectedBoostType = EPDModificationBoostType::None;
 	FPDModificationPreview CurrentPreview;
