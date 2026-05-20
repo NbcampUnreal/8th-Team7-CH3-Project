@@ -7,6 +7,10 @@
 
 class UBoxComponent;
 class UPDMarketComponent;
+class APDMarketActor;
+class APDPlayerController;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDMarketStateChangedSignature, APDMarketActor*, MarketActor);
 
 UCLASS(Blueprintable)
 class PROJECTD_API APDMarketActor : public AActor, public IPDInteractable
@@ -17,10 +21,17 @@ public:
 	APDMarketActor();
 
 	virtual void OnConstruction(const FTransform& Transform) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Interact_Implementation(AActor* Interactor) override;
 
 	UFUNCTION(BlueprintPure, Category = "PD|Market")
 	UPDMarketComponent* GetMarketComponent() const { return MarketComponent; }
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Market|Events")
+	FPDMarketStateChangedSignature OnMarketOpened;
+
+	UPROPERTY(BlueprintAssignable, Category = "PD|Market|Events")
+	FPDMarketStateChangedSignature OnMarketClosed;
 
 protected:
 	virtual void BeginPlay() override;
@@ -32,4 +43,9 @@ protected:
 	TObjectPtr<UPDMarketComponent> MarketComponent;
 private:
 	void ConfigureInteractionCollision() const;
+	void BindMarketClose(APDPlayerController* PlayerController);
+	void UnbindMarketClose();
+	void HandleMarketInterfaceClosed(UPDMarketComponent* ClosedMarketComponent);
+
+	TWeakObjectPtr<APDPlayerController> BoundPlayerController;
 };

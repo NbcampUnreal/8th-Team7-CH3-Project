@@ -36,6 +36,7 @@ enum class EWidgetInputMode : uint8;
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDStashInterfaceClosedSignature, UPDStashComponent*);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature,  UPDLootComponent*);
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDMarketInterfaceClosedSignature, UPDMarketComponent*);
 DECLARE_MULTICAST_DELEGATE(FPDEquipmentModificationInterfaceClosedSignature);
 
 
@@ -51,6 +52,7 @@ public:
 	void RequestExtraction();
 
 	FPDStashInterfaceClosedSignature OnStashInterfaceClosed;
+	FPDMarketInterfaceClosedSignature OnMarketInterfaceClosed;
 	FPDEquipmentModificationInterfaceClosedSignature OnEquipmentModificationInterfaceClosed;
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Stash")
@@ -91,6 +93,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Market")
 	bool IsMarketInterfaceOpen() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Market")
+	FORCEINLINE UPDMarketComponent* GetActiveMarketComponent() const { return ActiveMarketComponent.Get(); }
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	bool SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity = 1);
@@ -239,7 +244,7 @@ private:
 	TObjectPtr<UPDQuestWindowWidget> QuestWindowWidgetInstance;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UPDMarketComponent> ActiveMarketComponent;
+	TWeakObjectPtr<UPDMarketComponent> ActiveMarketComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDHUDWidget> HUDInstance;
