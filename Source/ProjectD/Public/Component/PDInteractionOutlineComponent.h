@@ -4,7 +4,11 @@
 #include "Components/ActorComponent.h"
 #include "PDInteractionOutlineComponent.generated.h"
 
+class AActor;
 class APawn;
+class UMaterialInstanceDynamic;
+class UMaterialInterface;
+class UMeshComponent;
 class UPrimitiveComponent;
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
@@ -23,15 +27,27 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Interaction|Outline")
 	bool IsOutlineEnabled() const { return bOutlineEnabled; }
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Interaction|Outline")
+	void RefreshOutlineTargets();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Interaction|Outline")
-	int32 StencilValue = 1;
+	TObjectPtr<UMaterialInterface> OutlineMaterial;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Interaction|Outline", meta = (ClampMin = "0.0"))
+	float OutlineIntensity = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Interaction|Outline", meta = (ClampMin = "0.0"))
+	float OutlineThickness = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Interaction|Outline")
 	bool bOnlyLocalPlayer = true;
+
+	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category = "PD|Interaction|Outline")
+	TArray<TObjectPtr<AActor>> OutlineTargetActors;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Interaction|Outline")
 	bool bApplyToChildActors = false;
@@ -46,15 +62,19 @@ private:
 	void BindTrigger();
 	void UnbindTrigger();
 	bool IsValidInteractor(AActor* Actor) const;
-	void CachePrimitiveRenderState(TArray<UPrimitiveComponent*>& OutComponents) const;
+	void ApplyOverlayMaterial();
+	void CacheMeshComponents(TArray<UMeshComponent*>& OutComponents) const;
+	void AppendActorMeshComponents(AActor* Actor, TArray<UMeshComponent*>& OutComponents, TSet<TWeakObjectPtr<UMeshComponent>>& AddedComponents) const;
 	void ResetOverlapState();
+	void UpdateOutlineParameters();
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPrimitiveComponent> TriggerComponent;
 
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> OutlineMID;
+
 	TSet<TWeakObjectPtr<APawn>> OverlappingPawns;
-	TMap<TWeakObjectPtr<UPrimitiveComponent>, bool> PreviousCustomDepthStates;
-	TMap<TWeakObjectPtr<UPrimitiveComponent>, int32> PreviousStencilValues;
 	bool bOutlineEnabled = false;
 	bool bTriggerBound = false;
 };

@@ -7,6 +7,7 @@
 
 class UBoxComponent;
 class APDPlayerController;
+class UPDInteractionOutlineComponent;
 class UStaticMeshComponent;
 
 class APDEquipmentModificationActor;
@@ -38,6 +39,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment Modification")
 	TObjectPtr<UStaticMeshComponent> WorkbenchMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Equipment Modification")
+	TObjectPtr<UPDInteractionOutlineComponent> OutlineComponent;
 
 private:
 	void ConfigureInteractionCollision() const;

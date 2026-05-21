@@ -1,6 +1,7 @@
 #include "Items/PDMarketActor.h"
 
 #include "Components/BoxComponent.h"
+#include "Component/PDInteractionOutlineComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDMarketComponent.h"
@@ -15,6 +16,9 @@ APDMarketActor::APDMarketActor()
 	ConfigureInteractionCollision();
 
 	MarketComponent = CreateDefaultSubobject<UPDMarketComponent>(TEXT("MarketComponent"));
+
+	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
+	OutlineComponent->SetupTrigger(InteractionCollision);
 }
 
 void APDMarketActor::BeginPlay()
@@ -22,6 +26,10 @@ void APDMarketActor::BeginPlay()
 	Super::BeginPlay();
 
 	ConfigureInteractionCollision();
+	if (OutlineComponent)
+	{
+		OutlineComponent->SetupTrigger(InteractionCollision);
+	}
 }
 
 void APDMarketActor::EndPlay(const EEndPlayReason::Type EndPlayReason)

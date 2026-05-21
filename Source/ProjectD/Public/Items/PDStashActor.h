@@ -11,6 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPDStashStateChangedSignature, APDSt
 
 class APDPlayerController;
 class UBoxComponent;
+class UPDInteractionOutlineComponent;
 class UPDStashComponent;
 class USoundBase;
 
@@ -44,6 +45,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
 	TObjectPtr<UPDStashComponent> StashComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Stash")
+	TObjectPtr<UPDInteractionOutlineComponent> OutlineComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "PD|Stash|Door")
 	FName DoorBoneName = TEXT("Door_Hinge_01");
