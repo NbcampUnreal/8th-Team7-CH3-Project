@@ -28,12 +28,19 @@ namespace PDBTKeys
 	static const FName HasLOSToTarget    = TEXT("HasLOSToTarget");     // Bool    (Service 가 갱신 — 시야 변화 옵저버 트리거용)
 
 	// ─── Elite: Cover ───
-	static const FName CoverActor        = TEXT("CoverActor");         // Object  (APDCoverBase*; null = 동적 cover 지점)
 	static const FName CoverLocation     = TEXT("CoverLocation");      // Vector  (Actor.SnapLocation 또는 EQS Points 결과)
 	static const FName bHasCoverTarget   = TEXT("bHasCoverTarget");    // Bool
 
-	// ─── Elite: LOS Occlusion / Grenade ───
+	// ─── Elite: LOS Occlusion ───
 	static const FName TimeSinceLastLOS  = TEXT("TimeSinceLastLOS");   // Float   (Service 누적)
-	static const FName LastGrenadeTime   = TEXT("LastGrenadeTime");    // Float   (World time 기준 마지막 투척)
-	static const FName bCanThrowGrenade  = TEXT("bCanThrowGrenade");   // Bool    (Service 가 갱신)
+
+	// ─── Flanking ───
+	static const FName FlankLocation     = TEXT("FlankLocation");      // Vector  (LOS 차단 시 측면 우회 좌표)
+
+	// ─── Friendly Fire ───
+	static const FName bFriendlyInLineOfFire = TEXT("bFriendlyInLineOfFire"); // Bool (사선에 우군 → Flank 트리거)
+
+	// ─── Player Tracking (Service_TrackPlayer) ───
+	static const FName TrackedPlayerLocation = TEXT("TrackedPlayerLocation"); // Vector  (최근접 플레이어 폰 위치)
+	static const FName bHasTrackedPlayer     = TEXT("bHasTrackedPlayer");     // Bool    (추적 범위 내 플레이어 존재 여부)
 }

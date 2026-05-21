@@ -42,16 +42,20 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetLoseSightRadius()             const { return LoseSightRadius; }
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetPeripheralVisionAngleDegrees() const { return PeripheralVisionAngleDegrees; }
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetHearingRange()                const { return HearingRange; }
+	
+	// SightRadius setter
+	UFUNCTION(BlueprintCallable, Category = "PD|Perception") void SetSightRadius(float NewSightRadius) { SightRadius = NewSightRadius; };
+
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float SightRadius = 900.f;
+	float SightRadius = 800.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float LoseSightRadius = SightRadius * 1.3f;
+	float LoseSightRadius = SightRadius + 50.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0", ClampMax = "180.0"))
-	float PeripheralVisionAngleDegrees = 55.f;
+	float PeripheralVisionAngleDegrees = 90.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
 	float SightMaxAge = 4.f;
@@ -61,15 +65,6 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingMaxAge = 3.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectEnemies = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectNeutrals = false;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectFriendlies = false;
 
 private:
 	UFUNCTION()

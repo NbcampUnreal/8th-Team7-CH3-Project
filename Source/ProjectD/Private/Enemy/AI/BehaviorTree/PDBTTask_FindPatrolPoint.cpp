@@ -5,6 +5,7 @@
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Vector.h"
 #include "BehaviorTree/Blackboard/BlackboardKeyType_Float.h"
 #include "Enemy/AI/BehaviorTree/PDBTKeys.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "NavigationSystem.h"
 
 UPDBTTask_FindPatrolPoint::UPDBTTask_FindPatrolPoint()
@@ -31,11 +32,22 @@ EBTNodeResult::Type UPDBTTask_FindPatrolPoint::ExecuteTask(UBehaviorTreeComponen
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
 	if (!NavSys) return EBTNodeResult::Failed;
 
-	const FVector HomeLoc = BB->GetValueAsVector(HomeLocation.SelectedKeyName);
-	const FVector Origin = HomeLoc.IsNearlyZero() ? Pawn->GetActorLocation() : HomeLoc;
+	FVector Origin;
+	float   Radius;
+	if (bWander)
+	{
+		// 자유 배회: Home 무시, 현재 위치 기준 WanderRadius 로 즉시 새 점.
+		Origin = Pawn->GetActorLocation();
+		Radius = WanderRadius;
+	}
+	else
+	{
+		const FVector HomeLoc = BB->GetValueAsVector(HomeLocation.SelectedKeyName);
+		Origin = HomeLoc.IsNearlyZero() ? Pawn->GetActorLocation() : HomeLoc;
 
-	float Radius = BB->GetValueAsFloat(PatrolRadius.SelectedKeyName);
-	if (Radius <= 0.f) Radius = DefaultPatrolRadius;
+		Radius = BB->GetValueAsFloat(PatrolRadius.SelectedKeyName);
+		if (Radius <= 0.f) Radius = DefaultPatrolRadius;
+	}
 
 	FNavLocation Result;
 	if (!NavSys->GetRandomReachablePointInRadius(Origin, Radius, Result))
@@ -43,6 +55,15 @@ EBTNodeResult::Type UPDBTTask_FindPatrolPoint::ExecuteTask(UBehaviorTreeComponen
 		return EBTNodeResult::Failed;
 	}
 
-	BB->SetValueAsVector(OutPatrolPoint.SelectedKeyName, Result.Location);
+	const FName KeyName = OutPatrolPoint.SelectedKeyName;
+	if (BB->GetKeyID(KeyName) == FBlackboard::InvalidKey)
+	{
+		UE_LOG(LogPDAI, Warning,
+			TEXT("[%s] FindPatrolPoint FAIL — Blackboard 자산에 Vector 키 '%s' 없음."),
+			*Pawn->GetName(), *KeyName.ToString());
+		return EBTNodeResult::Failed;
+	}
+
+	BB->SetValueAsVector(KeyName, Result.Location);
 	return EBTNodeResult::Succeeded;
 }

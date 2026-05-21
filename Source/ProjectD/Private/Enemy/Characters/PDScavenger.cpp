@@ -1,12 +1,14 @@
 #include "Enemy/Characters/PDScavenger.h"
 
-#include "Animation/AnimMontage.h"
+#include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/PDAnimInstance.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
 #include "Enemy/Components/PDCombatComponent.h"
-#include "Enemy/Interfaces/PDCombatInterface.h"
-#include "GameFramework/Character.h"
-#include "Interfaces/PDDamageable.h"
+#include "GameplayTag/PDGameplayTags.h"
+#include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 
 APDScavenger::APDScavenger()
 {
@@ -17,91 +19,139 @@ void APDScavenger::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Soldier 와 동일 흐름: CombatComponent 가 보낸 공격 의도 → 자체 몽타주 재생.
+	// 무기 타입 태그 변경 시 AnimLayer 변경
+	if (ASC)
+	{
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Melee,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDScavenger::OnWeaponTypeTagChanged);
+	}
+	LinkDefaultAnimLayer();
+
+	SpawnAndEquipDefaultWeapon();
+
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
 		Combat->OnAttackRequested.AddDynamic(this, &APDScavenger::HandleAttackRequested);
 	}
 }
 
-void APDScavenger::HandleAttackRequested(AActor* Target)
+void APDScavenger::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
 {
-	// 트레이스 시점에 다시 조회하지 않도록 공격 의도 시점의 타겟을 약참조로 보관.
-	CachedAttackTarget = Target;
+	if (NewCount == 0) return;
 
-	if (!bAutoPlayMontageOnAttackRequested) return;
+	APDWeaponBase* CurWeapon = GetCurrentWeapon();
+	if (!IsValid(CurWeapon)) return;
+
+	TSubclassOf<UAnimInstance> LayerClass = CurWeapon->GetWeaponAnimLayerClass();
+	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
+
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(LayerClass);
+	}
 }
 
-void APDScavenger::PerformMeleeTrace()
+void APDScavenger::LinkDefaultAnimLayer()
 {
-	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!DefaultAnimLayerClass) return;
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
+	}
+}
+
+void APDScavenger::OnEnterState_Dead()
+{
+	// 무기 → 시체 Stash 이전은 EnemyBase::OnEnterState_Dead 안의 TryDropEquippedWeaponToCorpse 가
+	// WeaponDropChance 확률로 처리. 본 클래스는 무기 액터 정리만 담당.
+	Super::OnEnterState_Dead();
+
+	if (!EquippedWeapon) return;
+
+	EquippedWeapon->OnUnequip();
+	EquippedWeapon->Destroy();
+	EquippedWeapon = nullptr;
+}
+
+FName APDScavenger::GetEquippedWeaponItemID_Implementation() const
+{
+	return EquippedWeapon ? EquippedWeapon->GetItemID() : NAME_None;
+}
+
+void APDScavenger::SpawnAndEquipDefaultWeapon()
+{
+	if (!DefaultWeaponClass) return;
+
 	UWorld* World = GetWorld();
-	if (!MeshComp || !World) return;
+	if (!World) return;
 
-	const FVector Start = MeshComp->DoesSocketExist(MeleeSocketName)
-		? MeshComp->GetSocketLocation(MeleeSocketName)
-		: GetActorLocation();
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = this;
+	SpawnParams.Instigator = this;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// 기본은 정면. 캐시된 타겟의 head 소켓이 있으면 그쪽으로 보정.
-	FVector Direction = GetActorForwardVector();
-	if (const ACharacter* TargetChar = Cast<ACharacter>(CachedAttackTarget.Get()))
+	APDWeaponBase* NewWeapon = World->SpawnActor<APDWeaponBase>(
+		DefaultWeaponClass,
+		GetActorLocation(),
+		GetActorRotation(),
+		SpawnParams);
+
+	if (!NewWeapon) return;
+
+	SetEquippedWeapon(NewWeapon, /*bDestroyPrevious=*/true);
+}
+
+void APDScavenger::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevious)
+{
+	if (EquippedWeapon == NewWeapon) return;
+
+	UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
+	if (EquippedWeapon)
 	{
-		const USkeletalMeshComponent* TargetMesh = TargetChar->GetMesh();
-		if (TargetMesh && TargetMesh->DoesSocketExist(TargetHeadSocketName))
+		// 무기 타입 태그 제거 — AnimInstance.WeaponType 캐시가 None 으로 복귀.
+		if (ASC)
 		{
-			const FVector ToHead = TargetMesh->GetSocketLocation(TargetHeadSocketName) - Start;
-			if (!ToHead.IsNearlyZero())
-			{
-				Direction = ToHead.GetSafeNormal();
-			}
+			ASC->RemoveLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
 		}
-	}
-	const FVector End = Start + Direction * MeleeTraceDistance;
-
-	TArray<FHitResult> Hits;
-	const FCollisionShape Sphere = FCollisionShape::MakeSphere(MeleeTraceRadius);
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(PD_ScavengerMelee), false, this);
-	Params.AddIgnoredActor(this);
-
-	const bool bHit = World->SweepMultiByObjectType(
-		Hits,
-		Start,
-		End,
-		FQuat::Identity,
-		FCollisionObjectQueryParams(ECC_Pawn),
-		Sphere,
-		Params);
-
-	if (!bHit) return;
-
-	const uint8 OwnTeam = TeamID;
-
-	// 한 번의 스윕에서 동일 액터 중복 인가 방지.
-	TSet<AActor*> AlreadyHit;
-	AlreadyHit.Add(this);
-
-	for (const FHitResult& Hit : Hits)
-	{
-		AActor* Target = Hit.GetActor();
-		if (!Target) continue;
-		if (AlreadyHit.Contains(Target)) continue;
-		AlreadyHit.Add(Target);
-
-		// 같은 팀(아군) 제외.
-		if (Target->Implements<UPDCombatInterface>()
-			&& IPDCombatInterface::Execute_GetTeamID(Target) == OwnTeam)
+		if (AnimInst)
 		{
-			continue;
+			AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
 		}
 
-		if (!Target->Implements<UPDDamageable>()) continue;
-		if (!IPDDamageable::Execute_IsAlive(Target)) continue;
-
-		FPDDamageInfo Info;
-		Info.BaseDamage = MeleeDamage;
-		Info.Instigator = this;
-		Info.DamageTypeClass = MeleeDamageTypeClass;
-		Info.HitResult = Hit;
-		IPDDamageable::Execute_ApplyDamage(Target, Info);
+		EquippedWeapon->OnUnequip();
+		if (bDestroyPrevious)
+		{
+			EquippedWeapon->Destroy();
+		}
 	}
+
+	EquippedWeapon = NewWeapon;
+
+	if (EquippedWeapon)
+	{
+		AttachActorToWeaponSocket(EquippedWeapon);
+		EquippedWeapon->OnEquip(this);
+
+		// AnimInstance 가 ASC 태그를 보고 WeaponType/bIsMelee 를 결정.
+		if (ASC)
+		{
+			ASC->AddLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
+		}
+	}
+}
+
+void APDScavenger::HandleAttackRequested(AActor* /*Target*/)
+{
+	if (!bAutoFireOnAttackRequested) return;
+
+	// 상태 게이트 — BT 가 Combat 분기에서 SetEnemyState(Combat) 호출했을 때만 휘두름.
+	// Idle/Alert/Chase 단계에서 우발적 RequestAttack 이 와도 무시 (Soldier 의 OnFireTick 게이트와 동일 정책).
+	if (GetEnemyState() != EPDEnemyState::Combat) return;
+
+	if (!EquippedWeapon) return;
+	if (!ASC || !MeleeAttackAbilityClass) return;
+
+	// Ability 활성화 — 몽타주 재생/Anim Notify 대기/sweep/데미지 인가는 GA 내부에서 처리.
+	// 디자이너 노트: BP_PDScavenger 의 ActiveAbilities 배열에 같은 클래스가 등록돼 있어야 GiveAbility 됨.
+	ASC->TryActivateAbilityByClass(MeleeAttackAbilityClass);
 }
