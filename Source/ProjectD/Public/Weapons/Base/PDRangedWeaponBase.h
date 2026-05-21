@@ -55,6 +55,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon") bool  IsFullAuto()         const { return bFullAuto; }
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetAvailableAmmoCount() const;
 	UFUNCTION(BlueprintPure, Category="Weapon") int32 GetReserveAmmo() const { return ReserveAmmo; }
+	UFUNCTION(BlueprintPure,     Category="Weapon") bool HasInfiniteAmmo() const   { return bInfiniteAmmo; }
+	UFUNCTION(BlueprintCallable, Category="Weapon") void SetInfiniteAmmo(bool bEnabled) { bInfiniteAmmo = bEnabled; }
 
 	UFUNCTION(BlueprintCallable, Category="Weapon")
 	void RefreshAmmoChanged();
@@ -125,6 +127,10 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_IsReloading, VisibleAnywhere, BlueprintReadOnly, Category="Weapon|State")
 	bool bIsReloading = false;
+
+	/** 무한 탄약. true면 장전 모션은 정상 재생되지만 FinishReload에서 인벤토리 무시하고 MaxAmmo로 풀충. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Weapon|State")
+	bool bInfiniteAmmo = false;
 
 
 	bool HasAmmoToReload() const;

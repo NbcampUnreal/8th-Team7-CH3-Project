@@ -7,7 +7,7 @@
 #include "GameplayTagContainer.h"
 #include "PDAnimInstance.generated.h"
 
-class APDPlayerCharacter;
+class APDCharacterBase;
 class APDWeaponBase;
 class APDRangedWeaponBase;
 class UAbilitySystemComponent;
@@ -156,7 +156,7 @@ public:
 
 private:
 	UPROPERTY()
-	TObjectPtr<APDPlayerCharacter> OwnerCharacter;
+	TObjectPtr<APDCharacterBase> OwnerCharacter;
 
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> CachedASC;

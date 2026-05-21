@@ -141,6 +141,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void AttachActorToWeaponSocket(AActor* ActorToAttach);
 
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
+	virtual APDWeaponBase* GetCurrentWeapon() const { return nullptr; }
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
 	void OnDeath(AActor* Killer);
 

@@ -23,6 +23,8 @@
 #include "InputCoreTypes.h"
 #include "Widgets/Inventory/PDInventoryWidget.h"
 #include "Widgets/Inventory/PDStashWidget.h"
+#include "Widgets/Inventory/PDLootWidget.h"
+#include "Items/PDLootComponent.h"
 #include "Widgets/Inventory/PDMarketWidget.h"
 #include "Widgets/Quest/PDQuestWindowWidget.h"
 #include "Items/PDMarketComponent.h"
@@ -567,6 +569,64 @@ bool APDPlayerController::IsStashInterfaceOpen() const
 UPDStashComponent* APDPlayerController::GetActiveStashComponent() const
 {
 	return UIManagerComponent ? UIManagerComponent->GetActiveStashComponent() : nullptr;
+}
+
+// ─── LootBox 인터페이스 ──────────────────────────────────────────────
+// codex 브랜치는 InventoryWidget 라이프사이클을 UIManager 로 위임하므로 develop 구현을 단순화 —
+// LootWidget 만 PlayerController 가 직접 다루고, 입력 차단은 기존 헬퍼 재사용.
+void APDPlayerController::OpenLootInterface(UPDLootComponent* LootSource)
+{
+	if (!LootWidgetClass || !LootSource)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("OpenLootInterface: missing widget class or source"));
+		return;
+	}
+
+	// 다른 모달 UI 가 같은 viewport 영역을 점유하므로 먼저 닫음.
+	if (IsStashInterfaceOpen())  CloseStashInterface();
+	if (IsMarketInterfaceOpen()) CloseMarketInterface();
+
+	ActiveLootComponent = LootSource;
+
+	if (!LootWidgetInstance || !LootWidgetInstance->IsInViewport())
+	{
+		LootWidgetInstance = CreateWidget<UPDLootWidget>(this, LootWidgetClass);
+		if (LootWidgetInstance)
+		{
+			LootWidgetInstance->InitializeLoot(LootSource);
+			LootWidgetInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		LootWidgetInstance->InitializeLoot(LootSource);
+	}
+
+	SetGameplayInputBlockedByModalUI(true, LootWidgetInstance);
+}
+
+void APDPlayerController::CloseLootInterface()
+{
+	UPDLootComponent* ClosingLootComponent = ActiveLootComponent.Get();
+
+	if (LootWidgetInstance && LootWidgetInstance->IsInViewport())
+	{
+		LootWidgetInstance->RemoveFromParent();
+	}
+	LootWidgetInstance = nullptr;
+	ActiveLootComponent.Reset();
+
+	if (ClosingLootComponent)
+	{
+		OnLootInterfaceClosed.Broadcast(ClosingLootComponent);
+	}
+
+	SetGameplayInputBlockedByModalUI(false);
+}
+
+bool APDPlayerController::IsLootInterfaceOpen() const
+{
+	return LootWidgetInstance && LootWidgetInstance->IsInViewport();
 }
 
 bool APDPlayerController::SellInventorySlotToActiveMarket(int32 SlotIndex, int32 Quantity)

@@ -1,6 +1,6 @@
 #include "Animation/PDAnimInstance.h"
 #include "AbilitySystemBlueprintLibrary.h"
-#include "Characters/PDPlayerCharacter.h"
+#include "Characters/Base/PDCharacterBase.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTag/PDGameplayTags.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -10,7 +10,8 @@
 void UPDAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
-	OwnerCharacter=Cast<APDPlayerCharacter>(GetOwningActor());
+	// Player/Enemy 공통 베이스로 캐스팅: AnimBP를 양쪽이 공유 가능
+	OwnerCharacter=Cast<APDCharacterBase>(GetOwningActor());
 	if (IsValid(OwnerCharacter))
 		CachedASC=UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(OwnerCharacter);
 }
@@ -33,10 +34,12 @@ void UPDAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Cache.AimPitch=0.f;
 	Cache.bIsDowned=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Downed);
 	Cache.bIsSprinting=CachedASC->HasMatchingGameplayTag(PDGameplayTags::State_Sprinting);
-	Cache.WeaponType=OwnerCharacter->GetReplicatedWeaponType();
-	Cache.bIsMeleeEquipped=Cache.WeaponType == EWeaponType::Melee;
 
 	APDWeaponBase* Weapon=OwnerCharacter->GetCurrentWeapon();
+	// 베이스 캐릭터 기반이므로 무기 자체에서 타입을 읽어 player/enemy 공통 처리
+	Cache.WeaponType=Weapon ? Weapon->GetWeaponType() : EWeaponType::None;
+	Cache.bIsMeleeEquipped=Cache.WeaponType == EWeaponType::Melee;
+
 	if (!IsValid(Weapon)||!IsValid(Weapon->GetWeaponMesh()))
 	{
 		Cache.LeftHandIKAlpha=0.f;

@@ -16,6 +16,8 @@ class UPDInputConfig;
 class UPDInventoryWidget;
 class UPDStashWidget;
 class UPDStashComponent;
+class UPDLootWidget;
+class UPDLootComponent;
 class UPDMarketWidget;
 class UPDMarketComponent;
 class UPDQuestWindowWidget;
@@ -38,6 +40,7 @@ class UPDWorldMapWidget;
 enum class EWidgetInputMode : uint8;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
+DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComponent*);
 
 UCLASS(abstract)
 class PROJECTD_API APDPlayerController : public APlayerController
@@ -68,6 +71,23 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PD|Stash")
 	UPDStashComponent* GetActiveStashComponent() const;
+
+	// ─── LootBox 인터페이스 ──────────────────────────────────────────────
+	// Stash 와 완전히 분리된 시스템 — UPDLootComponent 백엔드.
+	FPDLootInterfaceClosedSignature OnLootInterfaceClosed;
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	void OpenLootInterface(UPDLootComponent* LootSource);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Loot")
+	void CloseLootInterface();
+
+	UFUNCTION(BlueprintPure, Category = "PD|Loot")
+	bool IsLootInterfaceOpen() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Loot")
+	FORCEINLINE UPDLootComponent* GetActiveLootComponent() const { return ActiveLootComponent.Get(); }
+	// ─── LootBox 인터페이스 끝 ────────────────────────────────────────────
 
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void OpenMarketInterface(UPDMarketComponent* MarketComponent);
@@ -175,6 +195,9 @@ protected:
 	TSubclassOf<UPDStashWidget> StashWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
+	TSubclassOf<UPDLootWidget> LootWidgetClass; // LootBox용
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
 	TSubclassOf<UPDMarketWidget> MarketWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI")
@@ -275,6 +298,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryNotificationComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDLootWidget> LootWidgetInstance;
+
+	// OpenLootInterface 시 캐시. 박스가 파괴되어도 TWeakObjectPtr가 자동 무효화.
+	TWeakObjectPtr<UPDLootComponent> ActiveLootComponent;
 
 
 
