@@ -40,4 +40,8 @@ namespace PDBTKeys
 
 	// ─── Friendly Fire ───
 	static const FName bFriendlyInLineOfFire = TEXT("bFriendlyInLineOfFire"); // Bool (사선에 우군 → Flank 트리거)
+
+	// ─── Player Tracking (Service_TrackPlayer) ───
+	static const FName TrackedPlayerLocation = TEXT("TrackedPlayerLocation"); // Vector  (최근접 플레이어 폰 위치)
+	static const FName bHasTrackedPlayer     = TEXT("bHasTrackedPlayer");     // Bool    (추적 범위 내 플레이어 존재 여부)
 }
