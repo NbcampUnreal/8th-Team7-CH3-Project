@@ -186,12 +186,28 @@ void UPDMainWeaponAmmoWidget::RefreshMetadata()
 		}
 	}
 
-	// 실루엣 자동 해석 비활성화 — 별도 데이터 파이프라인(전용 실루엣 텍스처)으로 추후 구현 예정.
-	// 그동안 위젯이 인벤토리 아이콘을 그대로 띄우지 않도록 강제 Collapsed.
+	// 실루엣 해석 우선순위: 외부 Override > 무기 BP 의 UISilhouette > Collapsed.
 	if (Image_Silhouette)
 	{
-		Image_Silhouette->SetBrushFromTexture(nullptr);
-		Image_Silhouette->SetVisibility(ESlateVisibility::Collapsed);
+		UTexture2D* Resolved = SilhouetteOverride;
+		if (!Resolved)
+		{
+			if (APDRangedWeaponBase* Weapon = BoundWeapon.Get())
+			{
+				Resolved = Weapon->GetUISilhouette();
+			}
+		}
+
+		if (Resolved)
+		{
+			Image_Silhouette->SetBrushFromTexture(Resolved);
+			Image_Silhouette->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			Image_Silhouette->SetBrushFromTexture(nullptr);
+			Image_Silhouette->SetVisibility(ESlateVisibility::Collapsed);
+		}
 	}
 }
 

@@ -9,6 +9,7 @@
 
 #include "Items/PDInventoryComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/Texture2D.h"
 
 APDWeaponBase::APDWeaponBase()
 {
@@ -147,4 +148,9 @@ FVector APDWeaponBase::GetAimDirectionFromOwner(const FVector& StartLocation) co
 	}
 
 	return AimDir;
+}
+
+UTexture2D* APDWeaponBase::GetUISilhouette() const
+{
+	return UISilhouette.LoadSynchronous();
 }
