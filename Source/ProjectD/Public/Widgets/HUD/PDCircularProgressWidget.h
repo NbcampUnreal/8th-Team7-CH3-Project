@@ -33,6 +33,16 @@ public:
 	UFUNCTION(BlueprintCallable, Category="PD|HUD|Progress")
 	void CompleteProgress();
 
+	// 외부 push 모드 시작 — 게이지 visible, NativeTick 자동 진행 OFF.
+	// 진행률은 호출자가 PushExternalProgress() 로 매번 갱신.
+	UFUNCTION(BlueprintCallable, Category="PD|HUD|Progress")
+	void StartExternalDriven();
+
+	// 외부 모드일 때만 동작. Progress01 은 0~1 클램프됨.
+	// OptionalRemainingSeconds 가 0 이상이면 Text_Remaining 도 갱신.
+	UFUNCTION(BlueprintCallable, Category="PD|HUD|Progress")
+	void PushExternalProgress(float Progress01, float OptionalRemainingSeconds = -1.f);
+
 	UFUNCTION(BlueprintPure, Category="PD|HUD|Progress")
 	bool IsRunning() const { return bRunning; }
 
@@ -87,4 +97,5 @@ private:
 	float StartTime = 0.f;
 	float Duration = 0.f;
 	bool  bRunning = false;
+	bool  bExternalDriven = false;
 };

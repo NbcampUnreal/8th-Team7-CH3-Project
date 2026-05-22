@@ -48,6 +48,11 @@ void UPDCircularProgressWidget::NativeTick(const FGeometry& MyGeometry, float In
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
+	if (bExternalDriven)
+	{
+		return;
+	}
+
 	if (!bRunning)
 	{
 		return;
@@ -88,6 +93,7 @@ void UPDCircularProgressWidget::StartProgress(float InDuration)
 	Duration = InDuration;
 	StartTime = World->GetTimeSeconds();
 	bRunning = true;
+	bExternalDriven = false;
 
 	SetProgressScalar(0.f);
 	UpdateRemainingText(Duration);
@@ -98,6 +104,7 @@ void UPDCircularProgressWidget::StartProgress(float InDuration)
 void UPDCircularProgressWidget::StopProgress()
 {
 	bRunning = false;
+	bExternalDriven = false;
 	Duration = 0.f;
 	SetVisibility(ESlateVisibility::Collapsed);
 }
@@ -105,8 +112,37 @@ void UPDCircularProgressWidget::StopProgress()
 void UPDCircularProgressWidget::CompleteProgress()
 {
 	bRunning = false;
+	bExternalDriven = false;
 	SetProgressScalar(1.f);
 	SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void UPDCircularProgressWidget::StartExternalDriven()
+{
+	EnsureMID();
+
+	bRunning = false;
+	bExternalDriven = true;
+	Duration = 0.f;
+
+	SetProgressScalar(0.f);
+	RefreshCancelHint();
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+}
+
+void UPDCircularProgressWidget::PushExternalProgress(float Progress01, float OptionalRemainingSeconds)
+{
+	if (!bExternalDriven)
+	{
+		return;
+	}
+
+	SetProgressScalar(FMath::Clamp(Progress01, 0.f, 1.f));
+
+	if (OptionalRemainingSeconds >= 0.f)
+	{
+		UpdateRemainingText(OptionalRemainingSeconds);
+	}
 }
 
 void UPDCircularProgressWidget::EnsureMID()
