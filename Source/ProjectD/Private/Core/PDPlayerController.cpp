@@ -64,6 +64,14 @@ void APDPlayerController::RequestExtraction()
 	}
 }
 
+void APDPlayerController::Server_RequestBaseTravel_Implementation()
+{
+	if (APDGameMode* GM = GetWorld()->GetAuthGameMode<APDGameMode>())
+	{
+		GM->NotifyPlayerReadyForTravel(this);
+	}
+}
+
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);

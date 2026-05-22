@@ -24,3 +24,20 @@ struct PROJECTD_API FPDRaidStats
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Raid")
 	int32 ItemDelta = 0;
 };
+
+// 결산 위젯이 per-player로 받는 단위. 멀티 환경에서 PC당 1 entry.
+// 멀티 머지 후 APDPlayerState 의 Stats / bSurvived 를 그대로 채워 전달.
+USTRUCT(BlueprintType)
+struct PROJECTD_API FPDPlayerRaidEntryData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite, Category = "PD|Raid")
+	FString PlayerName;
+
+	UPROPERTY(BlueprintReadWrite, Category = "PD|Raid")
+	bool bSurvived = false;
+
+	UPROPERTY(BlueprintReadWrite, Category = "PD|Raid")
+	FPDRaidStats Stats;
+};

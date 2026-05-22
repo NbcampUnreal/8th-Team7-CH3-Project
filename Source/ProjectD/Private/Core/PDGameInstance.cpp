@@ -127,7 +127,18 @@ void UPDGameInstance::TravelToLevel(TSoftObjectPtr<UWorld> Level, bool bMarkBase
 		return;
 	}
 	if (bMarkBaseResetPending) bPendingResetToBase=true;
-	UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
+
+	UWorld* World = GetWorld();
+	const ENetMode NetMode = World ? World->GetNetMode() : NM_Standalone;
+
+	if (NetMode == NM_DedicatedServer || NetMode == NM_ListenServer)
+	{
+		World->ServerTravel(Level.ToSoftObjectPath().GetLongPackageName());
+	}
+	else
+	{
+		UGameplayStatics::OpenLevelBySoftObjectPtr(this, Level);
+	}
 }
 
 bool UPDGameInstance::HostHamachiGame(TSoftObjectPtr<UWorld> Level, int32 Port)

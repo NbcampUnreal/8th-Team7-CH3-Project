@@ -101,8 +101,16 @@ void APDGameMode::EndRaid(bool bSuccess)
 
 	if (GI) GI->SaveToDisk();
 
-	// BP 연출 훅 — BP에서 결과 UI + OpenLevel 처리
+	// BP 연출 훅 — BP에서 결과 UI 표시. 트래블은 ACK 게이트로 위임.
 	OnRaidEnded(bSuccess);
+
+	// 모든 PC가 ACK하거나 타임아웃 시 ServerTravel. 둘 중 빠른 쪽이 발동.
+	GetWorldTimerManager().SetTimer(
+		TravelTimeoutTimerHandle,
+		this,
+		&APDGameMode::OnTravelTimeoutExpired,
+		TravelGateTimeoutSeconds,
+		false);
 }
 
 void APDGameMode::OnPlayerDied(APlayerController* PC, AActor* Killer)
@@ -156,7 +164,7 @@ void APDGameMode::TransferPlayerInventoryToStash(APlayerController* PC)
 
 	UPDGameInstance* GI = GetGameInstance<UPDGameInstance>();
 	if (!GI) return;
-	
+
 	TArray<FPDInventorySlot> StashItems = GI->GetStashItems();
 
 	for (const FPDInventorySlot& RaidSlot : Inventory->Items)
@@ -169,4 +177,52 @@ void APDGameMode::TransferPlayerInventoryToStash(APlayerController* PC)
 	FPDPlayerData Data = GI->GetPlayerData();
 	Data.Gold += Inventory->Gold;
 	GI->SetPlayerData(Data);
+}
+
+void APDGameMode::NotifyPlayerReadyForTravel(APlayerController* PC)
+{
+	if (!PC || bTravelStarted) return;
+
+	ReadyPlayersForTravel.AddUnique(PC);
+
+	if (AreAllPlayersReadyForTravel())
+	{
+		RequestBaseTravel();
+	}
+}
+
+bool APDGameMode::AreAllPlayersReadyForTravel() const
+{
+	const AGameStateBase* GS = GetGameState<AGameStateBase>();
+	if (!GS) return false;
+
+	const int32 TotalPlayers = GS->PlayerArray.Num();
+	if (TotalPlayers <= 0) return false;
+
+	int32 ValidReadyCount = 0;
+	for (const TWeakObjectPtr<APlayerController>& WeakPC : ReadyPlayersForTravel)
+	{
+		if (WeakPC.IsValid()) ++ValidReadyCount;
+	}
+	return ValidReadyCount >= TotalPlayers;
+}
+
+void APDGameMode::OnTravelTimeoutExpired()
+{
+	if (bTravelStarted) return;
+	UE_LOG(LogTemp, Warning, TEXT("APDGameMode: Travel gate timeout — forcing ServerTravel"));
+	RequestBaseTravel();
+}
+
+void APDGameMode::RequestBaseTravel()
+{
+	if (bTravelStarted) return;
+	bTravelStarted = true;
+
+	GetWorldTimerManager().ClearTimer(TravelTimeoutTimerHandle);
+
+	if (UPDGameInstance* GI = GetGameInstance<UPDGameInstance>())
+	{
+		GI->TravelToLevel(GI->GetBaseLevel(), /*bMarkBaseResetPending=*/false);
+	}
 }
