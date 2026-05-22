@@ -27,14 +27,11 @@ void APDBuildingFloorVolume::BeginPlay()
     TriggerBox->OnComponentEndOverlap.AddDynamic(this, &APDBuildingFloorVolume::HandleEndOverlap);
 
     AttachComponentsToOverlappingMeshes();
+
+    // 시작 시 박스 안에 이미 있는 캐릭터 직접 체크 (BeginOverlap 이벤트 안 트리거되는 케이스)
     FTimerHandle TimerHandle;
     GetWorldTimerManager().SetTimer(TimerHandle, this, &APDBuildingFloorVolume::CheckInitialPawnOverlap, 0.1f, false);
-    
-    TArray<AActor*> Overlapping;
-    TriggerBox->GetOverlappingActors(Overlapping, AStaticMeshActor::StaticClass());
-    UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] %s Floor=%d : 박스 내 메시 %d개"),
-        *BuildingGroupID.ToString(), FloorLevel, Overlapping.Num());
-}   
+} 
 
 void APDBuildingFloorVolume::AttachComponentsToOverlappingMeshes()
 {
@@ -49,9 +46,6 @@ void APDBuildingFloorVolume::AttachComponentsToOverlappingMeshes()
         return;
     }
 
-    //박스 영역으로 직접 overlap query.
-    //GetOverlappingActors는 컴포넌트의 OverlapEvents에 의존하지만,
-    //World->OverlapMulti는 콜리전 채널만 보고 query하므로 메시쪽 설정 무관.
     TArray<FOverlapResult> Overlaps;
     const FCollisionShape BoxShape = FCollisionShape::MakeBox(TriggerBox->GetScaledBoxExtent());
 
@@ -67,9 +61,6 @@ void APDBuildingFloorVolume::AttachComponentsToOverlappingMeshes()
         BoxShape
     );
 
-    UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] %s Floor=%d Overlap query 결과 %d개"),
-        *BuildingGroupID.ToString(), FloorLevel, Overlaps.Num());
-
     for (const FOverlapResult& Result : Overlaps)
     {
         AActor* MeshActor = Result.GetActor();
@@ -78,7 +69,6 @@ void APDBuildingFloorVolume::AttachComponentsToOverlappingMeshes()
             continue;
         }
 
-        //StaticMeshActor만 잡기. BP 액터에 자식 메시가 있는 경우는 별도 대응 필요.
         if (!MeshActor->IsA(AStaticMeshActor::StaticClass()))
         {
             continue;
@@ -97,36 +87,23 @@ void APDBuildingFloorVolume::AttachComponentsToOverlappingMeshes()
 
         NewComp->InitializeFloorInfo(BuildingGroupID, FloorLevel);
         NewComp->RegisterComponent();
-
-        UE_LOG(LogTemp, Warning, TEXT("[FloorVolume]   부착: %s"), *MeshActor->GetName());
     }
 }
 
 void APDBuildingFloorVolume::HandleBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
-{   
-    UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] %s Floor=%d : %s 진입"),
-        *BuildingGroupID.ToString(), FloorLevel, *GetNameSafe(OtherActor));
-    
+{
     APawn* OverlappingPawn = Cast<APawn>(OtherActor);
     if (!OverlappingPawn || !OverlappingPawn->IsLocallyControlled())
-    {   
-        UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] Pawn 아님 또는 LocallyControlled 아님"));
+    {
         return;
     }
 
-    UPDFloorDetectionComponent* Detection = OverlappingPawn->FindComponentByClass<UPDFloorDetectionComponent>();
-    if (Detection)
+    if (UPDFloorDetectionComponent* Detection = OverlappingPawn->FindComponentByClass<UPDFloorDetectionComponent>())
     {
-        UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] Detection 찾음, 알림 전송"));
         Detection->OnEnteredBuildingFloor(BuildingGroupID, FloorLevel);
     }
-    else
-    {
-        UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] Detection 컴포넌트 없음! 캐릭터 BP에 추가 필요"));
-    }
 
-
-    // 캐릭터 진입 시점에 WP로 늦게 로드된 메시 다시 스캔
+    //캐릭터 진입 시점에 WP로 늦게 로드된 메시 다시 스캔
     AttachComponentsToOverlappingMeshes();
 }
 
@@ -175,12 +152,9 @@ void APDBuildingFloorVolume::CheckInitialPawnOverlap()
             continue;
         }
 
-        UPDFloorDetectionComponent* Detection = OverlappingPawn->FindComponentByClass<UPDFloorDetectionComponent>();
-        if (Detection)
+        if (UPDFloorDetectionComponent* Detection = OverlappingPawn->FindComponentByClass<UPDFloorDetectionComponent>())
         {
             Detection->OnEnteredBuildingFloor(BuildingGroupID, FloorLevel);
-            UE_LOG(LogTemp, Warning, TEXT("[FloorVolume] %s Floor=%d 시작 시 캐릭터 이미 내부"),
-                *BuildingGroupID.ToString(), FloorLevel);
         }
     }
 }

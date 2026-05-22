@@ -106,10 +106,6 @@ void UPDFloorOcclusionSubsystem::SetVisibleBuildingFloor(FName BuildingGroupID, 
     }
 
     VisibleFloorByBuilding.Add(BuildingGroupID, VisibleFloor);
-    
-    UE_LOG(LogTemp, Warning, TEXT("[Subsystem] %s 가시층 = %d"),
-       *BuildingGroupID.ToString(), VisibleFloor);
-
     RefreshBuildingFades(BuildingGroupID);
 }
 
@@ -171,16 +167,12 @@ void UPDFloorOcclusionSubsystem::RefreshBuildingFades(FName BuildingGroupID)
     TMap<int32, TArray<TWeakObjectPtr<UPDFloorOcclusionComponent>>>* FloorMap = ComponentsByBuildingFloor.Find(BuildingGroupID);
     if (!FloorMap)
     {
-        UE_LOG(LogTemp, Warning, TEXT("[Subsystem] %s 빌딩 데이터 없음!"), *BuildingGroupID.ToString());
         return;
     }
 
     for (auto& Pair : *FloorMap)
     {
         const float Target = CalculateTargetAlpha(BuildingGroupID, Pair.Key);
-        UE_LOG(LogTemp, Warning, TEXT("[Subsystem]   Floor=%d 컴포넌트 %d개 → Target alpha=%.2f"),
-            Pair.Key, Pair.Value.Num(), Target);
-        
         for (TWeakObjectPtr<UPDFloorOcclusionComponent>& Weak : Pair.Value)
         {
             if (UPDFloorOcclusionComponent* Comp = Weak.Get())

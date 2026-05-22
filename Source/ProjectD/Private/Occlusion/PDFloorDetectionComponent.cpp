@@ -39,7 +39,6 @@ void UPDFloorDetectionComponent::OnLeftBuildingFloor(FName BuildingGroupID, int3
 
 void UPDFloorDetectionComponent::UpdateActiveFloor()
 {
-    //가장 최근 진입한 (Building, Floor)가 활성
     FName NewBuilding = NAME_None;
     int32 NewFloor = INDEX_NONE;
 
@@ -67,7 +66,7 @@ void UPDFloorDetectionComponent::UpdateActiveFloor()
         return;
     }
 
-    //빌딩 자체가 바뀌면 이전 빌딩 가시성 풀기 (위층 다시 보이게)
+    // 빌딩이 바뀌면 이전 빌딩 가시성 풀기
     if (!CurrentBuildingGroupID.IsNone() && CurrentBuildingGroupID != NewBuilding)
     {
         Subsystem->ClearVisibleBuilding(CurrentBuildingGroupID);
@@ -75,9 +74,6 @@ void UPDFloorDetectionComponent::UpdateActiveFloor()
 
     CurrentBuildingGroupID = NewBuilding;
     CurrentFloorLevel = NewFloor;
-    
-    UE_LOG(LogTemp, Warning, TEXT("[Detection] 활성층 변경: Building=%s Floor=%d (스택 %d개)"),
-        *NewBuilding.ToString(), NewFloor, ActiveStack.Num());
 
     if (!NewBuilding.IsNone())
     {
