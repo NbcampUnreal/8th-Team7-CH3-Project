@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
+#include "Widgets/Screen/PDTabbedContent.h"
 #include "PDInventoryWidget.generated.h"
 
 class UUniformGridPanel;
@@ -24,11 +25,16 @@ class UWidget;
 class UPDInventoryWeightBarWidget;
 
 UCLASS(BlueprintType, Blueprintable)
-class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase
+class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase, public IPDTabbedContent
 {
 	GENERATED_BODY()
 
 public:
+	// IPDTabbedContent
+	virtual void InitializeForOwner(APlayerController* OwnerPC) override;
+	virtual void OnTabShown() override;
+	virtual void OnTabHidden() override;
+
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void RefreshInventoryGrid();
 

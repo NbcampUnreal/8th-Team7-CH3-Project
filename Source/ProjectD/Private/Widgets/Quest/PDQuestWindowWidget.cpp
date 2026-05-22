@@ -14,6 +14,20 @@
 #include "Items/PDInventoryComponent.h"
 #include "Widgets/Quest/PDQuestListItemWidget.h"
 
+void UPDQuestWindowWidget::InitializeForOwner(APlayerController* /*OwnerPC*/)
+{
+}
+
+void UPDQuestWindowWidget::OnTabShown()
+{
+	RefreshQuestList();
+	RefreshQuestDetail();
+}
+
+void UPDQuestWindowWidget::OnTabHidden()
+{
+}
+
 void UPDQuestWindowWidget::NativeConstruct()
 {
 	Super::NativeConstruct();

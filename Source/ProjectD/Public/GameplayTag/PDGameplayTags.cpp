@@ -74,4 +74,10 @@ namespace PDGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_MeleeAttacking, "State.MeleeAttacking");
 	UE_DEFINE_GAMEPLAY_TAG(Anim_Notify_MeleeHit, "Anim.Notify.MeleeHit");
 
+	// UI Tabs - Player Hub
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Loadout,   "UI.Tab.PlayerHub.Loadout");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Character, "UI.Tab.PlayerHub.Character");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Skills,    "UI.Tab.PlayerHub.Skills");
+	UE_DEFINE_GAMEPLAY_TAG(UI_Tab_PlayerHub_Quest,     "UI.Tab.PlayerHub.Quest");
+
 }

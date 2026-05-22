@@ -27,6 +27,20 @@
 #include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
+void UPDInventoryWidget::InitializeForOwner(APlayerController* /*OwnerPC*/)
+{
+}
+
+void UPDInventoryWidget::OnTabShown()
+{
+}
+
+void UPDInventoryWidget::OnTabHidden()
+{
+	CloseContextMenu();
+	CloseItemHoverTooltip();
+}
+
 void UPDInventoryWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
