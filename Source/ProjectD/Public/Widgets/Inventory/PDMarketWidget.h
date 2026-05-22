@@ -2,12 +2,15 @@
 
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
+#include "Type/Types.h"
 #include "PDMarketWidget.generated.h"
 
-class UUniformGridPanel;
+class UPanelWidget;
 class UPDMarketComponent;
 class UPDInventoryComponent;
-class UUserWidget;
+class UPDInventorySlotWidget;
+class UPDMarketItemWidget;
+class UPDMarketQuantityPopupWidget;
 class UTextBlock;
 
 UCLASS(BlueprintType, Blueprintable)
@@ -30,42 +33,46 @@ protected:
 	virtual void NativeDestruct() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market")
-	TSubclassOf<UUserWidget> MarketItemWidgetClass;
+	TSubclassOf<UPDInventorySlotWidget> MarketSlotWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market")
-	FName MarketGridWidgetName = TEXT("UniformGridPanel_MarketGoods");
+	TSubclassOf<UPDMarketItemWidget> MarketRowWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market")
-	int32 MarketGridColumns = 5;
+	TSubclassOf<UPDMarketQuantityPopupWidget> MarketQuantityPopupWidgetClass;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market")
-	FName MarketLevelTextWidgetName = TEXT("Text_MarketLevel");
+	FName MarketListWidgetName = TEXT("ScrollBox_MarketGoods");
+
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market")
-	FName MarketExpTextWidgetName = TEXT("Text_MarketExp");
+	FName InventoryGoldTextWidgetName = TEXT("Text_Gold");
 
 private:
-	void ResolveMarketGridPanel();
+	void ResolveMarketListPanel();
 	void ResolveMarketInfoTextBlocks();
-
-	UFUNCTION()
-	void HandleMarketReputationChanged(int32 NewLevel, int32 NewExp);
-	UPDInventoryComponent* FindInventoryComponent() const;
 	void BindMarketChanged();
 	void UnbindMarketChanged();
+	void BindInventoryChanged();
+	void UnbindInventoryChanged();
+	void RefreshInventoryGold();
+	UPDInventoryComponent* FindInventoryComponent() const;
+	FText MakeGoldText(int32 Gold) const;
+
+
 
 	UPROPERTY(Transient)
-	TObjectPtr<UUniformGridPanel> MarketGridPanel;
+	TObjectPtr<UPanelWidget> MarketListPanel;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextMarketLevel;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UTextBlock> TextMarketExp;
+	TObjectPtr<UTextBlock> TextInventoryGold;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> MarketComponent;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> BoundMarketComponent;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPDInventoryComponent> BoundInventoryComponent;
 };

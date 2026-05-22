@@ -1,6 +1,7 @@
 #include "Items/PDEquipmentModificationActor.h"
 
 #include "Components/BoxComponent.h"
+#include "Component/PDInteractionOutlineComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -17,6 +18,9 @@ APDEquipmentModificationActor::APDEquipmentModificationActor()
 	WorkbenchMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("WorkbenchMesh"));
 	WorkbenchMesh->SetupAttachment(InteractionCollision);
 	WorkbenchMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
+	OutlineComponent->SetupTrigger(InteractionCollision);
 }
 
 void APDEquipmentModificationActor::BeginPlay()
@@ -24,6 +28,10 @@ void APDEquipmentModificationActor::BeginPlay()
 	Super::BeginPlay();
 
 	ConfigureInteractionCollision();
+	if (OutlineComponent)
+	{
+		OutlineComponent->SetupTrigger(InteractionCollision);
+	}
 }
 
 void APDEquipmentModificationActor::EndPlay(const EEndPlayReason::Type EndPlayReason)

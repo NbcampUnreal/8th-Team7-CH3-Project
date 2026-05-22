@@ -1,7 +1,10 @@
 #include "Component/PDInteractionOutlineComponent.h"
 
+#include "Components/MeshComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 
 UPDInteractionOutlineComponent::UPDInteractionOutlineComponent()
 {
@@ -12,6 +15,7 @@ void UPDInteractionOutlineComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
+	ApplyOverlayMaterial();
 	BindTrigger();
 }
 
@@ -103,6 +107,11 @@ bool UPDInteractionOutlineComponent::IsValidInteractor(AActor* Actor) const
 	return !bOnlyLocalPlayer || Pawn->IsLocallyControlled();
 }
 
+void UPDInteractionOutlineComponent::RefreshOutlineTargets()
+{
+	ApplyOverlayMaterial();
+}
+
 void UPDInteractionOutlineComponent::SetOutlineEnabled(bool bEnabled)
 {
 	if (bOutlineEnabled == bEnabled)
@@ -110,61 +119,98 @@ void UPDInteractionOutlineComponent::SetOutlineEnabled(bool bEnabled)
 		return;
 	}
 
-	TArray<UPrimitiveComponent*> PrimitiveComponents;
-	CachePrimitiveRenderState(PrimitiveComponents);
-
-	if (bEnabled)
-	{
-		PreviousCustomDepthStates.Reset();
-		PreviousStencilValues.Reset();
-
-		for (UPrimitiveComponent* PrimitiveComponent : PrimitiveComponents)
-		{
-			if (!PrimitiveComponent || PrimitiveComponent == TriggerComponent)
-			{
-				continue;
-			}
-
-			PreviousCustomDepthStates.Add(PrimitiveComponent, PrimitiveComponent->bRenderCustomDepth);
-			PreviousStencilValues.Add(PrimitiveComponent, PrimitiveComponent->CustomDepthStencilValue);
-			PrimitiveComponent->SetRenderCustomDepth(true);
-			PrimitiveComponent->SetCustomDepthStencilValue(StencilValue);
-		}
-	}
-	else
-	{
-		for (const TPair<TWeakObjectPtr<UPrimitiveComponent>, bool>& Pair : PreviousCustomDepthStates)
-		{
-			UPrimitiveComponent* PrimitiveComponent = Pair.Key.Get();
-			if (!PrimitiveComponent)
-			{
-				continue;
-			}
-
-			PrimitiveComponent->SetRenderCustomDepth(Pair.Value);
-
-			if (const int32* PreviousStencilValue = PreviousStencilValues.Find(PrimitiveComponent))
-			{
-				PrimitiveComponent->SetCustomDepthStencilValue(*PreviousStencilValue);
-			}
-		}
-
-		PreviousCustomDepthStates.Reset();
-		PreviousStencilValues.Reset();
-	}
-
 	bOutlineEnabled = bEnabled;
+	UpdateOutlineParameters();
 }
 
-void UPDInteractionOutlineComponent::CachePrimitiveRenderState(TArray<UPrimitiveComponent*>& OutComponents) const
+void UPDInteractionOutlineComponent::ApplyOverlayMaterial()
 {
-	AActor* Owner = GetOwner();
-	if (!Owner)
+	if (!OutlineMaterial)
 	{
 		return;
 	}
 
-	Owner->GetComponents<UPrimitiveComponent>(OutComponents, bApplyToChildActors);
+	if (!OutlineMID)
+	{
+		OutlineMID = UMaterialInstanceDynamic::Create(OutlineMaterial, this);
+	}
+
+	if (!OutlineMID)
+	{
+		return;
+	}
+
+	UpdateOutlineParameters();
+
+	TArray<UMeshComponent*> MeshComponents;
+	CacheMeshComponents(MeshComponents);
+
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (!MeshComponent)
+		{
+			continue;
+		}
+
+		MeshComponent->SetOverlayMaterial(OutlineMID);
+	}
+}
+
+void UPDInteractionOutlineComponent::UpdateOutlineParameters()
+{
+	if (!OutlineMID)
+	{
+		return;
+	}
+
+	OutlineMID->SetScalarParameterValue(TEXT("OLIntensity"), bOutlineEnabled ? OutlineIntensity : 0.f);
+	OutlineMID->SetScalarParameterValue(TEXT("OLThickness"), OutlineThickness);
+}
+
+void UPDInteractionOutlineComponent::CacheMeshComponents(TArray<UMeshComponent*>& OutComponents) const
+{
+	OutComponents.Reset();
+
+	TSet<TWeakObjectPtr<UMeshComponent>> AddedComponents;
+
+	bool bHasExplicitTarget = false;
+	for (AActor* TargetActor : OutlineTargetActors)
+	{
+		if (!IsValid(TargetActor))
+		{
+			continue;
+		}
+
+		bHasExplicitTarget = true;
+		AppendActorMeshComponents(TargetActor, OutComponents, AddedComponents);
+	}
+
+	if (!bHasExplicitTarget)
+	{
+		AppendActorMeshComponents(GetOwner(), OutComponents, AddedComponents);
+	}
+}
+
+void UPDInteractionOutlineComponent::AppendActorMeshComponents(AActor* Actor, TArray<UMeshComponent*>& OutComponents, TSet<TWeakObjectPtr<UMeshComponent>>& AddedComponents) const
+{
+	if (!IsValid(Actor))
+	{
+		return;
+	}
+
+	TArray<UMeshComponent*> MeshComponents;
+	Actor->GetComponents<UMeshComponent>(MeshComponents, bApplyToChildActors);
+
+	for (UMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (!IsValid(MeshComponent) || AddedComponents.Contains(MeshComponent))
+		{
+			continue;
+		}
+
+		AddedComponents.Add(MeshComponent);
+		OutComponents.Add(MeshComponent);
+	}
 }
 
 void UPDInteractionOutlineComponent::ResetOverlapState()

@@ -1,6 +1,7 @@
 #include "Items/PDStashActor.h"
 
 #include "Components/BoxComponent.h"
+#include "Component/PDInteractionOutlineComponent.h"
 #include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Items/PDStashComponent.h"
@@ -20,6 +21,9 @@ APDStashActor::APDStashActor()
 
 	StashComponent = CreateDefaultSubobject<UPDStashComponent>(TEXT("StashComponent"));
 
+	OutlineComponent = CreateDefaultSubobject<UPDInteractionOutlineComponent>(TEXT("OutlineComponent"));
+	OutlineComponent->SetupTrigger(InteractionCollision);
+
 	CurrentDoorAngle = ClosedDoorAngle;
 	TargetDoorAngle = ClosedDoorAngle;
 }
@@ -29,6 +33,10 @@ void APDStashActor::BeginPlay()
 	Super::BeginPlay();
 
 	ConfigureInteractionCollision();
+	if (OutlineComponent)
+	{
+		OutlineComponent->SetupTrigger(InteractionCollision);
+	}
 	SetDoorOpen(false, true);
 }
 

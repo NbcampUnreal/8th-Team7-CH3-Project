@@ -6,6 +6,7 @@
 #include "PDMarketActor.generated.h"
 
 class UBoxComponent;
+class UPDInteractionOutlineComponent;
 class UPDMarketComponent;
 class APDMarketActor;
 class APDPlayerController;
@@ -41,6 +42,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Market")
 	TObjectPtr<UPDMarketComponent> MarketComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Market")
+	TObjectPtr<UPDInteractionOutlineComponent> OutlineComponent;
 private:
 	void ConfigureInteractionCollision() const;
 	void BindMarketClose(APDPlayerController* PlayerController);

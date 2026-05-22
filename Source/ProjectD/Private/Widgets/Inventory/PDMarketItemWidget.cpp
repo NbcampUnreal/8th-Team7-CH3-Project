@@ -1,11 +1,12 @@
 #include "Widgets/Inventory/PDMarketItemWidget.h"
 
-#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
-#include "Components/Image.h"
+#include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Items/PDInventoryComponent.h"
+#include "Widgets/Inventory/PDInventorySlotWidget.h"
+#include "Widgets/Inventory/PDMarketQuantityPopupWidget.h"
 
 void UPDMarketItemWidget::NativeOnInitialized()
 {
@@ -23,11 +24,16 @@ void UPDMarketItemWidget::SetMarketEntry(UPDMarketComponent* InMarketComponent, 
 	RefreshVisuals();
 }
 
-
-void UPDMarketItemWidget::SetShowLockedRequirementText(bool bInShow)
+void UPDMarketItemWidget::SetInventorySlotWidgetClass(TSubclassOf<UPDInventorySlotWidget> InSlotWidgetClass)
 {
-	bShowLockedRequirementText = bInShow;
+	InventorySlotWidgetClass = InSlotWidgetClass;
+	InventorySlotWidget = nullptr;
 	RefreshVisuals();
+}
+
+void UPDMarketItemWidget::SetQuantityPopupWidgetClass(TSubclassOf<UPDMarketQuantityPopupWidget> InPopupWidgetClass)
+{
+	QuantityPopupWidgetClass = InPopupWidgetClass;
 }
 
 void UPDMarketItemWidget::ResolveWidgets()
@@ -37,9 +43,29 @@ void UPDMarketItemWidget::ResolveWidgets()
 		return;
 	}
 
-	if (!ImageItemIconWidget && !ImageItemIconWidgetName.IsNone())
+	if (!InventorySlotWidget && !InventorySlotWidgetName.IsNone())
 	{
-		ImageItemIconWidget = Cast<UImage>(WidgetTree->FindWidget(ImageItemIconWidgetName));
+		InventorySlotWidget = Cast<UPDInventorySlotWidget>(WidgetTree->FindWidget(InventorySlotWidgetName));
+	}
+
+	if (!InventorySlotHostWidget && !InventorySlotHostWidgetName.IsNone())
+	{
+		InventorySlotHostWidget = Cast<UPanelWidget>(WidgetTree->FindWidget(InventorySlotHostWidgetName));
+	}
+
+	if (!InventorySlotHostWidget)
+	{
+		InventorySlotHostWidget = Cast<UPanelWidget>(WidgetTree->FindWidget(TEXT("Panel_ItemSlot")));
+	}
+
+	if (!InventorySlotWidget && InventorySlotHostWidget && InventorySlotWidgetClass)
+	{
+		InventorySlotWidget = CreateWidget<UPDInventorySlotWidget>(GetOwningPlayer(), InventorySlotWidgetClass);
+		if (InventorySlotWidget)
+		{
+			InventorySlotHostWidget->ClearChildren();
+			InventorySlotHostWidget->AddChild(InventorySlotWidget);
+		}
 	}
 
 	if (!TextItemNameWidget && !TextItemNameWidgetName.IsNone())
@@ -50,6 +76,11 @@ void UPDMarketItemWidget::ResolveWidgets()
 	if (!TextPriceWidget && !TextPriceWidgetName.IsNone())
 	{
 		TextPriceWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TextPriceWidgetName));
+	}
+
+	if (!TextPriceWidget)
+	{
+		TextPriceWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("Text_Price")));
 	}
 
 	if (!TextStockWidget && !TextStockWidgetName.IsNone())
@@ -66,125 +97,64 @@ void UPDMarketItemWidget::ResolveWidgets()
 			ButtonBuyWidget->OnClicked.AddUniqueDynamic(this, &UPDMarketItemWidget::HandleBuyClicked);
 		}
 	}
-
-	if (!TextRequiredTraderLevelWidget && !TextRequiredTraderLevelWidgetName.IsNone())
-	{
-		TextRequiredTraderLevelWidget = Cast<UTextBlock>(WidgetTree->FindWidget(TextRequiredTraderLevelWidgetName));
-	}
 }
 
 void UPDMarketItemWidget::RefreshVisuals()
 {
+	ResolveWidgets();
+
 	FPDItemData ItemData;
-	if (MarketComponent)
-	{
-		MarketComponent->ResolveEntryItemData(Entry, ItemData);
-	}
+	const bool bHasItem = MarketComponent && MarketComponent->ResolveEntryItemData(Entry, ItemData);
 
-	const bool bLocked = IsLocked();
-	const int32 RequiredLevel = GetRequiredTraderLevel();
-	const FText LockedRequirementText = FText::FromString(FString::Printf(TEXT("마켓 레벨 %d 필요"), RequiredLevel));
-
-	ClearMarketTooltips();
-
-	if (ImageItemIconWidget)
-	{
-		ImageItemIconWidget->SetBrushFromTexture(bLocked ? nullptr : ItemData.Icon);
-		ImageItemIconWidget->SetVisibility(!bLocked && ItemData.Icon ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
-	}
+	RefreshInventorySlot(ItemData);
 
 	if (TextItemNameWidget)
 	{
-		const FText DisplayName = ItemData.DisplayName.IsEmpty() ? FText::FromName(ItemData.ItemID) : ItemData.DisplayName;
-		TextItemNameWidget->SetText(bLocked ? FText::FromString(LockedItemNameString) : DisplayName);
+		const FText DisplayName = bHasItem && !ItemData.DisplayName.IsEmpty() ? ItemData.DisplayName : FText::FromName(Entry.ItemRowName);
+		TextItemNameWidget->SetText(DisplayName);
 	}
 
 	if (TextPriceWidget)
 	{
-		TextPriceWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : FText::AsNumber(GetUnitPrice()));
+		TextPriceWidget->SetText(MakePriceText(GetUnitPrice()));
 	}
 
 	if (TextStockWidget)
 	{
-		TextStockWidget->SetText(bLocked ? FText::FromString(TEXT("-")) : (Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock)));
+		TextStockWidget->SetText(Entry.Stock < 0 ? FText::FromString(TEXT("∞")) : FText::AsNumber(Entry.Stock));
 	}
 
 	if (ButtonBuyWidget)
 	{
-		ButtonBuyWidget->SetIsEnabled(!bLocked);
-	}
-
-	if (TextRequiredTraderLevelWidget)
-	{
-		const bool bShowRequirementText = bLocked && bShowLockedRequirementText;
-		TextRequiredTraderLevelWidget->SetText(LockedRequirementText);
-		TextRequiredTraderLevelWidget->SetVisibility(bShowRequirementText ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
-	}
-
-	if (bLocked)
-	{
-		SetToolTip(CreateLockedRequirementTooltipWidget(LockedRequirementText));
+		ButtonBuyWidget->SetIsEnabled(CanBuyCurrentEntry());
 	}
 }
 
-void UPDMarketItemWidget::ClearMarketTooltips()
+void UPDMarketItemWidget::RefreshInventorySlot(const FPDItemData& ItemData)
 {
-	SetToolTip(nullptr);
-	SetToolTipText(FText::GetEmpty());
-
-	if (ImageItemIconWidget)
+	if (!InventorySlotWidget)
 	{
-		ImageItemIconWidget->SetToolTip(nullptr);
-		ImageItemIconWidget->SetToolTipText(FText::GetEmpty());
+		return;
 	}
 
-	if (TextItemNameWidget)
+	InventorySlotWidget->SetSlotContainerType(EPDItemContainerType::None);
+
+	if (ItemData.ItemID.IsNone())
 	{
-		TextItemNameWidget->SetToolTip(nullptr);
-		TextItemNameWidget->SetToolTipText(FText::GetEmpty());
+		InventorySlotWidget->ClearSlotData(EntryIndex);
+		return;
 	}
 
-	if (TextPriceWidget)
-	{
-		TextPriceWidget->SetToolTip(nullptr);
-		TextPriceWidget->SetToolTipText(FText::GetEmpty());
-	}
-
-	if (TextStockWidget)
-	{
-		TextStockWidget->SetToolTip(nullptr);
-		TextStockWidget->SetToolTipText(FText::GetEmpty());
-	}
-
-	if (ButtonBuyWidget)
-	{
-		ButtonBuyWidget->SetToolTip(nullptr);
-		ButtonBuyWidget->SetToolTipText(FText::GetEmpty());
-	}
+	InventorySlotWidget->SetSlotData(MakeMarketSlotData(ItemData), EntryIndex);
 }
 
-UUserWidget* UPDMarketItemWidget::CreateLockedRequirementTooltipWidget(const FText& RequirementText) const
+FPDInventorySlot UPDMarketItemWidget::MakeMarketSlotData(const FPDItemData& ItemData) const
 {
-	if (!LockedTooltipWidgetClass)
-	{
-		return nullptr;
-	}
-
-	UUserWidget* TooltipWidget = GetOwningPlayer()
-		? CreateWidget<UUserWidget>(GetOwningPlayer(), LockedTooltipWidgetClass)
-		: CreateWidget<UUserWidget>(GetWorld(), LockedTooltipWidgetClass);
-
-	if (!TooltipWidget || !TooltipWidget->WidgetTree)
-	{
-		return TooltipWidget;
-	}
-
-	if (UTextBlock* RequiredLevelText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(LockedTooltipRequiredLevelTextWidgetName)))
-	{
-		RequiredLevelText->SetText(RequirementText);
-	}
-
-	return TooltipWidget;
+	FPDInventorySlot SlotData;
+	SlotData.ItemData = ItemData;
+	SlotData.Quantity = Entry.Stock > 0 ? Entry.Stock : 1;
+	SlotData.bIsEmpty = ItemData.ItemID.IsNone();
+	return SlotData;
 }
 
 int32 UPDMarketItemWidget::GetUnitPrice() const
@@ -192,22 +162,44 @@ int32 UPDMarketItemWidget::GetUnitPrice() const
 	return MarketComponent ? MarketComponent->GetEntryUnitPrice(Entry) : 0;
 }
 
-bool UPDMarketItemWidget::IsLocked() const
+bool UPDMarketItemWidget::CanBuyCurrentEntry() const
 {
-	return MarketComponent && !MarketComponent->CanBuyEntry(EntryIndex);
+	if (!MarketComponent || !BuyerInventory || EntryIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	if (!MarketComponent->CanBuyEntry(EntryIndex))
+	{
+		return false;
+	}
+
+	if (Entry.Stock == 0)
+	{
+		return false;
+	}
+
+	return BuyerInventory->GetGold() >= GetUnitPrice();
 }
 
-int32 UPDMarketItemWidget::GetRequiredTraderLevel() const
+FText UPDMarketItemWidget::MakePriceText(int32 Price) const
 {
-	return MarketComponent ? MarketComponent->GetRequiredTraderLevelForEntry(EntryIndex) : 1;
+	return FText::Format(NSLOCTEXT("PDMarket", "MarketPriceFormat", "{0} Gold"), FText::AsNumber(FMath::Max(0, Price)));
 }
 
 void UPDMarketItemWidget::HandleBuyClicked()
 {
-	if (!MarketComponent || !BuyerInventory || EntryIndex == INDEX_NONE)
+	if (!MarketComponent || !BuyerInventory || EntryIndex == INDEX_NONE || !QuantityPopupWidgetClass)
 	{
 		return;
 	}
 
-	MarketComponent->BuyEntry(BuyerInventory, EntryIndex, 1);
+	UPDMarketQuantityPopupWidget* PopupWidget = CreateWidget<UPDMarketQuantityPopupWidget>(GetOwningPlayer(), QuantityPopupWidgetClass);
+	if (!PopupWidget)
+	{
+		return;
+	}
+
+	PopupWidget->InitializePurchasePopup(MarketComponent, BuyerInventory, Entry, EntryIndex);
+	PopupWidget->AddToViewport(100);
 }

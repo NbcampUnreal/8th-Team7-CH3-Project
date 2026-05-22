@@ -1,33 +1,6 @@
 #include "Items/PDMarketComponent.h"
 
-#include "Core/PDGameInstance.h"
 #include "Engine/DataTable.h"
-
-namespace
-{
-	const FPDItemData* FindPDMarketItemDataByID(const UDataTable* DataTable, const FName& ItemID)
-	{
-		if (!DataTable || ItemID.IsNone())
-		{
-			return nullptr;
-		}
-
-		TArray<FPDItemData*> Rows;
-		DataTable->GetAllRows<FPDItemData>(TEXT("FindPDMarketItemDataByID"), Rows);
-
-		for (const FPDItemData* Row : Rows)
-		{
-			if (Row && Row->ItemID == ItemID)
-			{
-				return Row;
-			}
-		}
-
-		return nullptr;
-	}
-
-	const TCHAR* DefaultMarketLevelDataTablePath = TEXT("/Game/Main/Blueprints/Data/DT_MarketLevelData.DT_MarketLevelData");
-}
 
 UPDMarketComponent::UPDMarketComponent()
 {
@@ -37,17 +10,52 @@ UPDMarketComponent::UPDMarketComponent()
 void UPDMarketComponent::BeginPlay()
 {
 	Super::BeginPlay();
-	SyncTraderReputationFromSave();
+	ReloadGoodsFromDataTable();
+}
+
+void UPDMarketComponent::ReloadGoodsFromDataTable()
+{
+	Goods.Reset();
+
+	if (!MarketGoodsDataTable)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PDMarketComponent: MarketGoodsDataTable is not set."));
+		OnMarketChanged.Broadcast();
+		return;
+	}
+
+	TArray<FName> RowNames = MarketGoodsDataTable->GetRowNames();
+	Goods.Reserve(RowNames.Num());
+
+	for (const FName& RowName : RowNames)
+	{
+		const FPDMarketGoodsRow* Row = MarketGoodsDataTable->FindRow<FPDMarketGoodsRow>(RowName, TEXT("ReloadGoodsFromDataTable"), false);
+		if (!Row)
+		{
+			continue;
+		}
+
+		FPDMarketEntry Entry;
+		Entry.ItemRowName = Row->ItemRowName.IsNone() ? RowName : Row->ItemRowName;
+		Entry.Stock = Row->Stock;
+		Entry.OverridePrice = Row->OverridePrice;
+
+		FPDItemData ItemData;
+		if (!ResolveEntryItemData(Entry, ItemData))
+		{
+			UE_LOG(LogTemp, Warning, TEXT("PDMarketComponent: Invalid market goods row '%s'. ItemRowName='%s'"), *RowName.ToString(), *Entry.ItemRowName.ToString());
+			continue;
+		}
+
+		Goods.Add(Entry);
+	}
+
+	OnMarketChanged.Broadcast();
 }
 
 bool UPDMarketComponent::BuyEntry(UPDInventoryComponent* BuyerInventory, int32 EntryIndex, int32 Quantity)
 {
 	if (!BuyerInventory || !Goods.IsValidIndex(EntryIndex) || Quantity <= 0)
-	{
-		return false;
-	}
-
-	if (!CanBuyEntry(EntryIndex))
 	{
 		return false;
 	}
@@ -73,7 +81,6 @@ bool UPDMarketComponent::BuyEntry(UPDInventoryComponent* BuyerInventory, int32 E
 	}
 
 	const int32 AddedQuantity = BuyerInventory->AddItemPartial(ItemData, Quantity);
-
 	if (AddedQuantity != Quantity)
 	{
 		if (AddedQuantity > 0)
@@ -90,8 +97,6 @@ bool UPDMarketComponent::BuyEntry(UPDInventoryComponent* BuyerInventory, int32 E
 		Entry.Stock -= AddedQuantity;
 	}
 
-	AddTraderReputationExp(CalculateReputationReward(TotalPrice, BuyReputationExpPercent));
-
 	OnMarketChanged.Broadcast();
 	return true;
 }
@@ -104,7 +109,7 @@ bool UPDMarketComponent::SellInventorySlot(UPDInventoryComponent* SellerInventor
 	}
 
 	const FPDInventorySlot& SourceSlot = SellerInventory->Items[SlotIndex];
-	if (SourceSlot.IsEmpty() || SourceSlot.ItemData.ItemID.IsNone())
+	if (SourceSlot.IsEmpty() || SourceSlot.ItemData.ItemID.IsNone() || SourceSlot.ItemData.bIsQuestItem)
 	{
 		return false;
 	}
@@ -115,14 +120,7 @@ bool UPDMarketComponent::SellInventorySlot(UPDInventoryComponent* SellerInventor
 		return false;
 	}
 
-	FPDMarketEntry* Entry = FindEntryByItemID(SourceSlot.ItemData.ItemID);
-	if (SourceSlot.ItemData.bIsQuestItem)
-	{
-		return false;
-	}
-
-	const int32 UnitPrice = GetItemSellPrice(SourceSlot.ItemData);
-	const int32 TotalPrice = UnitPrice * SellQuantity;
+	const int32 TotalPrice = GetItemSellPrice(SourceSlot.ItemData) * SellQuantity;
 
 	FPDInventorySlot& MutableSourceSlot = SellerInventory->Items[SlotIndex];
 	MutableSourceSlot.Quantity -= SellQuantity;
@@ -134,12 +132,10 @@ bool UPDMarketComponent::SellInventorySlot(UPDInventoryComponent* SellerInventor
 
 	SellerInventory->AddGold(TotalPrice);
 
-	if (Entry && Entry->Stock >= 0)
+	if (FPDMarketEntry* Entry = FindEntryByItemID(SourceSlot.ItemData.ItemID); Entry && Entry->Stock >= 0)
 	{
 		Entry->Stock += SellQuantity;
 	}
-
-	AddTraderReputationExp(CalculateReputationReward(TotalPrice, SellReputationExpPercent));
 
 	OnMarketChanged.Broadcast();
 	return true;
@@ -149,12 +145,7 @@ bool UPDMarketComponent::ResolveEntryItemData(const FPDMarketEntry& Entry, FPDIt
 {
 	OutItemData = FPDItemData();
 
-	if (!Entry.ItemDataTable || Entry.ItemRowName.IsNone())
-	{
-		return false;
-	}
-
-	const FPDItemData* Row = FindPDMarketItemDataByID(Entry.ItemDataTable, Entry.ItemRowName);
+	const FPDItemData* Row = FindItemData(Entry.ItemRowName);
 	if (!Row)
 	{
 		return false;
@@ -166,7 +157,7 @@ bool UPDMarketComponent::ResolveEntryItemData(const FPDMarketEntry& Entry, FPDIt
 		OutItemData.ItemID = Entry.ItemRowName;
 	}
 
-	return true;
+	return !OutItemData.ItemID.IsNone();
 }
 
 int32 UPDMarketComponent::GetEntryUnitPrice(const FPDMarketEntry& Entry) const
@@ -204,260 +195,18 @@ bool UPDMarketComponent::CanBuyEntry(int32 EntryIndex) const
 	}
 
 	FPDItemData ItemData;
-	return ResolveEntryItemData(Goods[EntryIndex], ItemData) && CanBuyItemData(ItemData);
+	return ResolveEntryItemData(Goods[EntryIndex], ItemData);
 }
 
 bool UPDMarketComponent::CanBuyItemData(const FPDItemData& ItemData) const
 {
-	return static_cast<uint8>(ItemData.ItemGrade) <= static_cast<uint8>(GetMaxPurchasableGradeForLevel(TraderReputationLevel));
+	return !ItemData.ItemID.IsNone();
 }
 
 bool UPDMarketComponent::ShouldShowEntry(int32 EntryIndex) const
 {
-	const int32 RequiredLevel = GetRequiredTraderLevelForEntry(EntryIndex);
-	return RequiredLevel > 0 && RequiredLevel <= TraderReputationLevel + 1;
-}
-
-int32 UPDMarketComponent::GetRequiredTraderLevelForGrade(EPDItemGrade ItemGrade) const
-{
-	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
-	if (!LevelTable)
-	{
-		return 1;
-	}
-
-	TArray<FPDMarketLevelData*> LevelRows;
-	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetRequiredTraderLevelForGrade"), LevelRows);
-
-	int32 BestLevel = INDEX_NONE;
-	for (const FPDMarketLevelData* LevelData : LevelRows)
-	{
-		if (!LevelData)
-		{
-			continue;
-		}
-
-		if (static_cast<uint8>(LevelData->MaxPurchasableGrade) >= static_cast<uint8>(ItemGrade))
-		{
-			if (BestLevel == INDEX_NONE || LevelData->Level < BestLevel)
-			{
-				BestLevel = LevelData->Level;
-			}
-		}
-	}
-
-	return BestLevel == INDEX_NONE ? 1 : BestLevel;
-}
-
-int32 UPDMarketComponent::GetRequiredTraderLevelForEntry(int32 EntryIndex) const
-{
-	if (!Goods.IsValidIndex(EntryIndex))
-	{
-		return INDEX_NONE;
-	}
-
 	FPDItemData ItemData;
-	if (!ResolveEntryItemData(Goods[EntryIndex], ItemData))
-	{
-		return INDEX_NONE;
-	}
-
-	return GetRequiredTraderLevelForGrade(ItemData.ItemGrade);
-}
-
-EPDItemGrade UPDMarketComponent::GetMaxPurchasableGradeForLevel(int32 Level) const
-{
-	const FPDMarketLevelData* ExactLevelData = FindMarketLevelDataByLevel(Level);
-	if (ExactLevelData)
-	{
-		return ExactLevelData->MaxPurchasableGrade;
-	}
-
-	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
-	if (!LevelTable)
-	{
-		return EPDItemGrade::Grade1;
-	}
-
-	// Fallback: 지정 레벨 Row가 없으면 현재 레벨 이하 중 가장 높은 Row를 사용합니다.
-	TArray<FPDMarketLevelData*> LevelRows;
-	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetMaxPurchasableGradeForLevel"), LevelRows);
-
-	EPDItemGrade Result = EPDItemGrade::Grade1;
-	int32 BestLevel = 0;
-	for (const FPDMarketLevelData* LevelData : LevelRows)
-	{
-		if (!LevelData)
-		{
-			continue;
-		}
-
-		if (LevelData->Level <= Level && LevelData->Level >= BestLevel)
-		{
-			BestLevel = LevelData->Level;
-			Result = LevelData->MaxPurchasableGrade;
-		}
-	}
-
-	return Result;
-}
-
-
-int32 UPDMarketComponent::GetCurrentTraderLevelRequiredExp() const
-{
-	const FPDMarketLevelData* CurrentLevelData = FindMarketLevelDataByLevel(FMath::Max(1, TraderReputationLevel));
-	return CurrentLevelData ? FMath::Max(0, CurrentLevelData->RequiredExp) : 0;
-}
-
-int32 UPDMarketComponent::GetNextTraderLevelRequiredExp() const
-{
-	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
-	if (!LevelTable)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("PDMarketComponent: MarketLevelDataTable is not set and default DT_MarketLevelData could not be loaded."));
-		return INDEX_NONE;
-	}
-
-	TArray<FPDMarketLevelData*> LevelRows;
-	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("GetNextTraderLevelRequiredExp"), LevelRows);
-
-	int32 NextRequiredExp = INDEX_NONE;
-	for (const FPDMarketLevelData* LevelData : LevelRows)
-	{
-		if (!LevelData)
-		{
-			continue;
-		}
-
-		// RequiredExp는 누적 경험치입니다. 현재 EXP보다 큰 가장 가까운 값을 다음 목표로 사용합니다.
-		if (LevelData->RequiredExp > TraderReputationExp &&
-			(NextRequiredExp == INDEX_NONE || LevelData->RequiredExp < NextRequiredExp))
-		{
-			NextRequiredExp = LevelData->RequiredExp;
-		}
-	}
-
-	return NextRequiredExp;
-}
-
-int32 UPDMarketComponent::GetCurrentTraderLevelDisplayExp() const
-{
-	const int32 CurrentLevelStartExp = GetCurrentTraderLevelRequiredExp();
-	return FMath::Max(0, TraderReputationExp - CurrentLevelStartExp);
-}
-
-int32 UPDMarketComponent::GetNextTraderLevelDisplayRequiredExp() const
-{
-	const int32 CurrentLevelStartExp = GetCurrentTraderLevelRequiredExp();
-	const int32 NextRequiredExp = GetNextTraderLevelRequiredExp();
-
-	if (NextRequiredExp == INDEX_NONE)
-	{
-		return INDEX_NONE;
-	}
-
-	return FMath::Max(0, NextRequiredExp - CurrentLevelStartExp);
-}
-
-void UPDMarketComponent::AddTraderReputationExp(int32 Amount)
-{
-	if (Amount <= 0)
-	{
-		return;
-	}
-
-	TraderReputationExp += Amount;
-	RecalculateTraderReputationLevel();
-	SaveTraderReputationToSave();
-	OnTraderReputationChanged.Broadcast(TraderReputationLevel, TraderReputationExp);
-	OnMarketChanged.Broadcast();
-}
-
-void UPDMarketComponent::SyncTraderReputationFromSave()
-{
-	LoadTraderReputationFromSave();
-	RecalculateTraderReputationLevel();
-	SaveTraderReputationToSave();
-	OnTraderReputationChanged.Broadcast(TraderReputationLevel, TraderReputationExp);
-}
-
-void UPDMarketComponent::RecalculateTraderReputationLevel()
-{
-	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
-	if (!LevelTable)
-	{
-		TraderReputationLevel = FMath::Max(1, TraderReputationLevel);
-		return;
-	}
-
-	TArray<FPDMarketLevelData*> LevelRows;
-	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("RecalculateTraderReputationLevel"), LevelRows);
-
-	int32 NewLevel = 1;
-	int32 BestRequiredExp = INDEX_NONE;
-	for (const FPDMarketLevelData* LevelData : LevelRows)
-	{
-		if (!LevelData)
-		{
-			continue;
-		}
-
-		if (TraderReputationExp >= LevelData->RequiredExp &&
-			(BestRequiredExp == INDEX_NONE || LevelData->RequiredExp >= BestRequiredExp))
-		{
-			BestRequiredExp = LevelData->RequiredExp;
-			NewLevel = FMath::Max(1, LevelData->Level);
-		}
-	}
-
-	TraderReputationLevel = NewLevel;
-}
-
-const UDataTable* UPDMarketComponent::GetResolvedMarketLevelDataTable() const
-{
-	if (MarketLevelDataTable)
-	{
-		return MarketLevelDataTable;
-	}
-
-	// 마켓 Actor 컴포넌트에 DT 지정이 누락돼도 공통 DT를 사용하도록 fallback 처리합니다.
-	return LoadObject<UDataTable>(nullptr, DefaultMarketLevelDataTablePath);
-}
-
-const FPDMarketLevelData* UPDMarketComponent::FindMarketLevelDataByLevel(int32 Level) const
-{
-	const UDataTable* LevelTable = GetResolvedMarketLevelDataTable();
-	if (!LevelTable || Level <= 0)
-	{
-		return nullptr;
-	}
-
-	// 권장 RowName: 1, 2, 3 ...
-	const FName NumericRowName(*FString::FromInt(Level));
-	if (const FPDMarketLevelData* Row = LevelTable->FindRow<FPDMarketLevelData>(NumericRowName, TEXT("FindMarketLevelDataByLevel"), false))
-	{
-		return Row;
-	}
-
-	// 호환용 fallback: 기존 Level_1, Level_2 ... RowName도 지원합니다.
-	const FName LegacyRowName(*FString::Printf(TEXT("Level_%d"), Level));
-	if (const FPDMarketLevelData* Row = LevelTable->FindRow<FPDMarketLevelData>(LegacyRowName, TEXT("FindMarketLevelDataByLevel"), false))
-	{
-		return Row;
-	}
-
-	// 최종 fallback: RowName이 달라도 Level 컬럼 값이 맞으면 사용합니다.
-	TArray<FPDMarketLevelData*> LevelRows;
-	LevelTable->GetAllRows<FPDMarketLevelData>(TEXT("FindMarketLevelDataByLevel"), LevelRows);
-	for (const FPDMarketLevelData* LevelData : LevelRows)
-	{
-		if (LevelData && LevelData->Level == Level)
-		{
-			return LevelData;
-		}
-	}
-
-	return nullptr;
+	return Goods.IsValidIndex(EntryIndex) && ResolveEntryItemData(Goods[EntryIndex], ItemData);
 }
 
 FPDMarketEntry* UPDMarketComponent::FindEntryByItemID(FName ItemID)
@@ -479,29 +228,27 @@ FPDMarketEntry* UPDMarketComponent::FindEntryByItemID(FName ItemID)
 	return nullptr;
 }
 
-void UPDMarketComponent::LoadTraderReputationFromSave()
+const FPDItemData* UPDMarketComponent::FindItemData(FName ItemRowName) const
 {
-	if (const UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
+	if (!ItemDataTable || ItemRowName.IsNone())
 	{
-		TraderReputationExp = GI->GetTraderReputationExp();
-		TraderReputationLevel = GI->GetTraderReputationLevel();
-	}
-}
-
-void UPDMarketComponent::SaveTraderReputationToSave() const
-{
-	if (UPDGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance<UPDGameInstance>() : nullptr)
-	{
-		GI->SetTraderReputation(TraderReputationLevel, TraderReputationExp);
-	}
-}
-
-int32 UPDMarketComponent::CalculateReputationReward(int32 TotalPrice, int32 Percent) const
-{
-	if (TotalPrice <= 0 || Percent <= 0)
-	{
-		return 0;
+		return nullptr;
 	}
 
-	return FMath::Max(1, FMath::FloorToInt(static_cast<float>(TotalPrice * Percent) / 100.f));
+	if (const FPDItemData* DirectRow = ItemDataTable->FindRow<FPDItemData>(ItemRowName, TEXT("FindItemData"), false))
+	{
+		return DirectRow;
+	}
+
+	TArray<FPDItemData*> Rows;
+	ItemDataTable->GetAllRows<FPDItemData>(TEXT("FindItemData"), Rows);
+	for (const FPDItemData* Row : Rows)
+	{
+		if (Row && Row->ItemID == ItemRowName)
+		{
+			return Row;
+		}
+	}
+
+	return nullptr;
 }

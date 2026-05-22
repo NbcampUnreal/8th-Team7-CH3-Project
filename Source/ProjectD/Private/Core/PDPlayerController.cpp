@@ -417,12 +417,6 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 		return;
 	}
 
-	if (!InventoryWidgetClass)
-	{
-		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
-		return;
-	}
-
 	if (!MarketWidgetClass)
 	{
 		UE_LOG(LogPDCharacter, Warning, TEXT("MarketWidgetClass is not set."));
@@ -444,15 +438,6 @@ void APDPlayerController::OpenMarketInterface(UPDMarketComponent* MarketComponen
 	if (IsEquipmentModificationInterfaceOpen())
 	{
 		CloseEquipmentModificationInterface();
-	}
-
-	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
-		if (InventoryWidgetInstance)
-		{
-			InventoryWidgetInstance->AddToViewport();
-		}
 	}
 
 	if (!MarketWidgetInstance || !MarketWidgetInstance->IsInViewport())
@@ -482,12 +467,6 @@ void APDPlayerController::CloseMarketInterface()
 	}
 	MarketWidgetInstance = nullptr;
 	ActiveMarketComponent.Reset();
-
-	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
-	{
-		InventoryWidgetInstance->RemoveFromParent();
-	}
-	InventoryWidgetInstance = nullptr;
 
 	if (ClosingMarketComponent)
 	{
