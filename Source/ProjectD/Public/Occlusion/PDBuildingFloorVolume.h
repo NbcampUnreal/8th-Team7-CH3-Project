@@ -44,4 +44,5 @@ protected:
 private:
     //박스 영역 내 모든 StaticMeshActor에 UPDFloorOcclusionComponent 자동 부착
     void AttachComponentsToOverlappingMeshes();
+    void CheckInitialPawnOverlap();
 };

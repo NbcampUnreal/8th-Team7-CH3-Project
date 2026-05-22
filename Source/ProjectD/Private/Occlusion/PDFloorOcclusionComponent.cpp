@@ -1,5 +1,4 @@
 #include "Occlusion/PDFloorOcclusionComponent.h"
-
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Occlusion/PDFloorOcclusionSubsystem.h"

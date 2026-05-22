@@ -1,5 +1,4 @@
 #include "Occlusion/PDFloorDetectionComponent.h"
-
 #include "Engine/World.h"
 #include "Occlusion/PDFloorOcclusionSubsystem.h"
 
@@ -76,6 +75,9 @@ void UPDFloorDetectionComponent::UpdateActiveFloor()
 
     CurrentBuildingGroupID = NewBuilding;
     CurrentFloorLevel = NewFloor;
+    
+    UE_LOG(LogTemp, Warning, TEXT("[Detection] 활성층 변경: Building=%s Floor=%d (스택 %d개)"),
+        *NewBuilding.ToString(), NewFloor, ActiveStack.Num());
 
     if (!NewBuilding.IsNone())
     {
