@@ -1,5 +1,6 @@
 #include "Occlusion/PDFloorDetectionComponent.h"
 #include "Engine/World.h"
+#include "Kismet/KismetMaterialLibrary.h"
 #include "Occlusion/PDFloorOcclusionSubsystem.h"
 
 UPDFloorDetectionComponent::UPDFloorDetectionComponent()
@@ -78,5 +79,12 @@ void UPDFloorDetectionComponent::UpdateActiveFloor()
     if (!NewBuilding.IsNone())
     {
         Subsystem->SetVisibleBuildingFloor(NewBuilding, NewFloor);
+    }
+    
+    if (OcclusionMPC)
+    {
+        const float Strength = NewBuilding.IsNone() ? 1.0f : 0.0f;
+        UKismetMaterialLibrary::SetScalarParameterValue(
+            this, OcclusionMPC, TEXT("MaskStrength"), Strength);
     }
 }
