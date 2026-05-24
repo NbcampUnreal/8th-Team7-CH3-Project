@@ -1,6 +1,8 @@
 #include "Occlusion/PDFloorOcclusionComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Components/PrimitiveComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Occlusion/PDFloorOcclusionSubsystem.h"
 
 UPDFloorOcclusionComponent::UPDFloorOcclusionComponent()
@@ -17,6 +19,31 @@ void UPDFloorOcclusionComponent::InitializeFloorInfo(FName InBuildingGroupID, in
 void UPDFloorOcclusionComponent::BeginPlay()
 {
 	Super::BeginPlay();
+
+	//Owner의 모든 PrimitiveComponent 머티리얼을 DMI로 교체 + 캐시
+	if (AActor* Owner = GetOwner())
+	{
+		TArray<UPrimitiveComponent*> PrimComponents;
+		Owner->GetComponents<UPrimitiveComponent>(PrimComponents);
+
+		for (UPrimitiveComponent* Prim : PrimComponents)
+		{
+			if (!Prim)
+			{
+				continue;
+			}
+
+			const int32 NumMaterials = Prim->GetNumMaterials();
+			for (int32 i = 0; i < NumMaterials; i++)
+			{
+				UMaterialInstanceDynamic* DynMat = Prim->CreateAndSetMaterialInstanceDynamic(i);
+				if (DynMat)
+				{
+					DitherMaterials.Add(DynMat);
+				}
+			}
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -55,15 +82,19 @@ void UPDFloorOcclusionComponent::SetFadeAmount(float Alpha)
 		return;
 	}
 
-	// === 폴리싱 마이그레이션 포인트 시작 ===
-	// 1차: 양자택일. 0.5 미만이면 SetActorHiddenInGame(true).
-	// 2차: BeginPlay에서 메시 컴포넌트들의 머티리얼을 DMI로 캐시.
-	//      여기서 DMI에 SetScalarParameterValue("DitherFade", CurrentFadeAmount) 호출.
-	//      alpha == 0 도달 시에만 SetActorHiddenInGame(true) (충돌 비용 절감).
-	const bool bShouldBeHidden = CurrentFadeAmount < 0.5f;
+	// DMI의 DitherFade Scalar Parameter 갱신 => 머티리얼이 DitherTemporalAA로 부드럽게 discard
+	for (UMaterialInstanceDynamic* Mat : DitherMaterials)
+	{
+		if (Mat)
+		{
+			Mat->SetScalarParameterValue(TEXT("DitherFade"), CurrentFadeAmount);
+		}
+	}
+
+	// 알파 0 도달 시에만 hidden 처리 (충돌 비용 절감)
+	const bool bShouldBeHidden = FMath::IsNearlyZero(CurrentFadeAmount);
 	if (Owner->IsHidden() != bShouldBeHidden)
 	{
 		Owner->SetActorHiddenInGame(bShouldBeHidden);
 	}
-	// === 폴리싱 마이그레이션 포인트 끝 ===
 }

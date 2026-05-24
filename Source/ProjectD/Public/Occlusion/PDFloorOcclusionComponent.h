@@ -4,6 +4,8 @@
 #include "Components/ActorComponent.h"
 #include "PDFloorOcclusionComponent.generated.h"
 
+class UMaterialInstanceDynamic;
+
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
 class PROJECTD_API UPDFloorOcclusionComponent : public UActorComponent
 {
@@ -20,8 +22,7 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Floor")
 	int32 GetFloorLevel() const { return FloorLevel; }
-
-	//0 ~ 1. 1차는 0.5 기준 SetActorHiddenInGame 양자택일.
+	
 	//2차 디더 폴리싱 시 이 함수 내부만 머티리얼 파라미터 보간으로 교체.
 	void SetFadeAmount(float Alpha);
 
@@ -40,4 +41,8 @@ protected:
 private:
 	float CurrentFadeAmount = 1.0f;
 	bool bRegistered = false;
+	
+	//SetFadeAmount호출 시 DitherFade Scalar Parameter 갱신 대상
+	UPROPERTY()
+	TArray<TObjectPtr<UMaterialInstanceDynamic>> DitherMaterials;
 };

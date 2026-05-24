@@ -43,7 +43,7 @@ private:
 	TArray<FFadeTarget> ActiveFades;
 
 	//초당 alpha 변화량 4.0이면 0.25초에 0→1
-	float FadeSpeed = 4.0f;
+	float FadeSpeed = 1.0f;
 
 	void RequestFade(UPDFloorOcclusionComponent* Component, float TargetAlpha);
 	float CalculateTargetAlpha(FName BuildingGroupID, int32 FloorLevel) const;
