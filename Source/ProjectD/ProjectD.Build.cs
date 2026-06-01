@@ -7,12 +7,15 @@ public class ProjectD : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		PublicDependencyModuleNames.AddRange(new string[] {
-			"Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
+			"Core", "CoreUObject", "CoreOnline", "Engine", "InputCore", "EnhancedInput",
 			"GameplayAbilities", "GameplayTags", "GameplayTasks",
 			"AIModule", "NavigationSystem",
 			"StateTreeModule", "GameplayStateTreeModule",
 			"UMG", "Slate", "SlateCore", "Niagara", "CommonUI", "CommonInput",
-			"PhysicsCore"
+			"PhysicsCore",
+			"PreLoadScreen", "DeveloperSettings",
+			"GeometryCollectionEngine", "ChaosSolverEngine",
+			"OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam", "SteamSockets"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

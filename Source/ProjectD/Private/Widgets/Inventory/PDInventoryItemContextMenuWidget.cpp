@@ -1,4 +1,8 @@
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
+<<<<<<< HEAD
+#include "Widgets/PDWidgetSoundLibrary.h"
+=======
+>>>>>>> origin/main
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
@@ -79,15 +83,30 @@ void UPDInventoryItemContextMenuWidget::RefreshButtonVisibility()
 
 void UPDInventoryItemContextMenuWidget::HandleUseButtonClicked()
 {
+<<<<<<< HEAD
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
+=======
+>>>>>>> origin/main
 	OnUseClicked.Broadcast(this, SlotIndex);
 }
 
 void UPDInventoryItemContextMenuWidget::HandleDropButtonClicked()
 {
+<<<<<<< HEAD
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
+=======
+>>>>>>> origin/main
 	OnDropClicked.Broadcast(this, SlotIndex);
 }
 
 void UPDInventoryItemContextMenuWidget::HandleEquipButtonClicked()
 {
+<<<<<<< HEAD
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
+=======
+>>>>>>> origin/main
 	OnEquipClicked.Broadcast(this, SlotIndex);
 }

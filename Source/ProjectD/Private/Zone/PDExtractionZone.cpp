@@ -1,7 +1,8 @@
 #include "Zone/PDExtractionZone.h"
 #include "Components/BoxComponent.h"
-#include "Core/PDPlayerController.h"
+#include "Core/PDGameMode.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 
 APDExtractionZone::APDExtractionZone()
 {
@@ -24,32 +25,42 @@ void APDExtractionZone::OnOverlapBegin(UPrimitiveComponent* OverlappedComp, AAct
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
 	bool bFromSweep, const FHitResult& SweepResult)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] ExtractionZone OverlapBegin: Other=%s HasAuth=%d"),
+		*GetNameSafe(OtherActor), HasAuthority() ? 1 : 0);
+
+	if (!HasAuthority()) return;
+
 	APawn* Pawn=Cast<APawn>(OtherActor);
-	if (!Pawn) return;
+	if (!Pawn) { UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] ExtractionZone: Other is not a Pawn")); return; }
 
-	APDPlayerController* PC=Cast<APDPlayerController>(Pawn->GetController());
-	if (!PC) return;
+	APlayerController* PC=Cast<APlayerController>(Pawn->GetController());
+	if (!PC) { UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] ExtractionZone: Pawn has no PlayerController")); return; }
 
-	if (ExtractionDelay <= 0.f)
+	if (APDGameMode* GameMode = GetWorld()->GetAuthGameMode<APDGameMode>())
 	{
-		TriggerExtraction(PC);
-		return;
+		GameMode->NotifyZoneOccupancy(EPDZoneTravelType::Extraction, PC, true);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] ExtractionZone: no APDGameMode (GetAuthGameMode failed)"));
 	}
 }
 
 void APDExtractionZone::OnOverlapEnd(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
 	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
+	if (!HasAuthority()) return;
+
 	APawn* Pawn=Cast<APawn>(OtherActor);
 	if (!Pawn) return;
 
-	//≈ª√‚?
-}
+	APlayerController* PC=Cast<APlayerController>(Pawn->GetController());
+	if (!PC) return;
 
-void APDExtractionZone::TriggerExtraction(APlayerController* PC)
-{
-	if (APDPlayerController* PDPC=Cast<APDPlayerController>(PC))
+	UE_LOG(LogTemp, Warning, TEXT("[Diag-Zone] ExtractionZone OverlapEnd: PC=%s"), *GetNameSafe(PC));
+
+	if (APDGameMode* GameMode = GetWorld()->GetAuthGameMode<APDGameMode>())
 	{
-		PDPC->RequestExtraction();
+		GameMode->NotifyZoneOccupancy(EPDZoneTravelType::Extraction, PC, false);
 	}
 }

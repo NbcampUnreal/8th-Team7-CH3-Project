@@ -17,8 +17,10 @@ class PROJECTD_API IPDSurvivalSource
 	GENERATED_BODY()
 
 public:
-	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()  const = 0;
-	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()  const = 0;
-	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()     const = 0;
-	virtual TSubclassOf<UGameplayEffect> GetDehydratedEffectClass()   const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetHungerDecayEffectClass()   const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetThirstDecayEffectClass()   const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetStarvingEffectClass()      const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetDehydratedEffectClass()    const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetGasMaskDecayEffectClass()  const = 0;
+	virtual TSubclassOf<UGameplayEffect> GetGasExposureEffectClass()   const = 0;
 };

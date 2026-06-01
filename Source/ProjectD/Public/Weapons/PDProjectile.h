@@ -41,14 +41,29 @@ protected:
     UPROPERTY()
     TWeakObjectPtr<AActor> WeaponOwner;
 
+    // 발사 속도(방향×속력). 스폰 시 1회 복제 → 클라가 동일 방향으로 결정적 시뮬레이션.
+    UPROPERTY(ReplicatedUsing = OnRep_LaunchVelocity)
+    FVector LaunchVelocity = FVector::ZeroVector;
+
 public:
-    void InitProjectile(float InDamage, AActor* InOwner, bool bPenetrate);
+    void InitProjectile(float InDamage, AActor* InOwner, bool bPenetrate, const FVector& InitialDirection = FVector::ZeroVector);
 
 protected:
     virtual void BeginPlay() override;
+    virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+    UFUNCTION()
+    void OnRep_LaunchVelocity();
+
+    bool HandleProjectileHit(AActor* OtherActor, const FHitResult& Hit);
 
     UFUNCTION()
     void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor,
         UPrimitiveComponent* OtherComp, FVector NormalImpulse,
         const FHitResult& Hit);
+
+    UFUNCTION()
+    void OnOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+        UPrimitiveComponent* OtherComp, int32 OtherBodyIndex,
+        bool bFromSweep, const FHitResult& SweepResult);
 };

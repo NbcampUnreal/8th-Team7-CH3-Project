@@ -4,10 +4,13 @@
 APDPingMarker::APDPingMarker()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
+	
+	USceneComponent* SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+	SetRootComponent(SceneRoot);
+	
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComp"));
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision); //충돌 x
-	SetRootComponent(MeshComp);
+	MeshComp->SetupAttachment(SceneRoot);
 }
 
 void APDPingMarker::InitializePing(EPDPingType InPingType)

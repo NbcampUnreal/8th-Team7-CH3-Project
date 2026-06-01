@@ -15,6 +15,7 @@ namespace PDBTKeys
 	static const FName HasNoiseHint      = TEXT("HasNoiseHint");       // Bool
 	static const FName LastNoiseLocation = TEXT("LastNoiseLocation");  // Vector
 	static const FName LastSeenLocation  = TEXT("LastSeenLocation");   // Vector  (Chase 용)
+	static const FName LastSeenDirection = TEXT("LastSeenDirection");  // Vector  (Investigate 시 둘러볼 방향)
 
 	// ─── State / Movement ───
 	static const FName EnemyState        = TEXT("EnemyState");         // Enum    EPDEnemyState
@@ -26,4 +27,24 @@ namespace PDBTKeys
 	static const FName CanAttack         = TEXT("CanAttack");          // Bool    (Service 가 갱신)
 	static const FName IsTargetInRange   = TEXT("IsTargetInRange");    // Bool    (Service 가 갱신 — 거리 변화 옵저버 트리거용)
 	static const FName HasLOSToTarget    = TEXT("HasLOSToTarget");     // Bool    (Service 가 갱신 — 시야 변화 옵저버 트리거용)
+
+	// ─── Elite: Cover ───
+	static const FName CoverLocation     = TEXT("CoverLocation");      // Vector  (Actor.SnapLocation 또는 EQS Points 결과)
+
+	// ─── Elite: LOS Occlusion ───
+	static const FName TimeSinceLastLOS  = TEXT("TimeSinceLastLOS");   // Float   (Service 누적)
+
+	// ─── Flanking ───
+	static const FName FlankLocation     = TEXT("FlankLocation");      // Vector  (LOS 차단 시 측면 우회 좌표)
+
+	// ─── Friendly Fire ───
+	static const FName bFriendlyInLineOfFire = TEXT("bFriendlyInLineOfFire"); // Bool (사선에 우군 → Flank 트리거)
+
+	// ─── Player Tracking (Service_TrackPlayer) ───
+	static const FName TrackedPlayerLocation = TEXT("TrackedPlayerLocation"); // Vector  (최근접 플레이어 폰 위치)
+	static const FName bHasTrackedPlayer     = TEXT("bHasTrackedPlayer");     // Bool    (추적 범위 내 플레이어 존재 여부)
+
+	// ─── Boss (Juggernaut) ───
+	static const FName BossPhase           = TEXT("BossPhase");           // Enum  EPDJuggernautPhase (Dormant/Active/Deactivating/Returning)
+	static const FName bIsExecutingPattern = TEXT("bIsExecutingPattern"); // Bool  (패턴 실행 중 — 일반공격/Strafe 억제용 BT 게이트)
 }

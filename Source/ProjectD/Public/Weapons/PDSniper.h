@@ -1,56 +1,57 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Weapons/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
 #include "Weapons/PDProjectile.h"
 #include "PDSniper.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnScopeToggled, bool, bIsScoped);
 
 UCLASS(Blueprintable)
-class PROJECTD_API APDSniper : public APDWeaponBase
+class PROJECTD_API APDSniper : public APDRangedWeaponBase
 {
 	GENERATED_BODY()
-	
+
 public:
     APDSniper();
 
 protected:
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     TSubclassOf<APDProjectile> ProjectileClass;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper")
+    /** 볼트 액션 (무기 메시) */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Animation")
+    TObjectPtr<UAnimMontage> BoltActionMontage;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon")
     TArray<bool> PenetrationPerLevel = { false, false, true };
 
-    // 줌 (저격총 전용)
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    // ── 줌 ───────────────────────────────────────────────────────────────────
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Zoom")
     float DefaultFOV = 90.f;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Zoom")
     float ZoomedFOV = 40.f;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon|Sniper|Zoom")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Weapon|Zoom")
     bool bIsZoomed = false;
 
 public:
-    UPROPERTY(BlueprintAssignable, Category = "PD|Weapon|Events")
+    UPROPERTY(BlueprintAssignable, Category="Weapon")
     FOnScopeToggled OnScopeToggled;
 
-    UFUNCTION(BlueprintCallable, Category = "PD|Weapon|Sniper")
+    UFUNCTION(BlueprintCallable, Category="Weapon")
     void ToggleZoom();
 
-    UFUNCTION(BlueprintPure, Category = "PD|Weapon|Sniper")
+    UFUNCTION(BlueprintPure, Category="Weapon")
     FORCEINLINE bool IsZoomed() const { return bIsZoomed; }
-    
+
     virtual void Fire_Implementation() override;
-    virtual void Reload_Implementation() override;
 
 private:
     bool CanPenetrate() const;
-    void SpawnProjectile(bool bPenetrate);
-    FVector GetAimDirection() const;
+    bool BuildAimShot(FVector& OutStart, FVector& OutDirection, FVector& OutTraceEnd) const;
+    void SpawnProjectile(bool bPenetrate, const FVector& Start, const FVector& AimDirection);
 
     UFUNCTION()
     void OnBoltActionMontageEnded(UAnimMontage* Montage, bool bInterrupted);

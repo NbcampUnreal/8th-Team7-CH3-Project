@@ -34,6 +34,7 @@ public:
 
 			BindAction(Entry.InputAction, ETriggerEvent::Started, Object, PressedFunc, Entry.InputTag);
 			BindAction(Entry.InputAction, ETriggerEvent::Completed, Object, ReleasedFunc, Entry.InputTag);
+			BindAction(Entry.InputAction, ETriggerEvent::Canceled, Object, ReleasedFunc, Entry.InputTag);
 		}
 	}
 };

@@ -5,6 +5,14 @@
 
 #include "Blueprint/UserWidget.h"
 #include "Widgets/PDActivatableBase.h"
+#include "Widgets/PDRootLayout.h"
+#include "Widgets/PDWidgetStack.h"
+
+namespace
+{
+	constexpr EUILayer GAllLayers[] = { EUILayer::Frontend, EUILayer::GameMenu, EUILayer::Modal };
+
+}
 
 UPDFrontendUISubsystem* UPDFrontendUISubsystem::Get(const UObject* WorldContextObject)
 {
@@ -16,38 +24,153 @@ UPDFrontendUISubsystem* UPDFrontendUISubsystem::Get(const UObject* WorldContextO
 	return nullptr;
 }
 
-UPDActivatableBase* UPDFrontendUISubsystem::OpenScreen(TSubclassOf<UPDActivatableBase> ScreenClass)
+void UPDFrontendUISubsystem::RegisterRootLayout(UPDRootLayout* InRootLayout)
 {
-	if (!ScreenClass) return nullptr;
+	if (RootLayout == InRootLayout) return;
 
-	// 기존 화면 자동 정리
-	if (CurrentScreen)
+
+	// 기존 ?�록 ?�제
+	if (RootLayout)
 	{
-		if (CurrentScreen->IsActivated())
+		for (EUILayer Layer : GAllLayers)
 		{
-			CurrentScreen->Deactivate();
+			if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+			{
+				Stack->OnStackChanged.RemoveAll(this);
+			}
 		}
-		CurrentScreen->RemoveFromParent();
-		CurrentScreen = nullptr;
 	}
 
-	UPDActivatableBase* NewScreen = CreateWidget<UPDActivatableBase>(GetGameInstance(), ScreenClass);
-	if (!NewScreen) return nullptr;
+	RootLayout = InRootLayout;
 
-	NewScreen->AddToViewport(ScreenZOrder);
-	NewScreen->Activate();
-	CurrentScreen = NewScreen;
-	return NewScreen;
+	// ?�규 ?�록 �??�리게이??구독
+	if (RootLayout)
+	{
+		for (EUILayer Layer : GAllLayers)
+		{
+			if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+			{
+				Stack->OnStackChanged.AddUObject(this, &UPDFrontendUISubsystem::HandleAnyStackChanged);
+			}
+		}
+
+		FlushPendingInitialPush();
+	}
+
+	OnEffectiveUIStateChanged.Broadcast(ComputeEffectiveInputMode());
+
 }
 
-void UPDFrontendUISubsystem::CloseScreen()
+void UPDFrontendUISubsystem::UnregisterRootLayout()
 {
-	if (!CurrentScreen) return;
+	if (!RootLayout) return;
 
-	if (CurrentScreen->IsActivated())
+
+	for (EUILayer Layer : GAllLayers)
 	{
-		CurrentScreen->Deactivate();
+		if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+		{
+			Stack->OnStackChanged.RemoveAll(this);
+		}
 	}
-	CurrentScreen->RemoveFromParent();
-	CurrentScreen = nullptr;
+	RootLayout = nullptr;
+}
+
+UPDActivatableBase* UPDFrontendUISubsystem::PushToLayer(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass)
+{
+
+	if (!RootLayout)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PushToLayer called but RootLayout is not registered."));
+		return nullptr;
+	}
+	UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer);
+	UPDActivatableBase* Pushed = Stack ? Stack->Push(ScreenClass) : nullptr;
+	return Pushed;
+}
+
+void UPDFrontendUISubsystem::RequestInitialPush(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass)
+{
+	if (!ScreenClass)
+	{
+		return;
+	}
+
+	if (RootLayout)
+	{
+		PushToLayer(Layer, ScreenClass);
+		return;
+	}
+
+	PendingInitialPushLayer = Layer;
+	PendingInitialPushClass = ScreenClass;
+	bHasPendingInitialPush = true;
+}
+
+void UPDFrontendUISubsystem::FlushPendingInitialPush()
+{
+	if (!bHasPendingInitialPush || !PendingInitialPushClass)
+	{
+		bHasPendingInitialPush = false;
+		PendingInitialPushClass = nullptr;
+		return;
+	}
+
+	const EUILayer Layer = PendingInitialPushLayer;
+	TSubclassOf<UPDActivatableBase> Class = PendingInitialPushClass;
+
+	bHasPendingInitialPush = false;
+	PendingInitialPushClass = nullptr;
+
+	PushToLayer(Layer, Class);
+}
+
+void UPDFrontendUISubsystem::PopFromLayer(EUILayer Layer)
+{
+	if (!RootLayout) return;
+	if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+	{
+		Stack->Pop();
+	}
+}
+
+void UPDFrontendUISubsystem::ClearLayer(EUILayer Layer)
+{
+	if (!RootLayout) return;
+	if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+	{
+		Stack->Clear();
+	}
+}
+
+UPDActivatableBase* UPDFrontendUISubsystem::GetTopOfLayer(EUILayer Layer) const
+{
+	if (!RootLayout) return nullptr;
+	UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer);
+	return Stack ? Stack->GetTop() : nullptr;
+}
+
+void UPDFrontendUISubsystem::HandleAnyStackChanged(UPDWidgetStack* ChangedStack)
+{
+	const EWidgetInputMode Mode = ComputeEffectiveInputMode();
+	OnEffectiveUIStateChanged.Broadcast(Mode);
+}
+
+EWidgetInputMode UPDFrontendUISubsystem::ComputeEffectiveInputMode() const
+{
+	if (!RootLayout) return EWidgetInputMode::Game;
+
+	// ?�선?�위(=z-order top down): Modal > GameMenu > Frontend. 모두 비면 Game (?�게???�태).
+	static constexpr EUILayer Priority[] = { EUILayer::Modal, EUILayer::GameMenu, EUILayer::Frontend };
+	for (EUILayer Layer : Priority)
+	{
+		if (UPDWidgetStack* Stack = RootLayout->GetLayerStack(Layer))
+		{
+			if (UPDActivatableBase* Top = Stack->GetTop())
+			{
+				return Top->GetInputMode();
+			}
+		}
+	}
+	return EWidgetInputMode::Game;
 }

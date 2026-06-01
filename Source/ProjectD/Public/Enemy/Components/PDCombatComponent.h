@@ -77,6 +77,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Combat|Squad")
 	void NotifyAlliesInRadius(float Radius, AActor* SharedTarget);
 
+	/** Owner→CurrentTarget 사선에 같은 팀(우군)이 끼어 있으면 true. 발사 게이트로 사용 — 프렌들리 파이어 방지. */
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|FriendlyFire")
+	bool IsFriendlyInLineOfFire(float ZOffset = 64.f) const;
+
+	/** AI 측 LineTrace(발사 사선 / LOS) 의 표준 시작점.
+	 *  Actor.Loc + RightVector × MuzzleRightOffset + (0,0,ZOffset). 총구가 폰 우측에 있는 사실을 반영. */
+	UFUNCTION(BlueprintPure, Category = "PD|Combat|FireOffset")
+	FVector GetFireTraceStart(float ZOffset = 64.f) const;
+
 	UPROPERTY(BlueprintAssignable, Category = "PD|Combat")
 	FPDOnTargetChanged OnTargetChanged;
 
@@ -91,7 +100,25 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat", meta = (ClampMin = "0.0"))
 	float AttackRange = 800.f;
 
+	/**
+	 * 같은 타겟에 대해 NotifyAlliesInRadius 가 재발화하는 최소 간격(초).
+	 * BT 의 NotifyAllies task 가 Chase 분기에서 매번 발화되면 ally 의 target 이 영구 재설정됨 — 그 race 차단.
+	 * 새 타겟으로 바뀌면 cooldown 무시하고 즉시 통보.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat|Squad", meta = (ClampMin = "0.0"))
+	float NotifyAlliesCooldown = 5.0f;
+
+	/** AI 의 LineTrace 시작점을 actor 중심에서 우측으로 옮기는 거리(cm). 총구가 actor 우측에 부착된 사실을 반영. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Combat|FireOffset", meta = (ClampMin = "0.0"))
+	float MuzzleRightOffset = 30.f;
+
 private:
+	// 마지막으로 통보한 타겟 + 시점 — 같은 타겟 반복 통보 throttle 용.
+	UPROPERTY(Transient)
+	TWeakObjectPtr<AActor> LastNotifiedTarget;
+
+	float LastNotifyTime = -1.f;
+
 	UPROPERTY(Transient)
 	TWeakObjectPtr<AActor> CurrentTarget;
 

@@ -8,13 +8,25 @@
 #include "Interfaces/PDStatusEffectSource.h"
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
+#include "Component/PDWeaponComponent.h"
 #include "PDCharacterBase.generated.h"
 
 class UPDAttributeSet;
+class UPDBodyPartConfig;
 class UGameplayAbility;
 class UAIPerceptionStimuliSourceComponent;
+class FLifetimeProperty;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDeathSignature, AActor*, Killer);
 class UGameplayEffect;
+
+UENUM(BlueprintType)
+enum class EPDLifeState : uint8
+{
+	Alive = 0,
+	Downed = 1,
+	GettingUp = 3,
+	Dead = 2
+};
 
 UCLASS(Abstract, Blueprintable)
 class PROJECTD_API APDCharacterBase : public ACharacter,
@@ -29,6 +41,8 @@ class PROJECTD_API APDCharacterBase : public ACharacter,
 public:
 	APDCharacterBase();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Weapon")
 	FName WeaponSocketName=TEXT("WeaponSocket");
@@ -36,12 +50,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DamageEffectClass;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Damage")
+	TObjectPtr<UPDBodyPartConfig> BodyPartConfig;
+
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TArray<TSubclassOf<UGameplayAbility>> StartupAbilities;
 
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TArray<TSubclassOf<UGameplayAbility>> ActiveAbilities;
-	
+
 	UPROPERTY(EditAnywhere, Category = "PD|GAS")
 	TSubclassOf<UGameplayEffect> DefaultAttributes;
 
@@ -60,11 +77,19 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "PD|StatusEffect")
 	TSubclassOf<UGameplayEffect> ArmCrippledEffectClass;
 
-	/** 본 캐릭터의 팀. 디자이너가 BP 디폴트 또는 자식 생성자에서 지정 (1=Player, 2=Hostile, 255=Neutral). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Downed")
+	float DownedMoveSpeed = 100.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Downed", meta=(ClampMin="0.0", ForceUnits="s"))
+	float DownedLifeSpan = 20.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PD|Downed", meta=(ClampMin="0.0", ForceUnits="s"))
+	float DownedDamageGracePeriod = 3.f;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|AI")
 	uint8 TeamID = FGenericTeamId::NoTeam;
 
-	/** 다른 AI가 본 캐릭터를 자극(시각/청각)으로 인지할 수 있도록 등록. */
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|AI", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UAIPerceptionStimuliSourceComponent> StimuliSource;
 
@@ -76,21 +101,27 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PD|Damage")
 	FOnDeathSignature OnDeathDelegate;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PD|Weapon",
+		meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UPDWeaponComponent> WeaponComponent;
+
 	virtual void ApplyDamage_Implementation(const FPDDamageInfo& DamageInfo) override;
 	virtual float GetCurrentHealth_Implementation() const override;
 	virtual float GetMaxHealth_Implementation() const override;
 	virtual bool IsAlive_Implementation() const override;
-	virtual void Interact_Implementation(AActor* Interactor) override {}
+	virtual void Interact_Implementation(AActor* Interactor) override;
+	// 캐릭터 기본: 상호작용 대상 아님(적 포함). 플레이어는 Downed 일 때만 가능하도록 오버라이드.
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override { return ASC; }
 
-	// 엔진 perception 의 affiliation 시스템에 TeamID 노출.
-	// AAIController 가 possess 한 폰의 인터페이스로 자동 위임.
+
+
 	virtual FGenericTeamId GetGenericTeamId() const override { return FGenericTeamId(TeamID); }
 
 	UFUNCTION(BlueprintPure, Category = "PD|AI")
 	FORCEINLINE UAIPerceptionStimuliSourceComponent* GetStimuliSource() const { return StimuliSource; }
 
-	// IPDStatusEffectSource
+
 	virtual TSubclassOf<UGameplayEffect> GetLegDamagedEffectClass()  const override { return LegDamagedEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetLegCrippledEffectClass() const override { return LegCrippledEffectClass; }
 	virtual TSubclassOf<UGameplayEffect> GetArmDamagedEffectClass()  const override { return ArmDamagedEffectClass; }
@@ -100,12 +131,90 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Weapon")
 	void AttachActorToWeaponSocket(AActor* ActorToAttach);
 
+	UFUNCTION(BlueprintPure, Category = "PD|Weapon")
+	virtual APDWeaponBase* GetCurrentWeapon() const { return nullptr; }
+
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
 	void OnDeath(AActor* Killer);
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
+	void OnDowned(AActor* InstigatorActor);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
+	void OnRevived(AActor* Reviver);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Damage")
+	void OnDamageFeedback(float DamageAmount, FVector HitLocation, AActor* InstigatorActor);
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE EPDLifeState GetLifeState() const { return LifeState; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE bool IsDowned() const { return LifeState == EPDLifeState::Downed; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE bool IsGettingUp() const { return LifeState == EPDLifeState::GettingUp; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE bool IsDead() const { return LifeState == EPDLifeState::Dead; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	float GetDownedRemainingTime() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE float GetDownedLifeSpan() const { return DownedLifeSpan; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Damage")
+	FORCEINLINE float GetDownedDamageGracePeriod() const { return FMath::Max(3.f, DownedDamageGracePeriod); }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Revive")
+	float GetReviveRemainingTime() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Revive")
+	float GetReviveProgress() const;
+
+	UFUNCTION(BlueprintPure, Category = "PD|Revive")
+	FORCEINLINE bool IsBeingRevived() const { return ActiveReviver.Get() != nullptr; }
+
+	UFUNCTION(BlueprintPure, Category = "PD|Revive")
+	FORCEINLINE AActor* GetActiveReviver() const { return ActiveReviver.Get(); }
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
+	void BeginReviveDisplay(AActor* Reviver, float Duration);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
+	void ClearReviveDisplay();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
+	void FinishGettingUp();
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Revive")
+	void BeginGettingUp(AActor* Reviver);
+
 	virtual void HandleDeath(AActor* Killer);
+	virtual void HandleDowned(AActor* InstigatorActor);
+	virtual bool ShouldEnterDownedStateOnLethalDamage() const { return false; }
+	bool CanBeKilledWhileDownedByDamage() const;
+
+	UPROPERTY(BlueprintReadOnly, Category="PD|Damage")
+	bool bIsDead = false;
 
 protected:
+	UPROPERTY(ReplicatedUsing = OnRep_LifeState, BlueprintReadOnly, Category="PD|Damage")
+	EPDLifeState LifeState = EPDLifeState::Alive;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Damage")
+	float DownedExpireServerTime = 0.f;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Revive")
+	TObjectPtr<AActor> ActiveReviver;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Revive")
+	float ReviveEndServerTime = 0.f;
+
+	UPROPERTY(Replicated, BlueprintReadOnly, Category="PD|Revive")
+	float ReviveDisplayDuration = 0.f;
+
 	UPROPERTY()
 	TObjectPtr<UAbilitySystemComponent> ASC;
 
@@ -114,7 +223,30 @@ protected:
 
 	virtual void InitAbilitySystem();
 	virtual void BeginPlay() override;
+	virtual void PossessedBy(AController* NewController) override;
+	virtual void OnRep_Controller() override;
+	virtual void OnLifeStateChanged(EPDLifeState OldLifeState, AActor* ContextActor);
+	void ResetLifeStateToAlive(AActor* ContextActor);
+
+	UFUNCTION()
+	void OnRep_LifeState(EPDLifeState OldLifeState);
 
 private:
 	void OnMoveSpeedChanged(const FOnAttributeChangeData& Data);
+	void SetLifeState(EPDLifeState NewLifeState, AActor* ContextActor);
+	void SyncLifeStateTags();
+	void ApplyLifeStateMovement();
+	void RestoreAliveCollisionAndInput();
+	void StartDownedDeathTimer();
+	void ClearDownedDeathTimer();
+	void HandleDownedExpired();
+
+	bool bAbilitySystemDelegatesBound = false;
+	bool bAttributesInitialized = false;
+	bool bStartupAbilitiesGiven = false;
+	bool bActiveAbilitiesGiven = false;
+
+	FTimerHandle DownedDeathTimerHandle;
+	float DownedEnteredServerTime = 0.f;
+	TWeakObjectPtr<AActor> PendingGetUpContext;
 };

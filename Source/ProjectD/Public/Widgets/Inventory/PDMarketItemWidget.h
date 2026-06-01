@@ -2,14 +2,18 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Items/PDMarketComponent.h"
+#include "Items/Market/PDMarketComponent.h"
 #include "PDMarketItemWidget.generated.h"
 
-class UImage;
-class UTextBlock;
+class USoundBase;
 class UButton;
+class UImage;
+class UPanelWidget;
+class UTextBlock;
 class UPDInventoryComponent;
+class UPDInventorySlotWidget;
 class UPDMarketComponent;
+class UPDMarketQuantityPopupWidget;
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDMarketItemWidget : public UUserWidget
@@ -20,17 +24,35 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Market")
 	void SetMarketEntry(UPDMarketComponent* InMarketComponent, UPDInventoryComponent* InBuyerInventory, const FPDMarketEntry& InEntry, int32 InEntryIndex);
 
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void SetInventorySlotWidgetClass(TSubclassOf<UPDInventorySlotWidget> InSlotWidgetClass);
+
+	UFUNCTION(BlueprintCallable, Category = "PD|Market")
+	void SetQuantityPopupWidgetClass(TSubclassOf<UPDMarketQuantityPopupWidget> InPopupWidgetClass);
+
 protected:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
+	TObjectPtr<USoundBase> ButtonClickSound;
+
 	virtual void NativeOnInitialized() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
-	FName ImageItemIconWidgetName = TEXT("Image_ItemIcon");
+	TSubclassOf<UPDInventorySlotWidget> InventorySlotWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
+	TSubclassOf<UPDMarketQuantityPopupWidget> QuantityPopupWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
+	FName InventorySlotWidgetName = TEXT("WBP_InventorySlot");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
+	FName InventorySlotHostWidgetName = TEXT("Overlay_ItemSlot");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
 	FName TextItemNameWidgetName = TEXT("Text_ItemName");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
-	FName TextPriceWidgetName = TEXT("Text_Price");
+	FName TextPriceWidgetName = TEXT("Text_ItemPrice");
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Market|Widget", meta = (AllowPrivateAccess = "true"))
 	FName TextStockWidgetName = TEXT("Text_Stock");
@@ -44,7 +66,11 @@ private:
 
 	void ResolveWidgets();
 	void RefreshVisuals();
+	void RefreshInventorySlot(const FPDItemData& ItemData);
+	FPDInventorySlot MakeMarketSlotData(const FPDItemData& ItemData) const;
 	int32 GetUnitPrice() const;
+	bool CanBuyCurrentEntry() const;
+	FText MakePriceText(int32 Price) const;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UPDMarketComponent> MarketComponent;
@@ -53,7 +79,10 @@ private:
 	TObjectPtr<UPDInventoryComponent> BuyerInventory;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UImage> ImageItemIconWidget;
+	TObjectPtr<UPDInventorySlotWidget> InventorySlotWidget;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UPanelWidget> InventorySlotHostWidget;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> TextItemNameWidget;

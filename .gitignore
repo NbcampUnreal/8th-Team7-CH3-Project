@@ -2,6 +2,7 @@
 .idea/
 .claude/
 CLAUDE.MD
+Content/Developers/LCW/Enemy/ExternalAsset/
 Content/Developers/LCW/ExternalAsset/
 Content/Developers/yunseong/ExternalAssets/
 
@@ -96,6 +97,7 @@ Plugins/**/Intermediate/*
 
 # End of https://www.toptal.com/developers/gitignore/api/unrealengine
 /Content/Asset/FogArea
-/Content/Asset/PrivateAsset/AnimStarterPack
-/Content/Asset/PrivateAsset
 /Content/FogArea
+/Content/SiteDesign/
+Content/SiteDesign/
+Content/ParagonLtBelica/

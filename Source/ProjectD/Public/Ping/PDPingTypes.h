@@ -11,9 +11,10 @@ enum class EPDPingType : uint8
 {
 	Default     UMETA(DisplayName="Default"),
 	Enemy       UMETA(DisplayName="Enemy"),
-	Item        UMETA(DisplayName="Item"),
 	MoveHere    UMETA(DisplayName="Move Here"),
+	Item        UMETA(DisplayName="Item"),
 	Danger      UMETA(DisplayName="Danger"),
+	Help     UMETA(DisplayName="Help"),
 };
 
 

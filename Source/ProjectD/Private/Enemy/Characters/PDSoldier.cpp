@@ -1,9 +1,32 @@
 #include "Enemy/Characters/PDSoldier.h"
 
+#include "AbilitySystemComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
+#include "Animation/PDAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "Enemy/AI/Controllers/PDEnemyAIControllerBase.h"
 #include "Enemy/Components/PDCombatComponent.h"
-#include "Weapons/PDWeaponBase.h"
+#include "GameplayTag/PDGameplayTags.h"
+#include "HAL/IConsoleManager.h"
+#include "Net/UnrealNetwork.h"
+#include "TimerManager.h"
+#include "Weapons/Base/PDWeaponBase.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
+
+#if ENABLE_DRAW_DEBUG
+static IConsoleVariable* GetPDAIDebugCVar_Soldier()
+{
+	static IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("pd.ai.debugdraw"));
+	return CVar;
+}
+#define PD_SOLDIER_FIRE_LOG(Reason, ...) \
+	do { const IConsoleVariable* CVar = GetPDAIDebugCVar_Soldier(); \
+	     if (CVar && CVar->GetInt() != 0) { UE_LOG(LogPDAI, Log, TEXT("[%s] OnFireTick: " Reason), *GetName(), ##__VA_ARGS__); } } while(0)
+#else
+#define PD_SOLDIER_FIRE_LOG(Reason, ...)
+#endif
 
 APDSoldier::APDSoldier()
 {
@@ -14,29 +37,124 @@ void APDSoldier::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// 무기 타입 태그 변경 시 AnimLayer 갈아끼우기 — Player 와 동일 패턴.
+	if (ASC)
+	{
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Rifle,   EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Shotgun, EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+		ASC->RegisterGameplayTagEvent(PDGameplayTags::Weapon_Type_Sniper,  EGameplayTagEventType::NewOrRemoved).AddUObject(this, &APDSoldier::OnWeaponTypeTagChanged);
+	}
+	LinkDefaultAnimLayer();
+
 	SpawnAndEquipDefaultWeapon();
 
-	// CombatComponent.OnAttackRequested 는 "공격 의도" 신호 — 무기에게 Fire 위임.
+	// 타겟 획득/상실에 맞춰 풀오토 루프 on/off.
+	// OnAttackRequested 는 단발/비-Rifle 경로 — BT FireAtTarget 매 cycle 1회 발사.
 	if (UPDCombatComponent* Combat = GetCombatComponent())
 	{
+		Combat->OnTargetChanged  .AddDynamic(this, &APDSoldier::HandleTargetChanged);
 		Combat->OnAttackRequested.AddDynamic(this, &APDSoldier::HandleAttackRequested);
+	}
+}
+
+void APDSoldier::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(APDSoldier, EquippedWeapon);
+}
+
+void APDSoldier::OnRep_EquippedWeapon()
+{
+	// 클라 전용 연출 동기화. 스폰/파괴·타이머·탄약·ASC 태그는 서버 권위(SetEquippedWeapon).
+	// 무기 부착은 무기 자체 OnRep_WeaponOwner 가 처리하지만 복제 순서 무관하게 보강.
+	USkeletalMeshComponent* SkelMesh = GetMesh();
+	UPDAnimInstance* AnimInst = SkelMesh ? Cast<UPDAnimInstance>(SkelMesh->GetAnimInstance()) : nullptr;
+
+	if (EquippedWeapon)
+	{
+		AttachActorToWeaponSocket(EquippedWeapon);
+
+		TSubclassOf<UAnimInstance> Layer = EquippedWeapon->GetWeaponAnimLayerClass();
+		if (!Layer) Layer = DefaultAnimLayerClass;
+		if (Layer && SkelMesh)
+		{
+			SkelMesh->LinkAnimClassLayers(Layer);
+		}
+
+		// 발사/장전 몽타주 바인딩 — 무기 멀티캐스트(OnWeaponFired/ReloadStarted)를 클라 AnimInstance 에 연결.
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+	}
+	else
+	{
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(nullptr); // 이전 무기 바인딩 해제.
+		}
+		LinkDefaultAnimLayer();
+	}
+}
+
+void APDSoldier::OnWeaponTypeTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	if (NewCount == 0) return;
+
+	APDWeaponBase* CurWeapon = GetCurrentWeapon();
+	if (!IsValid(CurWeapon)) return;
+
+	TSubclassOf<UAnimInstance> LayerClass = CurWeapon->GetWeaponAnimLayerClass();
+	if (!LayerClass) { LinkDefaultAnimLayer(); return; }
+
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(LayerClass);
+	}
+}
+
+void APDSoldier::LinkDefaultAnimLayer()
+{
+	if (!DefaultAnimLayerClass) return;
+	if (USkeletalMeshComponent* SkelMesh = GetMesh())
+	{
+		SkelMesh->LinkAnimClassLayers(DefaultAnimLayerClass);
 	}
 }
 
 void APDSoldier::OnEnterState_Dead()
 {
+	StopContinuousFire();
+
+	// 무기 → 시체 Stash 이전은 EnemyBase::OnEnterState_Dead 안의 TryDropEquippedWeaponToCorpse 가
+	// WeaponDropChance 확률로 처리. 본 클래스는 발사 timer 정리 + 무기 액터 정리만 담당.
 	Super::OnEnterState_Dead();
 
-	// 사망 시 무기 떨굼 — Drop 처리는 무기 측 IsDropped 플래그가 있어 BP 디자이너가 후속 정책 결정.
-	if (EquippedWeapon)
+	if (!EquippedWeapon) return;
+
+	// 사망 시 무기 AnimLayer 해제 + Default 복귀 — 서버/스탠드얼론은 OnRep_EquippedWeapon 이
+	// 안 불려 무기 레이어가 사망 몽타주를 덮어쓰므로 직접 끊는다. (PDPlayerCharacter::HandleDeath 와 동일)
+	if (UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr)
 	{
-		EquippedWeapon->OnUnequip();
-		EquippedWeapon->SetDropped(true);
+		AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
 	}
+	LinkDefaultAnimLayer();
+
+	EquippedWeapon->OnUnequip();
+	EquippedWeapon->Destroy();
+	EquippedWeapon = nullptr;
+}
+
+FName APDSoldier::GetEquippedWeaponItemID_Implementation() const
+{
+	return EquippedWeapon ? EquippedWeapon->GetItemID() : NAME_None;
 }
 
 void APDSoldier::SpawnAndEquipDefaultWeapon()
 {
+	// 무기는 서버 권위 — 복제 액터를 클라에서 중복 스폰하지 않도록 게이트. 클라는 복제로 받아 OnRep 연출.
+	if (!HasAuthority()) return;
 	if (!DefaultWeaponClass) return;
 
 	UWorld* World = GetWorld();
@@ -62,8 +180,25 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 {
 	if (EquippedWeapon == NewWeapon) return;
 
+	// 무기 교체 전 fire timer 활성 여부 기록 — BT(예: PeekFire) 가 발사 중이면 교체 후 재개,
+	// 발사 중이 아니면(=combat 상태만으로 가만히 있던 경우) 새 무기로도 자동 발사 시작 금지.
+	const UWorld* World = GetWorld();
+	const bool bWasFiring = World && World->GetTimerManager().IsTimerActive(FireTimerHandle);
+
+	UPDAnimInstance* AnimInst = GetMesh() ? Cast<UPDAnimInstance>(GetMesh()->GetAnimInstance()) : nullptr;
+
 	if (EquippedWeapon)
 	{
+		// 무기 타입 태그 제거 — AnimInstance.WeaponType 캐시가 None 으로 복귀하도록.
+		if (ASC)
+		{
+			ASC->RemoveLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
+		}
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponUnequipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+
 		EquippedWeapon->OnUnequip();
 		if (bDestroyPrevious)
 		{
@@ -77,18 +212,227 @@ void APDSoldier::SetEquippedWeapon(APDWeaponBase* NewWeapon, bool bDestroyPrevio
 	{
 		AttachActorToWeaponSocket(EquippedWeapon);
 		EquippedWeapon->OnEquip(this);
+
+		// 무한탄약 옵션 전파: Soldier가 든 사격무기는 인벤토리 없이도 장전 시 풀충.
+		if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+		{
+			Ranged->SetInfiniteAmmo(bForceInfiniteAmmo);
+		}
+
+		// AnimInstance 가 ASC 태그를 보고 WeaponType/bIsMelee 를 결정 — 태그를 먼저 박는다.
+		if (ASC)
+		{
+			ASC->AddLooseGameplayTag(EquippedWeapon->GetWeaponTypeTag());
+		}
+
+		// Fire/Reload/Equip 몽타주 바인딩 + Equip 몽타주 즉시 재생.
+		if (AnimInst)
+		{
+			AnimInst->OnWeaponEquipped(Cast<APDRangedWeaponBase>(EquippedWeapon));
+		}
+	}
+
+	// 무기 변경 후 연사 timer 재평가 — bWasFiring 이 true 일 때만 재개.
+	// BT 가 발사 중이지 않았다면 새 무기가 풀오토여도 자동 시작 안 함 (사용자 정책: BT-driven only).
+	// Elite peek 중에는 단발 무기(Shotgun/Sniper) swap 도 timer 보존 — ShouldForceContinuousFire 로 우회.
+	if (bWasFiring && EquippedWeapon && (IsCurrentWeaponFullAutoMode() || ShouldForceContinuousFire()))
+	{
+		StartContinuousFire();
+	}
+	else
+	{
+		StopContinuousFire();
+	}
+}
+
+void APDSoldier::HandleTargetChanged(AActor* NewTarget)
+{
+	PD_SOLDIER_FIRE_LOG("HandleTargetChanged NewTarget=%s, bAutoFire=%s, HasWeapon=%s, FullAuto=%s",
+		*GetNameSafe(NewTarget),
+		bAutoFireOnAttackRequested ? TEXT("Y") : TEXT("N"),
+		EquippedWeapon ? TEXT("Y") : TEXT("N"),
+		IsCurrentWeaponFullAutoMode() ? TEXT("Y") : TEXT("N"));
+
+	if (!bAutoFireOnAttackRequested) return;
+
+	// 발사 시작은 BT task (FireAtTarget / MeleeAttack / PeekFireFromCover) 가 담당.
+	// 본 콜백은 target 소실 시 timer leak 방지용 safety stop 만 수행.
+	// (perception 만으로 자동 발사되던 경로 제거 — combat 상태만으로 자동 사격하지 않음.)
+	if (!NewTarget)
+	{
+		StopContinuousFire();
 	}
 }
 
 void APDSoldier::HandleAttackRequested(AActor* /*Target*/)
 {
+	// 단발/비-Rifle 무기 경로. Rifle Auto 는 timer 가 처리하므로 본 경로는 no-op.
 	if (!bAutoFireOnAttackRequested) return;
 	if (!EquippedWeapon) return;
+	if (GetEnemyState() != EPDEnemyState::Combat) return;
 
-	if (AttackMontage)
+	if (IsCurrentWeaponFullAutoMode())
 	{
-		PlayAnimMontage(AttackMontage);
+		// Rifle Auto 는 timer 가 발사 — 중복 방지.
+		// 단, BT 진입 직후 timer 가 아직 시작되지 않았을 가능성에 대비해 한 번 보장.
+		UWorld* World = GetWorld();
+		if (World && !World->GetTimerManager().IsTimerActive(FireTimerHandle))
+		{
+			StartContinuousFire();
+		}
+		return;
 	}
 
+	TryFireSingleShot();
+}
+
+bool APDSoldier::IsCurrentWeaponFullAutoMode() const
+{
+	const APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon);
+	return Ranged && Ranged->IsFullAuto();
+}
+
+bool APDSoldier::TryFireSingleShot()
+{
+	// OnFireTick 의 발사 직전 검증과 동일 정책 (장전/우군 사선) — 단발 경로에도 적용.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		if (Ranged->IsReloading())
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE SKIP (reloading)");
+			return false;
+		}
+		if (Ranged->GetCurrentAmmo() <= 0)
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE RELOAD (ammo=0)");
+			Ranged->Reload();
+			return false;
+		}
+	}
+
+	if (UPDCombatComponent* Combat = GetCombatComponent())
+	{
+		if (Combat->IsFriendlyInLineOfFire())
+		{
+			PD_SOLDIER_FIRE_LOG("SINGLE SKIP (friendly in LOF)");
+			return false;
+		}
+	}
+
+	PD_SOLDIER_FIRE_LOG("SINGLE FIRE");
+	EquippedWeapon->Fire();
+	return true;
+}
+
+void APDSoldier::StartContinuousFire()
+{
+	UWorld* World = GetWorld();
+	if (!World) return;
+
+	// 이미 timer 가 도는 중이어도 return 하지 않음 — 무기 swap 시 새 weapon FireRate 로 interval 갱신 필요.
+	// 첫 발 즉시 시도는 timer 가 정말 새로 시작될 때만.
+	const bool bAlreadyActive = World->GetTimerManager().IsTimerActive(FireTimerHandle);
+
+	if (!bAlreadyActive)
+	{
+		// 첫 발은 지연 없이 즉시 시도.
+		OnFireTick();
+	}
+
+	// 플레이어 GA_FireAbility 와 동일하게 무기 stat 의 FireRate 사용.
+	// 미설정/0 이면 FireInterval(BP 디폴트) 로 폴백.
+	float Interval = FireInterval;
+	if (const APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		const float WeaponRate = Ranged->GetCurrentStats().FireRate;
+		if (WeaponRate > 0.f) Interval = WeaponRate;
+	}
+	Interval = FMath::Max(Interval, 0.0167f); // 1 프레임 클램프.
+
+	// 같은 handle 로 SetTimer 호출 → 기존 timer 대체. swap 케이스에서 안전한 interval 갱신.
+	World->GetTimerManager().SetTimer(FireTimerHandle, this, &APDSoldier::OnFireTick, Interval, /*bLoop=*/true);
+}
+
+void APDSoldier::StopContinuousFire()
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(FireTimerHandle);
+	}
+}
+
+void APDSoldier::OnFireTick()
+{
+	if (!EquippedWeapon)
+	{
+		PD_SOLDIER_FIRE_LOG("STOP (no weapon)");
+		StopContinuousFire();
+		return;
+	}
+
+	// 무기 교체/FireMode 토글로 더 이상 연사 대상이 아니면 timer 정리 — 단발 경로(HandleAttackRequested)로 위임.
+	// 단, 자식 클래스가 ShouldForceContinuousFire()=true 면 무기 타입 무관 timer 유지 (Elite peek 사격용).
+	// 발사 속도는 무기의 FireRate stat + 무기 내부 cooldown(bCanFire) 가 결정.
+	if (!IsCurrentWeaponFullAutoMode() && !ShouldForceContinuousFire())
+	{
+		PD_SOLDIER_FIRE_LOG("STOP (weapon not full-auto)");
+		StopContinuousFire();
+		return;
+	}
+
+	UPDCombatComponent* Combat = GetCombatComponent();
+	if (!Combat || !Combat->HasValidTarget())
+	{
+		PD_SOLDIER_FIRE_LOG("STOP (no valid target)");
+		StopContinuousFire();
+		return;
+	}
+
+	// 상태 게이트 — BT 가 Combat 분기에서 SetEnemyState(Combat) 호출했을 때만 발사.
+	// Idle/Alert/Chase 등 BT 결정 이전 단계에서 OnTargetChanged 만으로 자동 발사되는 것 차단.
+	if (GetEnemyState() != EPDEnemyState::Combat)
+	{
+		PD_SOLDIER_FIRE_LOG("SKIP (state != Combat, state=%d)", static_cast<int32>(GetEnemyState()));
+		return;
+	}
+
+	if (bRequireInRangeToFire)
+	{
+		if (const AActor* Target = Combat->GetCurrentTarget())
+		{
+			const float Range = Combat->GetAttackRange();
+			const float DistSq = FVector::DistSquared(GetActorLocation(), Target->GetActorLocation());
+			if (DistSq > Range * Range)
+			{
+				PD_SOLDIER_FIRE_LOG("SKIP (out of range Dist=%.0f Range=%.0f)", FMath::Sqrt(DistSq), Range);
+				return;
+			}
+		}
+	}
+
+	// 탄 소진 시 자동 장전: 모션 재생 후 FinishReload에서 풀충 → 사실상 무한 사격 사이클.
+	if (APDRangedWeaponBase* Ranged = Cast<APDRangedWeaponBase>(EquippedWeapon))
+	{
+		if (Ranged->IsReloading())
+		{
+			PD_SOLDIER_FIRE_LOG("SKIP (reloading)");
+			return;
+		}
+		if (Ranged->GetCurrentAmmo() <= 0)
+		{
+			PD_SOLDIER_FIRE_LOG("RELOAD (ammo=0)");
+			Ranged->Reload();
+			return;
+		}
+	}
+
+	// 우군 사선 안전망 — BT 외 자율 발사 경로에서도 프렌들리 파이어 차단. 타이머는 유지(우군 이동 시 즉시 재개).
+	if (Combat->IsFriendlyInLineOfFire())
+	{
+		PD_SOLDIER_FIRE_LOG("SKIP (friendly in LOF)");
+		return;
+	}
+
+	PD_SOLDIER_FIRE_LOG("FIRE");
 	EquippedWeapon->Fire();
 }

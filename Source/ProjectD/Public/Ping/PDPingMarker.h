@@ -26,6 +26,6 @@ protected:
 	void OnPingInitialized(EPDPingType InPingType);
 	
 	//비주얼 베이스
-	UPROPERTY(VisibleAnywhere, Category="Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 };

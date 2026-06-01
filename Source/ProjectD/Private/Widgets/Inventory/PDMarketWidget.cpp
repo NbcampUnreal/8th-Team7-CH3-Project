@@ -1,23 +1,27 @@
 #include "Widgets/Inventory/PDMarketWidget.h"
 
-#include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetTree.h"
-#include "Components/UniformGridPanel.h"
-#include "Components/UniformGridSlot.h"
+#include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
+#include "Core/PDPlayerComponentResolver.h"
+#include "Core/PDPlayerController.h"
 #include "GameFramework/Pawn.h"
-#include "Items/PDInventoryComponent.h"
-#include "Items/PDMarketComponent.h"
+#include "Items/Containers/PDInventoryComponent.h"
+#include "Items/Market/PDMarketComponent.h"
 #include "Widgets/Inventory/PDMarketItemWidget.h"
 
 void UPDMarketWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 	BindMarketChanged();
+	BindInventoryChanged();
+	RefreshMarketInfo();
 	RefreshMarketGoods();
 }
 
 void UPDMarketWidget::NativeDestruct()
 {
+	UnbindInventoryChanged();
 	UnbindMarketChanged();
 	Super::NativeDestruct();
 }
@@ -26,88 +30,75 @@ void UPDMarketWidget::InitializeMarket(UPDMarketComponent* InMarketComponent)
 {
 	MarketComponent = InMarketComponent;
 	BindMarketChanged();
+	BindInventoryChanged();
+	RefreshMarketInfo();
 	RefreshMarketGoods();
+}
+
+void UPDMarketWidget::RefreshMarketInfo()
+{
+	ResolveMarketInfoTextBlocks();
+	RefreshInventoryGold();
 }
 
 void UPDMarketWidget::RefreshMarketGoods()
 {
-	ResolveMarketGridPanel();
+	ResolveMarketListPanel();
+	RefreshInventoryGold();
 
-	if (!MarketGridPanel)
+	if (MarketListPanel)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PDMarketWidget: Market grid widget was not found. Expected widget name: %s"), *MarketGridWidgetName.ToString());
-		return;
+		MarketListPanel->ClearChildren();
 	}
 
-	MarketGridPanel->ClearChildren();
-
-	if (!MarketComponent || !MarketItemWidgetClass)
+	if (!MarketComponent || !MarketListPanel || !MarketRowWidgetClass)
 	{
 		return;
 	}
 
 	UPDInventoryComponent* BuyerInventory = FindInventoryComponent();
-	const int32 Columns = FMath::Max(1, MarketGridColumns);
 
-	for (int32 Index = 0; Index < MarketComponent->Goods.Num(); ++Index)
+	for (int32 EntryIndex = 0; EntryIndex < MarketComponent->Goods.Num(); ++EntryIndex)
 	{
-		UUserWidget* CreatedWidget = CreateWidget<UUserWidget>(GetOwningPlayer(), MarketItemWidgetClass);
-		if (!CreatedWidget)
+		if (!MarketComponent->ShouldShowEntry(EntryIndex))
 		{
 			continue;
 		}
 
-		if (UPDMarketItemWidget* MarketItemWidget = Cast<UPDMarketItemWidget>(CreatedWidget))
+		UPDMarketItemWidget* RowWidget = CreateWidget<UPDMarketItemWidget>(GetOwningPlayer(), MarketRowWidgetClass);
+		if (!RowWidget)
 		{
-			MarketItemWidget->SetMarketEntry(MarketComponent, BuyerInventory, MarketComponent->Goods[Index], Index);
+			continue;
 		}
 
-		UUniformGridSlot* GridSlot = MarketGridPanel->AddChildToUniformGrid(CreatedWidget, Index / Columns, Index % Columns);
-		if (GridSlot)
-		{
-			GridSlot->SetHorizontalAlignment(HAlign_Center);
-			GridSlot->SetVerticalAlignment(VAlign_Center);
-		}
+		RowWidget->SetInventorySlotWidgetClass(MarketSlotWidgetClass);
+		RowWidget->SetQuantityPopupWidgetClass(MarketQuantityPopupWidgetClass);
+		RowWidget->SetMarketEntry(MarketComponent, BuyerInventory, MarketComponent->Goods[EntryIndex], EntryIndex);
+		MarketListPanel->AddChild(RowWidget);
 	}
 }
 
-void UPDMarketWidget::ResolveMarketGridPanel()
+void UPDMarketWidget::ResolveMarketInfoTextBlocks()
 {
-	if (MarketGridPanel)
-	{
-		return;
-	}
-
 	if (!WidgetTree)
 	{
 		return;
 	}
 
-	if (UWidget* FoundWidget = WidgetTree->FindWidget(MarketGridWidgetName))
+	if (!TextInventoryGold && !InventoryGoldTextWidgetName.IsNone())
 	{
-		MarketGridPanel = Cast<UUniformGridPanel>(FoundWidget);
-	}
-
-	if (!MarketGridPanel)
-	{
-		WidgetTree->ForEachWidget([this](UWidget* Widget)
-		{
-			if (!MarketGridPanel)
-			{
-				MarketGridPanel = Cast<UUniformGridPanel>(Widget);
-			}
-		});
+		TextInventoryGold = Cast<UTextBlock>(WidgetTree->FindWidget(InventoryGoldTextWidgetName));
 	}
 }
 
-UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
+void UPDMarketWidget::ResolveMarketListPanel()
 {
-	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	if (MarketListPanel || !WidgetTree || MarketListWidgetName.IsNone())
 	{
-		return OwningPawn->FindComponentByClass<UPDInventoryComponent>();
+		return;
 	}
 
-	return nullptr;
+	MarketListPanel = Cast<UPanelWidget>(WidgetTree->FindWidget(MarketListWidgetName));
 }
 
 void UPDMarketWidget::BindMarketChanged()
@@ -118,7 +109,6 @@ void UPDMarketWidget::BindMarketChanged()
 	}
 
 	UnbindMarketChanged();
-
 	BoundMarketComponent = MarketComponent;
 
 	if (BoundMarketComponent)
@@ -134,4 +124,57 @@ void UPDMarketWidget::UnbindMarketChanged()
 		BoundMarketComponent->OnMarketChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
 		BoundMarketComponent = nullptr;
 	}
+}
+
+void UPDMarketWidget::BindInventoryChanged()
+{
+	UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	if (BoundInventoryComponent == InventoryComponent)
+	{
+		return;
+	}
+
+	UnbindInventoryChanged();
+	BoundInventoryComponent = InventoryComponent;
+
+	if (BoundInventoryComponent)
+	{
+		BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketInfo);
+		BoundInventoryComponent->OnInventoryChanged.AddUniqueDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+	}
+}
+
+void UPDMarketWidget::UnbindInventoryChanged()
+{
+	if (BoundInventoryComponent)
+	{
+		BoundInventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketInfo);
+		BoundInventoryComponent->OnInventoryChanged.RemoveDynamic(this, &UPDMarketWidget::RefreshMarketGoods);
+		BoundInventoryComponent = nullptr;
+	}
+}
+
+void UPDMarketWidget::RefreshInventoryGold()
+{
+	ResolveMarketInfoTextBlocks();
+
+	if (TextInventoryGold)
+	{
+		const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+		TextInventoryGold->SetText(MakeGoldText(InventoryComponent ? InventoryComponent->GetGold() : 0));
+	}
+}
+
+FText UPDMarketWidget::MakeGoldText(int32 Gold) const
+{
+	return FText::AsNumber(FMath::Max(0, Gold));
+}
+
+UPDInventoryComponent* UPDMarketWidget::FindInventoryComponent() const
+{
+	if (UPDInventoryComponent* Inventory = FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayer()))
+	{
+		return Inventory;
+	}
+	return FPDPlayerComponentResolver::ResolveInventory(GetOwningPlayerPawn());
 }

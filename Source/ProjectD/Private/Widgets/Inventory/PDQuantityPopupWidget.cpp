@@ -1,11 +1,10 @@
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
+#include "Widgets/PDWidgetSoundLibrary.h"
 
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
-#include "Components/EditableTextBox.h"
-#include "Components/EditableText.h"
 #include "Components/TextBlock.h"
-#include "Input/Events.h"
+#include "Widgets/Inventory/PDInventorySlotWidget.h"
 
 void UPDQuantityPopupWidget::NativeOnInitialized()
 {
@@ -22,7 +21,22 @@ void UPDQuantityPopupWidget::NativeConstruct()
 void UPDQuantityPopupWidget::InitializeQuantityPopup(int32 InMaxQuantity, const FText& InTitle)
 {
 	MaxQuantity = FMath::Max(1, InMaxQuantity);
+	CurrentQuantity = 1;
 	PopupTitle = InTitle;
+	bHasPreviewSlotData = false;
+	bHasPendingPopupState = true;
+
+	ResolveWidgets();
+	ApplyPopupStateToWidgets();
+}
+
+void UPDQuantityPopupWidget::InitializeQuantityPopupWithSlot(int32 InMaxQuantity, const FText& InTitle, const FPDInventorySlot& InPreviewSlot)
+{
+	MaxQuantity = FMath::Max(1, InMaxQuantity);
+	CurrentQuantity = 1;
+	PopupTitle = InTitle;
+	PreviewSlotData = InPreviewSlot;
+	bHasPreviewSlotData = !InPreviewSlot.IsEmpty();
 	bHasPendingPopupState = true;
 
 	ResolveWidgets();
@@ -41,51 +55,46 @@ void UPDQuantityPopupWidget::ResolveWidgets()
 		TextTitleWidget = Cast<UTextBlock>(FindWidgetByExactNameOrPartialName(TextTitleWidgetName, TEXT("Title")));
 	}
 
+	if (!TextQuantityWidget)
+	{
+		TextQuantityWidget = Cast<UTextBlock>(FindWidgetByExactNameOrPartialName(TextQuantityWidgetName, TEXT("Quantity")));
+	}
+
 	if (!TextMaxQuantityWidget)
 	{
 		TextMaxQuantityWidget = Cast<UTextBlock>(FindWidgetByExactNameOrPartialName(TextMaxQuantityWidgetName, TEXT("Max")));
 	}
 
-	if (!EditableQuantityTextBoxWidget && !EditableQuantityTextWidget)
+	if (!ButtonMinusWidget)
 	{
-		if (UWidget* QuantityWidget = FindWidgetByExactNameOrPartialName(EditableQuantityWidgetName, TEXT("Quantity")))
-		{
-			EditableQuantityTextBoxWidget = Cast<UEditableTextBox>(QuantityWidget);
-			EditableQuantityTextWidget = Cast<UEditableText>(QuantityWidget);
-		}
+		ButtonMinusWidget = Cast<UButton>(FindWidgetByExactNameOrPartialName(ButtonMinusWidgetName, TEXT("Minus")));
 	}
 
-	if (!EditableQuantityTextBoxWidget && !EditableQuantityTextWidget)
+	if (ButtonMinusWidget)
 	{
-		WidgetTree->ForEachWidget([this](UWidget* Widget)
-		{
-			if (!EditableQuantityTextBoxWidget)
-			{
-				EditableQuantityTextBoxWidget = Cast<UEditableTextBox>(Widget);
-			}
-
-			if (!EditableQuantityTextWidget)
-			{
-				EditableQuantityTextWidget = Cast<UEditableText>(Widget);
-			}
-		});
+		ButtonMinusWidget->OnClicked.RemoveDynamic(this, &UPDQuantityPopupWidget::HandleMinusClicked);
+		ButtonMinusWidget->OnClicked.AddUniqueDynamic(this, &UPDQuantityPopupWidget::HandleMinusClicked);
 	}
 
-	if (EditableQuantityTextBoxWidget)
+	if (!ButtonPlusWidget)
 	{
-		EditableQuantityTextBoxWidget->OnTextCommitted.RemoveDynamic(this, &UPDQuantityPopupWidget::HandleQuantityTextCommitted);
-		EditableQuantityTextBoxWidget->OnTextCommitted.AddUniqueDynamic(this, &UPDQuantityPopupWidget::HandleQuantityTextCommitted);
+		ButtonPlusWidget = Cast<UButton>(FindWidgetByExactNameOrPartialName(ButtonPlusWidgetName, TEXT("Plus")));
 	}
 
-	if (EditableQuantityTextWidget)
+	if (ButtonPlusWidget)
 	{
-		EditableQuantityTextWidget->OnTextCommitted.RemoveDynamic(this, &UPDQuantityPopupWidget::HandleQuantityTextCommitted);
-		EditableQuantityTextWidget->OnTextCommitted.AddUniqueDynamic(this, &UPDQuantityPopupWidget::HandleQuantityTextCommitted);
+		ButtonPlusWidget->OnClicked.RemoveDynamic(this, &UPDQuantityPopupWidget::HandlePlusClicked);
+		ButtonPlusWidget->OnClicked.AddUniqueDynamic(this, &UPDQuantityPopupWidget::HandlePlusClicked);
 	}
 
 	if (!ButtonConfirmWidget)
 	{
-		ButtonConfirmWidget = Cast<UButton>(FindWidgetByExactNameOrPartialName(ButtonConfirmWidgetName, TEXT("Confirm")));
+		ButtonConfirmWidget = Cast<UButton>(FindWidgetByExactNameOrPartialName(ButtonConfirmWidgetName, TEXT("Buy")));
+	}
+
+	if (!ButtonConfirmWidget)
+	{
+		ButtonConfirmWidget = Cast<UButton>(FindWidgetByExactNameOrPartialName(NAME_None, TEXT("Confirm")));
 	}
 
 	if (!ButtonConfirmWidget)
@@ -110,6 +119,11 @@ void UPDQuantityPopupWidget::ResolveWidgets()
 		ButtonCancelWidget->OnClicked.AddUniqueDynamic(this, &UPDQuantityPopupWidget::HandleCancelClicked);
 	}
 
+	if (!PreviewSlotWidget)
+	{
+		PreviewSlotWidget = FindPreviewSlotWidget();
+	}
+
 	ApplyPopupStateToWidgets();
 }
 
@@ -127,11 +141,46 @@ void UPDQuantityPopupWidget::ApplyPopupStateToWidgets()
 
 	if (TextMaxQuantityWidget)
 	{
-		TextMaxQuantityWidget->SetText(FText::Format(NSLOCTEXT("PDInventory", "QuantityPopupMax", "Max: {0}"), FText::AsNumber(MaxQuantity)));
+		TextMaxQuantityWidget->SetText(FText::Format(NSLOCTEXT("PDInventory", "QuantityPopupMax", "Max {0}"), FText::AsNumber(MaxQuantity)));
 	}
 
-	SetQuantityInputText(FText::AsNumber(1));
-	FocusQuantityInput();
+	if (PreviewSlotWidget && bHasPreviewSlotData)
+	{
+		FPDInventorySlot DisplaySlot = PreviewSlotData;
+		DisplaySlot.Quantity = MaxQuantity;
+		PreviewSlotWidget->SetSlotData(DisplaySlot, INDEX_NONE);
+	}
+
+	SetCurrentQuantity(FMath::Clamp(CurrentQuantity, 1, MaxQuantity));
+}
+
+void UPDQuantityPopupWidget::RefreshQuantityWidgets()
+{
+	if (TextQuantityWidget)
+	{
+		TextQuantityWidget->SetText(FText::AsNumber(CurrentQuantity));
+	}
+
+	if (ButtonMinusWidget)
+	{
+		ButtonMinusWidget->SetIsEnabled(CurrentQuantity > 1);
+	}
+
+	if (ButtonPlusWidget)
+	{
+		ButtonPlusWidget->SetIsEnabled(CurrentQuantity < MaxQuantity);
+	}
+
+	if (ButtonConfirmWidget)
+	{
+		ButtonConfirmWidget->SetIsEnabled(CurrentQuantity >= 1 && CurrentQuantity <= MaxQuantity);
+	}
+}
+
+void UPDQuantityPopupWidget::SetCurrentQuantity(int32 InQuantity)
+{
+	CurrentQuantity = FMath::Clamp(InQuantity, 1, MaxQuantity);
+	RefreshQuantityWidgets();
 }
 
 UWidget* UPDQuantityPopupWidget::FindWidgetByExactNameOrPartialName(FName ExactName, const FString& PartialName) const
@@ -145,7 +194,10 @@ UWidget* UPDQuantityPopupWidget::FindWidgetByExactNameOrPartialName(FName ExactN
 	{
 		if (UWidget* FoundWidget = WidgetTree->FindWidget(ExactName))
 		{
-			return FoundWidget;
+			if (!FoundWidget->GetTypedOuter<UPDInventorySlotWidget>())
+			{
+				return FoundWidget;
+			}
 		}
 	}
 
@@ -154,7 +206,7 @@ UWidget* UPDQuantityPopupWidget::FindWidgetByExactNameOrPartialName(FName ExactN
 	{
 		WidgetTree->ForEachWidget([&FoundByPartialName, &PartialName](UWidget* Widget)
 		{
-			if (!FoundByPartialName && Widget && Widget->GetName().Contains(PartialName))
+				if (!FoundByPartialName && Widget && !Widget->GetTypedOuter<UPDInventorySlotWidget>() && Widget->GetName().Contains(PartialName))
 			{
 				FoundByPartialName = Widget;
 			}
@@ -164,83 +216,51 @@ UWidget* UPDQuantityPopupWidget::FindWidgetByExactNameOrPartialName(FName ExactN
 	return FoundByPartialName;
 }
 
-FText UPDQuantityPopupWidget::GetQuantityInputText() const
+UPDInventorySlotWidget* UPDQuantityPopupWidget::FindPreviewSlotWidget() const
 {
-	if (EditableQuantityTextBoxWidget)
+	if (!WidgetTree)
 	{
-		return EditableQuantityTextBoxWidget->GetText();
+		return nullptr;
 	}
 
-	if (EditableQuantityTextWidget)
+	UPDInventorySlotWidget* FoundSlotWidget = nullptr;
+	WidgetTree->ForEachWidget([&FoundSlotWidget](UWidget* Widget)
 	{
-		return EditableQuantityTextWidget->GetText();
-	}
+		if (!FoundSlotWidget)
+		{
+			FoundSlotWidget = Cast<UPDInventorySlotWidget>(Widget);
+		}
+	});
 
-	return FText::GetEmpty();
+	return FoundSlotWidget;
 }
 
-void UPDQuantityPopupWidget::SetQuantityInputText(const FText& InText)
+void UPDQuantityPopupWidget::HandleMinusClicked()
 {
-	if (EditableQuantityTextBoxWidget)
-	{
-		EditableQuantityTextBoxWidget->SetText(InText);
-	}
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
-	if (EditableQuantityTextWidget)
-	{
-		EditableQuantityTextWidget->SetText(InText);
-	}
+	SetCurrentQuantity(CurrentQuantity - 1);
 }
 
-void UPDQuantityPopupWidget::FocusQuantityInput()
+void UPDQuantityPopupWidget::HandlePlusClicked()
 {
-	if (EditableQuantityTextBoxWidget)
-	{
-		EditableQuantityTextBoxWidget->SetKeyboardFocus();
-		return;
-	}
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
-	if (EditableQuantityTextWidget)
-	{
-		EditableQuantityTextWidget->SetKeyboardFocus();
-	}
-}
-
-int32 UPDQuantityPopupWidget::GetInputQuantity() const
-{
-	const FText QuantityInputText = GetQuantityInputText();
-	if (QuantityInputText.IsEmpty())
-	{
-		UE_LOG(LogTemp, Warning, TEXT("PDQuantityPopupWidget: Quantity input widget was not found. Expected widget name: %s"), *EditableQuantityWidgetName.ToString());
-		return 1;
-	}
-
-	const FString QuantityString = QuantityInputText.ToString().TrimStartAndEnd();
-	if (QuantityString.IsEmpty())
-	{
-		return 1;
-	}
-
-	const int32 ParsedQuantity = FCString::Atoi(*QuantityString);
-	return FMath::Clamp(ParsedQuantity, 1, MaxQuantity);
+	SetCurrentQuantity(CurrentQuantity + 1);
 }
 
 void UPDQuantityPopupWidget::HandleConfirmClicked()
 {
-	OnConfirmed.Broadcast(GetInputQuantity());
-	RemoveFromParent();
-}
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
-void UPDQuantityPopupWidget::HandleQuantityTextCommitted(const FText& Text, ETextCommit::Type CommitMethod)
-{
-	if (CommitMethod == ETextCommit::OnEnter)
-	{
-		HandleConfirmClicked();
-	}
+	OnConfirmed.Broadcast(CurrentQuantity);
+	RemoveFromParent();
 }
 
 void UPDQuantityPopupWidget::HandleCancelClicked()
 {
+	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
+
 	OnCancelled.Broadcast();
 	RemoveFromParent();
 }

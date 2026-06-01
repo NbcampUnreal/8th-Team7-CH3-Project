@@ -4,16 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Type/Types.h"
 #include "PDFrontendUISubsystem.generated.h"
 
 class UPDActivatableBase;
+class UPDRootLayout;
+class UPDWidgetStack;
+enum class EWidgetInputMode : uint8;
 
 /**
- * 단일 메뉴 라이프사이클을 관리하는 서브시스템
- * 한 번에 활성 메뉴는 하나(CurrentScreen)만 배치. 새 화면을 열면 기존 화면을 자동으로 닫음.
- * HUD는 이 서브시스템이 관리하지 않음 (APDPlayerController가 BeginPlay에서 직접 viewport에 추가)
- * 모달은 메뉴 위젯 내부의 sub-widget으로 visibility 토글
+ * UI 라이프사이클 관리 서브시스템
+ * HUD는 이 서브시스템이 관리하지 않음 — APDPlayerController가 직접 viewport에 추가
  */
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnEffectiveUIStateChanged, EWidgetInputMode);
+
 UCLASS()
 class PROJECTD_API UPDFrontendUISubsystem : public UGameInstanceSubsystem
 {
@@ -22,22 +27,49 @@ class PROJECTD_API UPDFrontendUISubsystem : public UGameInstanceSubsystem
 public:
 	static UPDFrontendUISubsystem* Get(const UObject* WorldContextObject);
 
-	/** 새 화면 열기. 기존 CurrentScreen이 있으면 자동으로 닫고 새 화면으로 교체. */
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	UPDActivatableBase* OpenScreen(TSubclassOf<UPDActivatableBase> ScreenClass);
+	/** PC가 BeginPlay에서 RootLayout을 viewport에 추가한 뒤 등록 */
+	void RegisterRootLayout(UPDRootLayout* InRootLayout);
 
-	/** 현재 화면 닫기. 없으면 return */
-	UFUNCTION(BlueprintCallable, Category = "UI")
-	void CloseScreen();
+	/** PC EndPlay에서 등록 해제 */
+	void UnregisterRootLayout();
 
-	/** 현재 활성 화면. 없으면 nullptr. */
-	UFUNCTION(BlueprintPure, Category = "UI")
-	UPDActivatableBase* GetCurrentScreen() const { return CurrentScreen; }
+	UPDRootLayout* GetRootLayout() const { return RootLayout; }
+
+	/** 레이어 스택 top에 화면 push. RootLayout 미등록 시 nullptr */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	UPDActivatableBase* PushToLayer(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass);
+
+	/** RootLayout 등록 시점에 자동으로 push할 초기 화면 요청.
+	 *  RootLayout이 이미 등록되어 있으면 즉시 push, 아니면 RegisterRootLayout 시점에 flush.
+	 *  Lobby GameMode의 PostLogin처럼 PC BeginPlay(=RootLayout 등록)보다 앞서 호출되는 경우를 위한 큐잉 API. */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	void RequestInitialPush(EUILayer Layer, TSubclassOf<UPDActivatableBase> ScreenClass);
+
+	/** 레이어 스택 top을 pop */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	void PopFromLayer(EUILayer Layer);
+
+	/** 레이어 스택 전체 정리 */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	void ClearLayer(EUILayer Layer);
+
+	/** 레이어 스택 top 조회. 비어있거나 미등록이면 nullptr */
+	UFUNCTION(BlueprintCallable, Category = "UI|Layered")
+	UPDActivatableBase* GetTopOfLayer(EUILayer Layer) const;
+	
+	FOnEffectiveUIStateChanged OnEffectiveUIStateChanged;
 
 private:
-	/** AddToViewport ZOrder. HUD(0) 위, 시스템 모달(필요해질 경우 더 높은 값)의 아래. */
-	static constexpr int32 ScreenZOrder = 10;
+	UPROPERTY(Transient)
+	TObjectPtr<UPDRootLayout> RootLayout;
 
 	UPROPERTY(Transient)
-	TObjectPtr<UPDActivatableBase> CurrentScreen;
+	TSubclassOf<UPDActivatableBase> PendingInitialPushClass;
+
+	EUILayer PendingInitialPushLayer{};
+	bool bHasPendingInitialPush = false;
+
+	void HandleAnyStackChanged(UPDWidgetStack* ChangedStack);
+	EWidgetInputMode ComputeEffectiveInputMode() const;
+	void FlushPendingInitialPush();
 };

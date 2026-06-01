@@ -10,8 +10,7 @@
 class UPDAttributeBarWidget;
 
 /**
- * 6부위(Head/Torso/Arm_L/Arm_R/Leg_L/Leg_R) HP 바를 묶는 합성 위젯.
- * ASC를 직접 참조하지 않음 — 상위 HUD가 GetBar(Part)로 개별 바를 가져가 push.
+ * 6부위(Head/Torso/Arm_L/Arm_R/Leg_L/Leg_R) HP 바를 묶는 합성 위젯
  */
 UCLASS(Abstract, BlueprintType, meta = (DisableNativeTick))
 class PROJECTD_API UPDBodyPartHealthGroupWidget : public UUserWidget

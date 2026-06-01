@@ -1,134 +1,111 @@
-﻿#include "Weapons/PDShotgun.h"
-#include "DrawDebugHelpers.h"
+#include "Weapons/PDShotgun.h"
+#include "Weapons/Base/PDRangedWeaponBase.h"
+#include "Core/PDPlayerController.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/Pawn.h"
+
+namespace
+{
+bool RefineShotgunCharacterHitToMesh(const FHitResult& SourceHit, const FVector& Start, const FVector& End,
+    const FCollisionQueryParams& QueryParams, FHitResult& OutHit)
+{
+    ACharacter* HitCharacter = Cast<ACharacter>(SourceHit.GetActor());
+    if (!HitCharacter)
+    {
+        return false;
+    }
+
+    USkeletalMeshComponent* Mesh = HitCharacter->GetMesh();
+    if (!Mesh || SourceHit.GetComponent() == Mesh)
+    {
+        return false;
+    }
+
+    FCollisionQueryParams MeshQueryParams = QueryParams;
+    MeshQueryParams.bTraceComplex = false;
+
+    FHitResult MeshHit;
+    if (!Mesh->LineTraceComponent(MeshHit, Start, End, MeshQueryParams))
+    {
+        FVector ClosestBoneLocation = FVector::ZeroVector;
+        const FName ClosestBoneName = Mesh->FindClosestBone(SourceHit.ImpactPoint, &ClosestBoneLocation, 0.f, false);
+        if (ClosestBoneName.IsNone())
+        {
+            return false;
+        }
+
+        OutHit = SourceHit;
+        OutHit.Component = Mesh;
+        OutHit.BoneName = ClosestBoneName;
+        OutHit.MyBoneName = ClosestBoneName;
+        OutHit.TraceStart = Start;
+        OutHit.TraceEnd = End;
+        return true;
+    }
+
+    OutHit = SourceHit;
+    OutHit.Component = Mesh;
+    OutHit.BoneName = MeshHit.BoneName;
+    OutHit.MyBoneName = MeshHit.MyBoneName;
+    OutHit.ImpactPoint = MeshHit.ImpactPoint;
+    OutHit.Location = MeshHit.Location;
+    OutHit.ImpactNormal = MeshHit.ImpactNormal;
+    OutHit.Normal = MeshHit.Normal;
+    OutHit.TraceStart = Start;
+    OutHit.TraceEnd = End;
+    OutHit.Distance = MeshHit.Distance;
+    OutHit.FaceIndex = MeshHit.FaceIndex;
+    OutHit.PhysMaterial = MeshHit.PhysMaterial;
+    return true;
+}
+}
 
 APDShotgun::APDShotgun()
 {
     WeaponType = EWeaponType::Shotgun;
 
-    LevelStats.Add({ 15.f, 0.80f,  800.f, 6, 2.5f, 0.80f }); // Lv1
-    LevelStats.Add({ 20.f, 0.75f,  900.f, 8, 2.2f, 0.83f }); // Lv2
-    LevelStats.Add({ 28.f, 0.70f, 1000.f, 8, 2.0f, 0.87f }); // Lv3
+    LevelStats.Add({ 15.f, 0.80f,  800.f, 6, 2.5f, 0.80f });
+    LevelStats.Add({ 20.f, 0.75f,  900.f, 8, 2.2f, 0.83f });
+    LevelStats.Add({ 28.f, 0.70f, 1000.f, 8, 2.0f, 0.87f });
 }
 
 void APDShotgun::Fire_Implementation()
 {
+    if (!HasAuthority()) return;
     if (!CanFire()) return;
+
+    const FVector MuzzleLoc = WeaponMesh->DoesSocketExist(MuzzleSocketName)
+        ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
+        : GetActorLocation();
+
+
+    ExecuteFireCue(MuzzleLoc, FVector::ZeroVector);
+
 
     TArray<FHitResult> Hits;
     PerformPelletTraces(Hits);
 
-    TSet<AActor*> HitActors;
+
+    bool bImpactCueSent = false;
+    const int32 PelletCount = FMath::Max(1, GetCurrentPelletCount());
+    const float DamagePerPellet = GetCurrentStats().Damage / static_cast<float>(PelletCount);
     for (const FHitResult& Hit : Hits)
     {
         AActor* HitActor = Hit.GetActor();
-        if (HitActor && !HitActors.Contains(HitActor))
+        if (!HitActor) continue;
+
+        ApplyDamage(HitActor, DamagePerPellet, Hit);
+
+        if (!bImpactCueSent)
         {
-            HitActors.Add(HitActor);
-            ApplyDamage(HitActor, GetCurrentStats().Damage);
+            ExecuteImpactCue(Hit);
+            bImpactCueSent = true;
         }
     }
 
+    PlayWeaponMontage(FireMontage);
     PostFire();
-
-    // 발사 직후 탄피 배출
-    EjectShell();
-}
-
-void APDShotgun::Reload_Implementation()
-{
-    if (bIsReloading) return;
-    if (CurrentAmmo >= GetCurrentStats().MaxAmmo) return;
-
-    bIsReloading = true;
-    ShellsToLoad = GetCurrentStats().MaxAmmo - CurrentAmmo;
-    ShellsInserted = 0;
-
-    LoadNextShell();
-}
-
-void APDShotgun::OnShellInserted_Implementation()
-{
-    ++ShellsInserted;
-    // 실시간으로 탄약 UI에 반영
-    ++CurrentAmmo;
-    CurrentAmmo = FMath::Min(CurrentAmmo, GetCurrentStats().MaxAmmo);
-}
-
-void APDShotgun::LoadNextShell()
-{
-    if (ShellsInserted >= ShellsToLoad)
-    {
-        // 모든 탄 삽입 완료 → 펌프 동작 후 재장전 완료
-        if (PumpMontage)
-        {
-            PlayWeaponMontage(PumpMontage);
-            UAnimInstance* AnimInst = WeaponMesh ? WeaponMesh->GetAnimInstance() : nullptr;
-            if (AnimInst)
-            {
-                FOnMontageEnded EndDelegate;
-                EndDelegate.BindUObject(this, &APDShotgun::OnShellInsertMontageEnded);
-                AnimInst->Montage_SetEndDelegate(EndDelegate, PumpMontage);
-            }
-        }
-        else
-        {
-            FinishReload();
-        }
-        return;
-    }
-
-    if (ShellInsertMontage)
-    {
-        PlayWeaponMontage(ShellInsertMontage);
-
-        UAnimInstance* AnimInst = WeaponMesh ? WeaponMesh->GetAnimInstance() : nullptr;
-        if (AnimInst)
-        {
-            FOnMontageEnded EndDelegate;
-            EndDelegate.BindUObject(this, &APDShotgun::OnShellInsertMontageEnded);
-            AnimInst->Montage_SetEndDelegate(EndDelegate, ShellInsertMontage);
-        }
-    }
-    else
-    {
-        // 몽타주 없을 때 폴백: 타이머로 한 발씩
-        FTimerHandle TempTimer;
-        GetWorldTimerManager().SetTimer(
-            TempTimer, this,
-            &APDShotgun::LoadNextShell,
-            ShellInsertTime, false);
-    }
-}
-
-void APDShotgun::InterruptReloadAndFire()
-{
-    if (!bIsReloading || CurrentAmmo <= 0) return;
-
-    // 진행 중인 몽타주 중단
-    StopWeaponMontage(ShellInsertMontage);
-    StopWeaponMontage(PumpMontage);
-    bIsReloading = false;
-
-    Fire();
-}
-
-void APDShotgun::OnShellInsertMontageEnded(UAnimMontage* Montage, bool bInterrupted)
-{
-    if (bInterrupted)
-    {
-        // 도중 중단 (발사 등) — 장전 상태 정리
-        bIsReloading = false;
-        return;
-    }
-
-    if (Montage == PumpMontage)
-    {
-        FinishReload();
-        return;
-    }
-
-    // 다음 탄 삽입
-    LoadNextShell();
 }
 
 int32 APDShotgun::GetCurrentPelletCount() const
@@ -141,56 +118,61 @@ void APDShotgun::PerformPelletTraces(TArray<FHitResult>& OutHits)
 {
     AActor* WeaponOwnerActor = GetWeaponOwner();
     if (!WeaponOwnerActor) return;
- 
-    APlayerController* PC = Cast<APlayerController>(WeaponOwnerActor->GetInstigatorController());
- 
+
+    APlayerController* PC = nullptr;
+    if (APawn* OwnerPawn = Cast<APawn>(WeaponOwnerActor))
+        PC = Cast<APlayerController>(OwnerPawn->GetController());
+
     FVector Start = WeaponMesh->DoesSocketExist(MuzzleSocketName)
         ? WeaponMesh->GetSocketLocation(MuzzleSocketName)
         : WeaponOwnerActor->GetActorLocation();
- 
-    FVector Forward = WeaponOwnerActor->GetActorForwardVector();
- 
+
+    FVector Forward = GetAimDirectionFromOwner(Start);
+
+    float TraceLength = GetCurrentStats().Range;
     if (PC)
     {
-        // 1순위: 커서가 Pawn 위 → 부위 조준
-        FHitResult PawnHit;
-        if (PC->GetHitResultUnderCursorForObjects(
-            { UEngineTypes::ConvertToObjectType(ECC_Pawn) }, true, PawnHit)
-            && PawnHit.GetActor() && PawnHit.GetActor() != WeaponOwnerActor)
+        FVector AimLocation;
+        if (const APDPlayerController* PDPC = Cast<APDPlayerController>(PC);
+            PDPC && PDPC->GetCachedAimWorldLocation(AimLocation))
         {
-            FVector Dir = PawnHit.Location - Start;
-            if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
+            TraceLength = FVector::Dist(Start, AimLocation);
         }
-        // 2순위: 지면 커서
         else
         {
             FHitResult CursorHit;
             if (PC->GetHitResultUnderCursor(ECC_Visibility, true, CursorHit))
             {
-                FVector Dir = CursorHit.Location - Start;
-                if (!Dir.IsNearlyZero()) Forward = Dir.GetSafeNormal();
+                TraceLength = FVector::Dist(Start, CursorHit.Location);
             }
         }
     }
- 
+
     FCollisionQueryParams Params;
     Params.AddIgnoredActor(this);
     Params.AddIgnoredActor(WeaponOwnerActor);
     Params.bTraceComplex = true;
- 
-    const float Range   = GetCurrentStats().Range;
+
     const int32 Pellets = GetCurrentPelletCount();
- 
+    const float EffectiveSpreadAngle = SpreadAngle * FMath::Clamp(1.f - GetCurrentStats().Accuracy, 0.f, 1.f);
+
     for (int32 i = 0; i < Pellets; ++i)
     {
-        FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(SpreadAngle));
-        FVector End     = Start + RandDir * Range;
+        FVector RandDir = FMath::VRandCone(Forward, FMath::DegreesToRadians(EffectiveSpreadAngle));
+        FVector End     = Start + RandDir * TraceLength;
+
         FHitResult Hit;
-        if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params))
+        const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Pawn, Params);
+        if (bHit)
         {
-            OutHits.Add(Hit);
-            DrawDebugLine(GetWorld(), Start, Hit.Location, FColor::Red, false, 1.f, 0, 1.f);
+            FHitResult MeshHit;
+            if (RefineShotgunCharacterHitToMesh(Hit, Start, End, Params, MeshHit))
+            {
+                Hit = MeshHit;
+            }
         }
-        else DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 1.f, 0, 1.f);
+
+        if (bHit) OutHits.Add(Hit);
     }
+
 }

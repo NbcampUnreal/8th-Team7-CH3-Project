@@ -42,34 +42,29 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetLoseSightRadius()             const { return LoseSightRadius; }
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetPeripheralVisionAngleDegrees() const { return PeripheralVisionAngleDegrees; }
 	UFUNCTION(BlueprintPure, Category = "PD|Perception") FORCEINLINE float GetHearingRange()                const { return HearingRange; }
+	
+	// SightRadius setter
+	UFUNCTION(BlueprintCallable, Category = "PD|Perception") void SetSightRadius(float NewSightRadius) { SightRadius = NewSightRadius; };
+
 
 protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float SightRadius = 1500.f;
+	float SightRadius = 800.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float LoseSightRadius = 1800.f;
+	float LoseSightRadius = SightRadius + 50.0f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0", ClampMax = "180.0"))
-	float PeripheralVisionAngleDegrees = 70.f;
+	float PeripheralVisionAngleDegrees = 90.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Sight", meta = (ClampMin = "0.0"))
-	float SightMaxAge = 5.f;
+	float SightMaxAge = 4.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingRange = 1500.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Hearing", meta = (ClampMin = "0.0"))
 	float HearingMaxAge = 3.f;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectEnemies = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectNeutrals = true;
-
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Perception|Affiliation")
-	bool bDetectFriendlies = true;
 
 private:
 	UFUNCTION()
