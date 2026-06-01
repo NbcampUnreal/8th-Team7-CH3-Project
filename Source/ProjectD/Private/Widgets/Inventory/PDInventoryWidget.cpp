@@ -15,13 +15,18 @@
 #include "Components/SizeBox.h"
 #include "Components/SizeBoxSlot.h"
 #include "Components/TextBlock.h"
+<<<<<<< HEAD
 #include "Components/Widget.h"
 #include "Components/PanelWidget.h"
 #include "Components/Button.h"
 #include "Core/PDPlayerComponentResolver.h"
+=======
+#include "Components/PanelWidget.h"
+>>>>>>> origin/main
 #include "Core/PDPlayerController.h"
 #include "Items/Containers/PDLootComponent.h"
 #include "GameFramework/Pawn.h"
+<<<<<<< HEAD
 #include "Items/Containers/PDInventoryComponent.h"
 #include "Items/Data/PDItemSlotTransfer.h"
 #include "Items/Containers/PDQuickSlotComponent.h"
@@ -29,6 +34,12 @@
 #include "Characters/PDPlayerCharacter.h"
 #include "Items/Equipment/PDEquipmentComponent.h"
 #include "Items/Containers/PDStashComponent.h"
+=======
+#include "Items/PDInventoryComponent.h"
+#include "Items/PDItemSlotTransfer.h"
+#include "Items/PDQuickSlotComponent.h"
+#include "Items/PDStashComponent.h"
+>>>>>>> origin/main
 #include "Widgets/Inventory/PDInventoryItemContextMenuWidget.h"
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDInventoryWeightBarWidget.h"
@@ -77,7 +88,10 @@ void UPDInventoryWidget::NativeDestruct()
 		ActiveQuantityPopup->RemoveFromParent();
 	}
 	ClearQuantityRequest();
+<<<<<<< HEAD
 	UnbindEquipmentChanged();
+=======
+>>>>>>> origin/main
 	UnbindInventoryChanged();
 	Super::NativeDestruct();
 }
@@ -952,6 +966,45 @@ const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType 
 	}
 }
 
+UPDQuickSlotComponent* UPDInventoryWidget::FindQuickSlotComponent() const
+{
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
+	}
+
+	return nullptr;
+}
+
+const FPDInventorySlot* UPDInventoryWidget::FindInventorySlot(int32 SlotIndex) const
+{
+	const UPDInventoryComponent* InventoryComponent = FindInventoryComponent();
+	return InventoryComponent && InventoryComponent->Items.IsValidIndex(SlotIndex) ? &InventoryComponent->Items[SlotIndex] : nullptr;
+}
+
+const FPDInventorySlot* UPDInventoryWidget::FindSourceSlot(EPDItemContainerType SourceContainerType, int32 SlotIndex) const
+{
+	switch (SourceContainerType)
+	{
+	case EPDItemContainerType::Inventory:
+		return FindInventorySlot(SlotIndex);
+	case EPDItemContainerType::Stash:
+		if (const UPDStashComponent* StashComponent = FindStashComponent())
+		{
+			return StashComponent->StashItems.IsValidIndex(SlotIndex) ? &StashComponent->StashItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	case EPDItemContainerType::QuickSlot:
+		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	default:
+		return nullptr;
+	}
+}
+
 void UPDInventoryWidget::HandleInventorySlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex)
 {
 	if (!SlotWidget || !SlotWidget->WasLastClickWithControl() || SlotWidget->GetSlotData().IsEmpty())
@@ -978,7 +1031,11 @@ void UPDInventoryWidget::HandleInventorySlotLeftClicked(UPDInventorySlotWidget* 
 
 void UPDInventoryWidget::HandleInventorySlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation)
 {
+<<<<<<< HEAD
 	if (!SlotWidget || !CanAcceptDropForCurrentFilter(DragOperation) || TargetSlotIndex == INDEX_NONE)
+=======
+	if (!SlotWidget || !DragOperation || !DragOperation->IsValidPayload())
+>>>>>>> origin/main
 	{
 		return;
 	}
@@ -1051,7 +1108,10 @@ void UPDInventoryWidget::HandleInventorySlotRightClicked(UPDInventorySlotWidget*
 void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex)
 {
 	CloseContextMenu();
+<<<<<<< HEAD
 	CloseItemHoverTooltip();
+=======
+>>>>>>> origin/main
 
 	if (!SlotWidget || !ContextMenuWidgetClass)
 	{
@@ -1064,6 +1124,17 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 		return;
 	}
 
+<<<<<<< HEAD
+=======
+	OpenItemHoverTooltip(SlotWidget);
+
+	UPanelWidget* ContextMenuContainer = FindContextMenuContainer();
+	if (!ContextMenuContainer)
+	{
+		return;
+	}
+
+>>>>>>> origin/main
 	ActiveContextMenu = CreateWidget<UPDInventoryItemContextMenuWidget>(GetOwningPlayer(), ContextMenuWidgetClass);
 	if (!ActiveContextMenu)
 	{
@@ -1074,6 +1145,7 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 	ActiveContextMenu->OnDropClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
 	ActiveContextMenu->OnEquipClicked.AddUniqueDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
 	ActiveContextMenu->InitializeContextMenu(SlotIndex, SlotData);
+<<<<<<< HEAD
 	ActiveContextMenu->SetVisibility(ESlateVisibility::Visible);
 	ActiveContextMenu->AddToViewport(300);
 
@@ -1084,10 +1156,17 @@ void UPDInventoryWidget::OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int
 	}
 
 	ActiveContextMenu->SetPositionInViewport(MousePosition, false);
+=======
+	ContextMenuContainer->ClearChildren();
+	ContextMenuContainer->AddChild(ActiveContextMenu);
+	ContextMenuContainer->SetVisibility(ESlateVisibility::Visible);
+	ActiveContextMenu->ForceLayoutPrepass();
+>>>>>>> origin/main
 }
 
 void UPDInventoryWidget::CloseContextMenu()
 {
+<<<<<<< HEAD
 	if (!ActiveContextMenu)
 	{
 		return;
@@ -1100,6 +1179,48 @@ void UPDInventoryWidget::CloseContextMenu()
 	ActiveContextMenu = nullptr;
 }
 
+=======
+	if (ActiveContextMenu)
+	{
+		ActiveContextMenu->OnUseClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuUseClicked);
+		ActiveContextMenu->OnDropClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuDropClicked);
+		ActiveContextMenu->OnEquipClicked.RemoveDynamic(this, &UPDInventoryWidget::HandleContextMenuEquipClicked);
+		ActiveContextMenu->RemoveFromParent();
+		ActiveContextMenu = nullptr;
+	}
+
+	if (UPanelWidget* ContextMenuContainer = FindContextMenuContainer())
+	{
+		ContextMenuContainer->ClearChildren();
+		ContextMenuContainer->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+UPanelWidget* UPDInventoryWidget::FindContextMenuContainer() const
+{
+	if (!ActiveItemTooltip || !ActiveItemTooltip->WidgetTree)
+	{
+		return nullptr;
+	}
+
+	if (!ContextMenuContainerWidgetName.IsNone())
+	{
+		if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(ContextMenuContainerWidgetName)))
+		{
+			return FoundPanel;
+		}
+	}
+
+	if (UPanelWidget* FoundPanel = Cast<UPanelWidget>(ActiveItemTooltip->WidgetTree->FindWidget(TEXT("ContextMenuContainer"))))
+	{
+		return FoundPanel;
+	}
+
+	return nullptr;
+}
+
+
+>>>>>>> origin/main
 void UPDInventoryWidget::OpenItemHoverTooltip(UPDInventorySlotWidget* SlotWidget)
 {
 	if (!SlotWidget || SlotWidget->GetSlotData().IsEmpty())
@@ -1164,6 +1285,7 @@ FVector2D UPDInventoryWidget::GetSlotTooltipPosition(UPDInventorySlotWidget* Slo
 
 void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+<<<<<<< HEAD
 	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
 	CloseContextMenu();
@@ -1181,13 +1303,24 @@ void UPDInventoryWidget::HandleContextMenuUseClicked(UPDInventoryItemContextMenu
 		{
 			QuickSlotComponent->UseInventoryConsumableSlot(SlotIndex);
 		}
+=======
+	CloseContextMenu();
+	CloseItemHoverTooltip();
+
+	if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
+	{
+		InventoryComponent->UseItemFromSlot(SlotIndex);
+>>>>>>> origin/main
 	}
 }
 
 void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+<<<<<<< HEAD
 	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
+=======
+>>>>>>> origin/main
 	CloseContextMenu();
 	CloseItemHoverTooltip();
 
@@ -1199,6 +1332,7 @@ void UPDInventoryWidget::HandleContextMenuDropClicked(UPDInventoryItemContextMen
 
 void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex)
 {
+<<<<<<< HEAD
 	UPDWidgetSoundLibrary::PlayUISound2D(this, ButtonClickSound);
 
 	CloseContextMenu();
@@ -1235,6 +1369,10 @@ void UPDInventoryWidget::HandleContextMenuEquipClicked(UPDInventoryItemContextMe
 		RefreshEquipmentSlots();
 		RefreshInventoryGrid();
 	}
+=======
+	CloseContextMenu();
+	CloseItemHoverTooltip();
+>>>>>>> origin/main
 }
 
 void UPDInventoryWidget::ExecuteInventoryQuickAction(int32 SlotIndex, int32 Quantity)
@@ -1292,6 +1430,7 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 	case EPDItemContainerType::QuickSlot:
 		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
 		{
+<<<<<<< HEAD
 			QuickSlotComponent->RemoveItemFromSlot(SourceSlotIndex, Quantity);
 		}
 		break;
@@ -1314,6 +1453,9 @@ void UPDInventoryWidget::ExecuteInventorySlotTransfer(EPDItemContainerType Sourc
 			{
 				LootComponent->TakeSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 			}
+=======
+			QuickSlotComponent->TakeQuickSlotQuantityToInventorySlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+>>>>>>> origin/main
 		}
 		break;
 	default:
@@ -1369,6 +1511,42 @@ void UPDInventoryWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, c
 	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityConfirmed);
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
+<<<<<<< HEAD
+=======
+	ActiveQuantityPopup->AddToViewport(100);
+	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+}
+
+void UPDInventoryWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
+{
+	if (!QuantityPopupWidgetClass)
+	{
+		ExecuteInventorySlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	if (ActiveQuantityPopup && ActiveQuantityPopup->IsInViewport())
+	{
+		ActiveQuantityPopup->RemoveFromParent();
+	}
+
+	ActiveQuantityPopup = CreateWidget<UPDQuantityPopupWidget>(GetOwningPlayer(), QuantityPopupWidgetClass);
+	if (!ActiveQuantityPopup)
+	{
+		ExecuteInventorySlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	bPendingTransferQuantityRequest = true;
+	PendingTransferSourceContainerType = SourceContainerType;
+	PendingTransferSourceSlotIndex = SourceSlotIndex;
+	PendingTransferTargetSlotIndex = TargetSlotIndex;
+	PendingSlotIndex = INDEX_NONE;
+	ActiveQuantityPopup->OnConfirmed.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
+	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDInventoryWidget::HandleQuantityCancelled);
+>>>>>>> origin/main
 	ActiveQuantityPopup->AddToViewport(100);
 	if (const FPDInventorySlot* PreviewSlot = FindInventorySlot(SlotIndex))
 	{

@@ -4,7 +4,10 @@
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
+<<<<<<< HEAD
 #include "Widgets/Screen/PDTabbedContent.h"
+=======
+>>>>>>> origin/main
 #include "PDInventoryWidget.generated.h"
 
 class USoundBase;
@@ -12,7 +15,10 @@ class UUniformGridPanel;
 class UPDInventoryComponent;
 class UPDStashComponent;
 class UPDQuickSlotComponent;
+<<<<<<< HEAD
 class UPDSecureContainerComponent;
+=======
+>>>>>>> origin/main
 class UPDInventorySlotWidget;
 class UUserWidget;
 class UWidgetTree;
@@ -21,10 +27,13 @@ class UImage;
 class UPDQuantityPopupWidget;
 class UPDInventoryItemContextMenuWidget;
 class UPanelWidget;
+<<<<<<< HEAD
 class UPDEquipmentComponent;
 class UButton;
 class UWidget;
 class UPDInventoryWeightBarWidget;
+=======
+>>>>>>> origin/main
 
 UCLASS(BlueprintType, Blueprintable)
 class PROJECTD_API UPDInventoryWidget : public UPDActivatableBase, public IPDTabbedContent
@@ -98,6 +107,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
 	bool bEnableContextMenu = true;
 
+<<<<<<< HEAD
+=======
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|Inventory")
+	FName ContextMenuContainerWidgetName = TEXT("Panel_ContextMenu");
+
+>>>>>>> origin/main
 	UPROPERTY(Transient, BlueprintReadOnly, Category = "PD|Inventory")
 	TObjectPtr<UUniformGridPanel> InventoryGridPanel;
 
@@ -164,9 +179,12 @@ protected:
 	UFUNCTION()
 	void HandleInventorySlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
+<<<<<<< HEAD
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Inventory|Weight")
 	void BP_OnInventoryWeightLimitExceeded(float CurrentWeight, float MaxWeight);
 
+=======
+>>>>>>> origin/main
 	UFUNCTION()
 	void HandleContextMenuUseClicked(UPDInventoryItemContextMenuWidget* MenuWidget, int32 SlotIndex);
 
@@ -182,6 +200,7 @@ protected:
 	UFUNCTION()
 	void HandleQuantityCancelled();
 
+<<<<<<< HEAD
 	UFUNCTION()
 	void HandleEquipmentTabClicked();
 
@@ -206,6 +225,8 @@ protected:
 	UFUNCTION()
 	void HandleEquipmentSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 EquipmentSlotIndex, UPDInventoryDragDropOperation* DragOperation);
 
+=======
+>>>>>>> origin/main
 private:
 	void ResolveInventoryGridPanel();
 	void BindTabButtons();
@@ -237,6 +258,10 @@ private:
 	void ExecuteInventorySlotTransfer(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 Quantity);
 	void OpenContextMenu(UPDInventorySlotWidget* SlotWidget, int32 SlotIndex);
 	void CloseContextMenu();
+<<<<<<< HEAD
+=======
+	UPanelWidget* FindContextMenuContainer() const;
+>>>>>>> origin/main
 	void OpenItemHoverTooltip(UPDInventorySlotWidget* SlotWidget);
 	void CloseItemHoverTooltip();
 	FVector2D GetSlotTooltipPosition(UPDInventorySlotWidget* SlotWidget) const;
@@ -249,6 +274,7 @@ private:
 	UPDInventoryComponent* FindInventoryComponent() const;
 	UPDStashComponent* FindStashComponent() const;
 	UPDQuickSlotComponent* FindQuickSlotComponent() const;
+<<<<<<< HEAD
 	UPDSecureContainerComponent* FindSecureContainerComponent() const;
 	UPDEquipmentComponent* FindEquipmentComponent() const;
 
@@ -260,6 +286,8 @@ private:
 
 	UFUNCTION()
 	void HandleInventoryMessage(const FText& Message);
+=======
+>>>>>>> origin/main
 	void BindInventoryChanged();
 	void UnbindInventoryChanged();
 
@@ -301,8 +329,11 @@ private:
 	int32 PendingTransferSourceSlotIndex = INDEX_NONE;
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
+<<<<<<< HEAD
 	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
 	EPDItemSortMode CurrentSortMode = EPDItemSortMode::None;
 
+=======
+>>>>>>> origin/main
 	int32 PendingSlotIndex = INDEX_NONE;
 };

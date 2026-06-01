@@ -25,6 +25,7 @@ class APDPlayerCharacter;
 class UPDHUDWidget;
 class UPDActivatableBase;
 class UUserWidget;
+<<<<<<< HEAD
 class UPDNotificationWidget;
 class UPDInventoryComponent;
 class UPDEquipmentComponent;
@@ -42,6 +43,8 @@ class UPDRaidEndTransitionWidget;
 class UPDRaidStartTransitionWidget;
 struct FPDPlayerRaidEntryData;
 enum class EWidgetInputMode : uint8;
+=======
+>>>>>>> origin/main
 
 DECLARE_LOG_CATEGORY_EXTERN(LogPDCharacter, Log, All);
 DECLARE_MULTICAST_DELEGATE_OneParam(FPDLootInterfaceClosedSignature, UPDLootComponent*);
@@ -421,6 +424,9 @@ private:
 	TObjectPtr<UPDPlayerUIManagerComponent> UIManagerComponent;
 
 
+	bool IsGameplayInputBlockedByModalUI() const;
+	void SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus = nullptr);
+
 	UPROPERTY(Transient)
 	TObjectPtr<UPDInventoryComponent> BoundInventoryNotificationComponent;
 
@@ -436,10 +442,16 @@ private:
 
 
 
+<<<<<<< HEAD
 	void ApplyEffectiveUIState(EWidgetInputMode Mode);
 
 	void OnFirePressed();
 	void OnReload();
+=======
+	bool bIsGameplayInputBlockedByModalUI = false;
+	bool bMouseCursorVisibleBeforeModalUI = false;
+
+>>>>>>> origin/main
 	void OnInteract();
 	void OnSwitchSlot1();
 	void OnSwitchSlot2();
@@ -458,8 +470,13 @@ private:
 	void OnAimPressed();
 	void UpdateCrosshair();
 
+<<<<<<< HEAD
 	UFUNCTION()
 	void OnWeaponChanged(APDWeaponBase* NewWeapon, EWeaponSlot Slot);
+=======
+	bool bMouseClickEventsEnabledBeforeModalUI = false;
+	bool bMouseOverEventsEnabledBeforeModalUI = false;
+>>>>>>> origin/main
 
 	void BindInventoryNotifications();
 	void UnbindInventoryNotifications();

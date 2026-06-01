@@ -3,7 +3,10 @@
 #include "CoreMinimal.h"
 #include "Widgets/PDActivatableBase.h"
 #include "Widgets/Inventory/PDInventoryDragDropOperation.h"
+<<<<<<< HEAD
 #include "Items/Containers/PDStashComponent.h"
+=======
+>>>>>>> origin/main
 #include "PDStashWidget.generated.h"
 
 class USoundBase;
@@ -118,6 +121,7 @@ protected:
 	UFUNCTION()
 	void HandleQuantityCancelled();
 
+<<<<<<< HEAD
 	UFUNCTION()
 	void HandleEquipmentTabClicked();
 
@@ -145,6 +149,8 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Stash")
 	void BP_OnStashUpgradeFailed(EPDStashUpgradeResult Result);
 
+=======
+>>>>>>> origin/main
 private:
 	void ResolveStashGridPanel();
 	void BindTabButtons();
@@ -192,10 +198,13 @@ private:
 	int32 PendingTransferSourceSlotIndex = INDEX_NONE;
 	int32 PendingTransferTargetSlotIndex = INDEX_NONE;
 
+<<<<<<< HEAD
 	EPDItemFilterTab CurrentFilterTab = EPDItemFilterTab::Equipment;
 
 	TMap<EPDItemFilterTab, FText> FilterTabBaseLabels;
 	EPDItemSortMode CurrentSortMode = EPDItemSortMode::None;
 
+=======
+>>>>>>> origin/main
 	int32 PendingSlotIndex = INDEX_NONE;
 };

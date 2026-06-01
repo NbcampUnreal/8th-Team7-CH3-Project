@@ -67,6 +67,14 @@ enum class EWeaponType : uint8
 	Melee   UMETA(DisplayName = "Melee"),
 };
 
+UENUM(BlueprintType)
+enum class EPDItemType : uint8
+{
+	Equipment  UMETA(DisplayName = "Equipment"),
+	Consumable UMETA(DisplayName = "Consumable"),
+	Misc       UMETA(DisplayName = "Misc"),
+};
+
 USTRUCT(BlueprintType)
 struct FPDItemData : public FTableRowBase
 {
@@ -82,12 +90,15 @@ struct FPDItemData : public FTableRowBase
 	EPDItemType ItemType = EPDItemType::Misc;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+<<<<<<< HEAD
 	EPDItemGrade ItemGrade = EPDItemGrade::Grade1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bIsQuestItem = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+=======
+>>>>>>> origin/main
 	TObjectPtr<UTexture2D> Icon = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

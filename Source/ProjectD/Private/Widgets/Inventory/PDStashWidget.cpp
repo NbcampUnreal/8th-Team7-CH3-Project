@@ -16,11 +16,18 @@
 #include "Components/SizeBoxSlot.h"
 #include "Components/UniformGridSlot.h"
 #include "GameFramework/Pawn.h"
+<<<<<<< HEAD
 #include "Items/Containers/PDInventoryComponent.h"
 #include "Items/Data/PDItemSlotTransfer.h"
 #include "Items/Containers/PDQuickSlotComponent.h"
 #include "Items/Containers/PDStashComponent.h"
 #include "Weapons/Base/PDWeaponBase.h"
+=======
+#include "Items/PDInventoryComponent.h"
+#include "Items/PDItemSlotTransfer.h"
+#include "Items/PDQuickSlotComponent.h"
+#include "Items/PDStashComponent.h"
+>>>>>>> origin/main
 #include "Widgets/Inventory/PDInventorySlotWidget.h"
 #include "Widgets/Inventory/PDQuantityPopupWidget.h"
 
@@ -614,6 +621,45 @@ const FPDInventorySlot* UPDStashWidget::FindSourceSlot(EPDItemContainerType Sour
 	}
 }
 
+UPDQuickSlotComponent* UPDStashWidget::FindQuickSlotComponent() const
+{
+	if (APawn* OwningPawn = GetOwningPlayerPawn())
+	{
+		return OwningPawn->FindComponentByClass<UPDQuickSlotComponent>();
+	}
+
+	return nullptr;
+}
+
+const FPDInventorySlot* UPDStashWidget::FindStashSlot(int32 SlotIndex) const
+{
+	const UPDStashComponent* StashComponent = FindStashComponent();
+	return StashComponent && StashComponent->StashItems.IsValidIndex(SlotIndex) ? &StashComponent->StashItems[SlotIndex] : nullptr;
+}
+
+const FPDInventorySlot* UPDStashWidget::FindSourceSlot(EPDItemContainerType SourceContainerType, int32 SlotIndex) const
+{
+	switch (SourceContainerType)
+	{
+	case EPDItemContainerType::Inventory:
+		if (const UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
+		{
+			return InventoryComponent->Items.IsValidIndex(SlotIndex) ? &InventoryComponent->Items[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	case EPDItemContainerType::Stash:
+		return FindStashSlot(SlotIndex);
+	case EPDItemContainerType::QuickSlot:
+		if (const UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			return QuickSlotComponent->QuickSlotItems.IsValidIndex(SlotIndex) ? &QuickSlotComponent->QuickSlotItems[SlotIndex] : nullptr;
+		}
+		return nullptr;
+	default:
+		return nullptr;
+	}
+}
+
 void UPDStashWidget::HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidget, int32 ClickedSlotIndex)
 {
 	if (!SlotWidget || !SlotWidget->WasLastClickWithControl() || SlotWidget->GetSlotData().IsEmpty())
@@ -634,6 +680,7 @@ void UPDStashWidget::HandleStashSlotLeftClicked(UPDInventorySlotWidget* SlotWidg
 
 void UPDStashWidget::HandleStashSlotItemDropped(UPDInventorySlotWidget* SlotWidget, int32 TargetSlotIndex, UPDInventoryDragDropOperation* DragOperation)
 {
+<<<<<<< HEAD
 	if (!SlotWidget || !CanAcceptDropForCurrentFilter(DragOperation) || TargetSlotIndex == INDEX_NONE)
 	{
 		return;
@@ -641,6 +688,9 @@ void UPDStashWidget::HandleStashSlotItemDropped(UPDInventorySlotWidget* SlotWidg
 
 
 	if (DragOperation->SourceContainerType == EPDItemContainerType::QuickSlot)
+=======
+	if (!SlotWidget || !DragOperation || !DragOperation->IsValidPayload())
+>>>>>>> origin/main
 	{
 		return;
 	}
@@ -704,6 +754,7 @@ void UPDStashWidget::ExecuteStashSlotTransfer(EPDItemContainerType SourceContain
 	case EPDItemContainerType::Inventory:
 		if (UPDInventoryComponent* InventoryComponent = FindInventoryComponent())
 		{
+<<<<<<< HEAD
 			if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
 			{
 				const AActor* StashOwner = StashComponent->GetOwner();
@@ -713,10 +764,13 @@ void UPDStashWidget::ExecuteStashSlotTransfer(EPDItemContainerType SourceContain
 					return;
 				}
 			}
+=======
+>>>>>>> origin/main
 			StashComponent->StoreInventorySlotQuantityToSlot(InventoryComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
 		}
 		break;
 	case EPDItemContainerType::Stash:
+<<<<<<< HEAD
 		if (APDPlayerController* PlayerController = Cast<APDPlayerController>(GetOwningPlayer()))
 		{
 			const AActor* StashOwner = StashComponent->GetOwner();
@@ -731,6 +785,15 @@ void UPDStashWidget::ExecuteStashSlotTransfer(EPDItemContainerType SourceContain
 	case EPDItemContainerType::QuickSlot:
 
 
+=======
+		StashComponent->MoveSlotQuantityToSlot(SourceSlotIndex, TargetSlotIndex, Quantity);
+		break;
+	case EPDItemContainerType::QuickSlot:
+		if (UPDQuickSlotComponent* QuickSlotComponent = FindQuickSlotComponent())
+		{
+			QuickSlotComponent->TakeQuickSlotQuantityToStashSlot(StashComponent, SourceSlotIndex, TargetSlotIndex, Quantity);
+		}
+>>>>>>> origin/main
 		break;
 	default:
 		break;
@@ -785,6 +848,42 @@ void UPDStashWidget::OpenQuantityPopup(int32 SlotIndex, int32 MaxQuantity, const
 	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
 	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
 	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+<<<<<<< HEAD
+=======
+	ActiveQuantityPopup->AddToViewport(100);
+	ActiveQuantityPopup->InitializeQuantityPopup(MaxQuantity, Title);
+}
+
+void UPDStashWidget::OpenTransferQuantityPopup(EPDItemContainerType SourceContainerType, int32 SourceSlotIndex, int32 TargetSlotIndex, int32 MaxQuantity, const FText& Title)
+{
+	if (!QuantityPopupWidgetClass)
+	{
+		ExecuteStashSlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	if (ActiveQuantityPopup && ActiveQuantityPopup->IsInViewport())
+	{
+		ActiveQuantityPopup->RemoveFromParent();
+	}
+
+	ActiveQuantityPopup = CreateWidget<UPDQuantityPopupWidget>(GetOwningPlayer(), QuantityPopupWidgetClass);
+	if (!ActiveQuantityPopup)
+	{
+		ExecuteStashSlotTransfer(SourceContainerType, SourceSlotIndex, TargetSlotIndex, MaxQuantity);
+		return;
+	}
+
+	bPendingTransferQuantityRequest = true;
+	PendingTransferSourceContainerType = SourceContainerType;
+	PendingTransferSourceSlotIndex = SourceSlotIndex;
+	PendingTransferTargetSlotIndex = TargetSlotIndex;
+	PendingSlotIndex = INDEX_NONE;
+	ActiveQuantityPopup->OnConfirmed.RemoveDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnConfirmed.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityConfirmed);
+	ActiveQuantityPopup->OnCancelled.RemoveDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+	ActiveQuantityPopup->OnCancelled.AddUniqueDynamic(this, &UPDStashWidget::HandleQuantityCancelled);
+>>>>>>> origin/main
 	ActiveQuantityPopup->AddToViewport(100);
 	if (const FPDInventorySlot* PreviewSlot = FindStashSlot(SlotIndex))
 	{

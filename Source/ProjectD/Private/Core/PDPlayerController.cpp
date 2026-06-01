@@ -45,9 +45,12 @@
 #include "Widgets/Transition/PDRaidStartTransitionWidget.h"
 #include "Game/PDRaidStats.h"
 #include "Subsystems/PDFrontendUISubsystem.h"
+<<<<<<< HEAD
 #include "Subsystems/PDLoadingScreenSubsystem.h"
 #include "Subsystems/PDQuipSubsystem.h"
 #include "Data/PDQuipDataAsset.h"
+=======
+>>>>>>> origin/main
 #include "Blueprint/UserWidget.h"
 
 DEFINE_LOG_CATEGORY(LogPDCharacter);
@@ -391,7 +394,10 @@ UPDQuestComponent* APDPlayerController::GetPlayerQuestComponent() const
 void APDPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+<<<<<<< HEAD
 	TickRecoilRecovery(DeltaTime);
+=======
+>>>>>>> origin/main
 	UpdateAimRotation();
 	UpdateCrosshair();
 }
@@ -549,7 +555,11 @@ void APDPlayerController::BeginPlay()
 	InputMode.SetHideCursorDuringCapture(false);
 	SetInputMode(InputMode);
 
+<<<<<<< HEAD
 	bShowMouseCursor = false;
+=======
+	bShowMouseCursor = true;
+>>>>>>> origin/main
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
 	DefaultMouseCursor = EMouseCursor::Default;
@@ -699,7 +709,14 @@ void APDPlayerController::ApplyEffectiveUIState(EWidgetInputMode Mode)
 
 void APDPlayerController::OnMove(const struct FInputActionValue& Value)
 {
+<<<<<<< HEAD
 	if (IsGameplayInputBlockedByModalUI() && !ShouldAllowMovementWhileUIOpen()) return;
+=======
+	if (IsGameplayInputBlockedByModalUI()) return;
+
+	APawn* ControlledPawn =GetPawn();
+	if (!ControlledPawn) return;
+>>>>>>> origin/main
 
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
@@ -723,11 +740,14 @@ void APDPlayerController::OnJump()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
 
+<<<<<<< HEAD
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
 	{
 		if (PlayerCharacter->IsDowned() || PlayerCharacter->IsGettingUp() || PlayerCharacter->IsDead()) return;
 	}
 
+=======
+>>>>>>> origin/main
 	if (ACharacter* OwnerCharacter = Cast<ACharacter>(GetPawn()))
 	{
 		OwnerCharacter->Jump();
@@ -881,7 +901,54 @@ void APDPlayerController::ClientOpenMarketInterface_Implementation(UPDMarketComp
 		UIManagerComponent->CloseMarket();
 		return;
 	}
+<<<<<<< HEAD
 	UIManagerComponent->OpenMarket(MarketComponent);
+=======
+
+	if (!InventoryWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("InventoryWidgetClass is not set."));
+		return;
+	}
+
+	if (!MarketWidgetClass)
+	{
+		UE_LOG(LogPDCharacter, Warning, TEXT("MarketWidgetClass is not set."));
+		return;
+	}
+
+	ActiveMarketComponent = MarketComponent;
+
+	if (IsStashInterfaceOpen())
+	{
+		CloseStashInterface();
+	}
+
+	if (!InventoryWidgetInstance || !InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance = CreateWidget<UPDInventoryWidget>(this, InventoryWidgetClass);
+		if (InventoryWidgetInstance)
+		{
+			InventoryWidgetInstance->AddToViewport();
+		}
+	}
+
+	if (!MarketWidgetInstance || !MarketWidgetInstance->IsInViewport())
+	{
+		MarketWidgetInstance = CreateWidget<UPDMarketWidget>(this, MarketWidgetClass);
+		if (MarketWidgetInstance)
+		{
+			MarketWidgetInstance->InitializeMarket(MarketComponent);
+			MarketWidgetInstance->AddToViewport();
+		}
+	}
+	else
+	{
+		MarketWidgetInstance->InitializeMarket(MarketComponent);
+	}
+
+	SetGameplayInputBlockedByModalUI(true, MarketWidgetInstance);
+>>>>>>> origin/main
 }
 
 void APDPlayerController::CloseMarketInterface()
@@ -890,6 +957,22 @@ void APDPlayerController::CloseMarketInterface()
 	{
 		UIManagerComponent->CloseMarket();
 	}
+<<<<<<< HEAD
+=======
+	MarketWidgetInstance = nullptr;
+	ActiveMarketComponent = nullptr;
+
+	if (InventoryWidgetInstance && InventoryWidgetInstance->IsInViewport())
+	{
+		InventoryWidgetInstance->RemoveFromParent();
+	}
+	InventoryWidgetInstance = nullptr;
+
+	if (!IsStashInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+>>>>>>> origin/main
 }
 
 bool APDPlayerController::IsMarketInterfaceOpen() const
@@ -931,6 +1014,8 @@ void APDPlayerController::OpenStashInterface(UPDStashComponent* StashSource)
 	{
 		UIManagerComponent->OpenStash(StashSource);
 	}
+
+	SetGameplayInputBlockedByModalUI(true, StashWidgetInstance);
 }
 
 void APDPlayerController::ClientOpenStashInterface_Implementation(UPDStashComponent* StashSource)
@@ -973,6 +1058,15 @@ void APDPlayerController::ServerNotifyStashInterfaceClosed_Implementation(UPDSta
 	{
 		OnStashInterfaceClosed.Broadcast(StashSource);
 	}
+<<<<<<< HEAD
+=======
+	InventoryWidgetInstance = nullptr;
+
+	if (!IsMarketInterfaceOpen())
+	{
+		SetGameplayInputBlockedByModalUI(false);
+	}
+>>>>>>> origin/main
 }
 
 bool APDPlayerController::IsStashInterfaceOpen() const
@@ -1188,10 +1282,20 @@ void APDPlayerController::ServerSellInventorySlotToMarket_Implementation(UPDMark
 	}
 }
 
+<<<<<<< HEAD
 void APDPlayerController::ServerUpgradeStash_Implementation(UPDStashComponent* StashComponent)
 {
 	if (!StashComponent)
 	{
+=======
+		bIsGameplayInputBlockedByModalUI = false;
+		SetIgnoreMoveInput(false);
+		SetIgnoreLookInput(false);
+
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+		bShowMouseCursor = false;
+>>>>>>> origin/main
 		return;
 	}
 
@@ -1234,6 +1338,7 @@ void APDPlayerController::ServerTakeStashSlotQuantity_Implementation(UPDStashCom
 	}
 }
 
+<<<<<<< HEAD
 void APDPlayerController::ServerTakeStashSlotQuantityToInventorySlot_Implementation(UPDStashComponent* StashComponent, int32 StashSlotIndex, int32 TargetInventorySlotIndex, int32 Quantity)
 {
 	if (!StashComponent)
@@ -1417,6 +1522,31 @@ TArray<FKey> APDPlayerController::GetMappedKeysForInputTag(const FGameplayTag& I
 		}
 	}
 	return Keys;
+=======
+	bIsGameplayInputBlockedByModalUI = true;
+	SetIgnoreMoveInput(true);
+	SetIgnoreLookInput(true);
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+		{
+			MovementComponent->StopMovementImmediately();
+		}
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidgetInstance->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+	bEnableClickEvents = true;
+	bEnableMouseOverEvents = true;
+	DefaultMouseCursor = EMouseCursor::Default;
+	CurrentMouseCursor = EMouseCursor::Default;
+>>>>>>> origin/main
 }
 
 void APDPlayerController::TryInteract()
@@ -1427,6 +1557,7 @@ void APDPlayerController::TryInteract()
 	}
 }
 
+<<<<<<< HEAD
 void APDPlayerController::StopInteract()
 {
 	if (APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(GetPawn()))
@@ -1443,25 +1574,92 @@ bool APDPlayerController::IsGameplayInputBlockedByModalUI() const
 bool APDPlayerController::ShouldAllowMovementWhileUIOpen() const
 {
 	return UIManagerComponent && UIManagerComponent->ShouldAllowMovementWhileUIOpen();
+=======
+
+bool APDPlayerController::IsGameplayInputBlockedByModalUI() const
+{
+	return bIsGameplayInputBlockedByModalUI;
+>>>>>>> origin/main
 }
 
 void APDPlayerController::SetGameplayInputBlockedByModalUI(bool bBlocked, UUserWidget* WidgetToFocus)
 {
+<<<<<<< HEAD
 	if (UIManagerComponent)
 	{
 		UIManagerComponent->SetGameplayInputBlockedByModalUI(bBlocked, WidgetToFocus);
 	}
 }
+=======
+	if (bBlocked)
+	{
+		if (!bIsGameplayInputBlockedByModalUI)
+		{
+			bMouseCursorVisibleBeforeModalUI = bShowMouseCursor;
+			bMouseClickEventsEnabledBeforeModalUI = bEnableClickEvents;
+			bMouseOverEventsEnabledBeforeModalUI = bEnableMouseOverEvents;
+		}
+
+		bIsGameplayInputBlockedByModalUI = true;
+		SetIgnoreMoveInput(true);
+		SetIgnoreLookInput(true);
+
+		if (APawn* ControlledPawn = GetPawn())
+		{
+			if (UPawnMovementComponent* MovementComponent = ControlledPawn->GetMovementComponent())
+			{
+				MovementComponent->StopMovementImmediately();
+			}
+		}
+
+		FInputModeGameAndUI InputMode;
+		if (WidgetToFocus)
+		{
+			InputMode.SetWidgetToFocus(WidgetToFocus->TakeWidget());
+		}
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+
+		bShowMouseCursor = true;
+		bEnableClickEvents = true;
+		bEnableMouseOverEvents = true;
+		DefaultMouseCursor = EMouseCursor::Default;
+		CurrentMouseCursor = EMouseCursor::Default;
+		return;
+	}
+
+	if (!bIsGameplayInputBlockedByModalUI)
+	{
+		return;
+	}
+
+	bIsGameplayInputBlockedByModalUI = false;
+	SetIgnoreMoveInput(false);
+	SetIgnoreLookInput(false);
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+	bShowMouseCursor = bMouseCursorVisibleBeforeModalUI;
+	bEnableClickEvents = bMouseClickEventsEnabledBeforeModalUI;
+	bEnableMouseOverEvents = bMouseOverEventsEnabledBeforeModalUI;
+}
+
+
+>>>>>>> origin/main
 void APDPlayerController::UpdateAimRotation()
 {
 	if (IsGameplayInputBlockedByModalUI()) return;
 
+<<<<<<< HEAD
 	if (UAbilitySystemComponent* ASC =
 		UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(GetPawn()))
 	{
 		if (ASC->HasMatchingGameplayTag(PDGameplayTags::State_Rolling)) return;
 	}
 
+=======
+>>>>>>> origin/main
 	APawn* ControlledPawn =GetPawn();
 	if (!ControlledPawn) return;
 	if (const APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(ControlledPawn))

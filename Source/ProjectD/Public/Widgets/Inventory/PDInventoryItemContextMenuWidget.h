@@ -5,7 +5,10 @@
 #include "Type/Types.h"
 #include "PDInventoryItemContextMenuWidget.generated.h"
 
+<<<<<<< HEAD
 class USoundBase;
+=======
+>>>>>>> origin/main
 class UButton;
 class UPDInventoryItemContextMenuWidget;
 
@@ -36,9 +39,12 @@ public:
 	FPDOnInventoryContextMenuAction OnEquipClicked;
 
 protected:
+<<<<<<< HEAD
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PD|UI Sound")
 	TObjectPtr<USoundBase> ButtonClickSound;
 
+=======
+>>>>>>> origin/main
 	virtual void NativeOnInitialized() override;
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "PD|Inventory|ContextMenu")

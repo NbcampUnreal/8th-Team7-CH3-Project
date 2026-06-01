@@ -9,6 +9,7 @@
 #include "Core/PDPlayerState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+<<<<<<< HEAD
 #include "GameplayTag/PDGameplayTags.h"
 #include "Items/Containers/PDQuickSlotComponent.h"
 #include "Items/Equipment/PDEquipmentComponent.h"
@@ -58,6 +59,10 @@ namespace
 		AbilitySystemComponent->HandleGameplayEvent(PDGameplayTags::Event_Revive_Cancel, &EventData);
 	}
 }
+=======
+#include "Items/PDQuickSlotComponent.h"
+#include "Weapons/PDWeaponBase.h"
+>>>>>>> origin/main
 
 APDPlayerCharacter::APDPlayerCharacter()
 {
@@ -87,6 +92,7 @@ APDPlayerCharacter::APDPlayerCharacter()
 
 	VisionComponent=CreateDefaultSubobject<UPDVisionComponent>(TEXT("VisionComponent"));
 	InteractionComponent=CreateDefaultSubobject<UPDInteractionComponent>(TEXT("InteractionComponent"));
+	QuickSlotComponent=CreateDefaultSubobject<UPDQuickSlotComponent>(TEXT("QuickSlotComponent"));
 
 	EquipmentModificationComponent=CreateDefaultSubobject<UPDEquipmentModificationComponent>(TEXT("EquipmentModificationComponent"));
 	SecureContainerComponent=CreateDefaultSubobject<UPDSecureContainerComponent>(TEXT("SecureContainerComponent"));

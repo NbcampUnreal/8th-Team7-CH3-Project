@@ -50,25 +50,32 @@ void UPDInventorySlotWidget::NativeOnMouseEnter(const FGeometry& InGeometry, con
 {
 	Super::NativeOnMouseEnter(InGeometry, InMouseEvent);
 
+<<<<<<< HEAD
 	if (bTooltipPreviewMode)
 	{
 		return;
 	}
 
+=======
+>>>>>>> origin/main
 	if (!SlotData.IsEmpty())
 	{
 		OnSlotHovered.Broadcast(this, SlotIndex);
 	}
+<<<<<<< HEAD
 
 	if (Image_HoverBorder)
 	{
 		Image_HoverBorder->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
+=======
+>>>>>>> origin/main
 }
 
 void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEvent)
 {
 	Super::NativeOnMouseLeave(InMouseEvent);
+<<<<<<< HEAD
 
 	if (bTooltipPreviewMode)
 	{
@@ -85,17 +92,23 @@ void UPDInventorySlotWidget::NativeOnMouseLeave(const FPointerEvent& InMouseEven
 	{
 		Image_HoverBorder->SetVisibility(ESlateVisibility::Collapsed);
 	}
+=======
+	OnSlotUnhovered.Broadcast(this, SlotIndex);
+>>>>>>> origin/main
 }
 
 void UPDInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation)
 {
 	Super::NativeOnDragDetected(InGeometry, InMouseEvent, OutOperation);
 
+<<<<<<< HEAD
 	if (bTooltipPreviewMode)
 	{
 		return;
 	}
 
+=======
+>>>>>>> origin/main
 	if (SlotData.IsEmpty() || SlotContainerType == EPDItemContainerType::None || SlotIndex == INDEX_NONE)
 	{
 		return;
@@ -118,6 +131,7 @@ void UPDInventorySlotWidget::NativeOnDragDetected(const FGeometry& InGeometry, c
 
 bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
+<<<<<<< HEAD
 	ClearDropOverlays();
 
 	if (bTooltipPreviewMode)
@@ -128,6 +142,11 @@ bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
 	{
 		if (DragOperation->IsValidPayload() && OnSlotItemDropped.IsBound() && (SlotIndex != INDEX_NONE || SlotContainerType == EPDItemContainerType::None))
+=======
+	if (UPDInventoryDragDropOperation* DragOperation = Cast<UPDInventoryDragDropOperation>(InOperation))
+	{
+		if (DragOperation->IsValidPayload() && SlotIndex != INDEX_NONE && OnSlotItemDropped.IsBound())
+>>>>>>> origin/main
 		{
 			OnSlotItemDropped.Broadcast(this, SlotIndex, DragOperation);
 			return true;
@@ -137,6 +156,7 @@ bool UPDInventorySlotWidget::NativeOnDrop(const FGeometry& InGeometry, const FDr
 	return Super::NativeOnDrop(InGeometry, InDragDropEvent, InOperation);
 }
 
+<<<<<<< HEAD
 bool UPDInventorySlotWidget::NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation)
 {
 	if (bTooltipPreviewMode)
@@ -189,6 +209,8 @@ bool UPDInventorySlotWidget::CanAcceptDrop(UDragDropOperation* InOperation) cons
 	return true;
 }
 
+=======
+>>>>>>> origin/main
 void UPDInventorySlotWidget::SetSlotData(const FPDInventorySlot& InSlotData, int32 InSlotIndex)
 {
 	SlotData = InSlotData;
@@ -204,6 +226,14 @@ void UPDInventorySlotWidget::ClearSlotData(int32 InSlotIndex)
 }
 
 void UPDInventorySlotWidget::SetSlotContainerType(EPDItemContainerType InSlotContainerType)
+<<<<<<< HEAD
+=======
+{
+	SlotContainerType = InSlotContainerType;
+}
+
+void UPDInventorySlotWidget::ResolveTextWidgets()
+>>>>>>> origin/main
 {
 	SlotContainerType = InSlotContainerType;
 }
@@ -349,6 +379,7 @@ void UPDInventorySlotWidget::ApplyTooltipTextToWidget(UUserWidget* TooltipWidget
 		return;
 	}
 
+<<<<<<< HEAD
 	if (UPDInventorySlotWidget* PreviewSlot = Cast<UPDInventorySlotWidget>(TooltipWidget->WidgetTree->FindWidget(TooltipPreviewSlotWidgetName)))
 	{
 		PreviewSlot->SetTooltipPreviewMode(true);
@@ -367,10 +398,18 @@ void UPDInventorySlotWidget::ApplyTooltipTextToWidget(UUserWidget* TooltipWidget
 		TooltipGradeText->SetText(UEnum::GetDisplayValueAsText(SlotData.ItemData.ItemGrade));
 	}
 
+=======
+	if (UTextBlock* TooltipNameText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipItemNameWidgetName)))
+	{
+		TooltipNameText->SetText(DisplayName);
+	}
+
+>>>>>>> origin/main
 	if (UTextBlock* TooltipDescriptionText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipDescriptionWidgetName)))
 	{
 		TooltipDescriptionText->SetText(Description);
 	}
+<<<<<<< HEAD
 
 	if (UTextBlock* TooltipWeightText = Cast<UTextBlock>(TooltipWidget->WidgetTree->FindWidget(TooltipWeightWidgetName)))
 	{
@@ -382,6 +421,8 @@ void UPDInventorySlotWidget::ApplyTooltipTextToWidget(UUserWidget* TooltipWidget
 		const int32 SellPrice = SlotData.ItemData.Price > 0 ? FMath::Max(1, FMath::FloorToInt(static_cast<float>(SlotData.ItemData.Price) * 0.35f)) : 0;
 		TooltipSellPriceText->SetText(FText::Format(FText::FromString(TEXT("{0} Gold")), FText::AsNumber(SellPrice)));
 	}
+=======
+>>>>>>> origin/main
 }
 
 void UPDInventorySlotWidget::ClearTooltip()

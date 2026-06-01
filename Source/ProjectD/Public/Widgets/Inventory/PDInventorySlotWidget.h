@@ -32,9 +32,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetSlotContainerType(EPDItemContainerType InSlotContainerType);
 
+<<<<<<< HEAD
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory")
 	void SetEmptySlotLabel(const FText& InEmptySlotLabel);
 
+=======
+>>>>>>> origin/main
 	UFUNCTION(BlueprintPure, Category = "PD|Inventory")
 	EPDItemContainerType GetSlotContainerType() const { return SlotContainerType; }
 
@@ -50,9 +53,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
 	UUserWidget* CreateItemTooltipWidget();
 
+<<<<<<< HEAD
 	UFUNCTION(BlueprintCallable, Category = "PD|Inventory|Tooltip")
 	void SetTooltipPreviewMode(bool bInPreviewMode);
 
+=======
+>>>>>>> origin/main
 	UPROPERTY(BlueprintAssignable, Category = "PD|Inventory|Event")
 	FPDOnInventorySlotClicked OnSlotLeftClicked;
 
@@ -81,10 +87,13 @@ protected:
 	virtual void NativeOnMouseLeave(const FPointerEvent& InMouseEvent) override;
 	virtual void NativeOnDragDetected(const FGeometry& InGeometry, const FPointerEvent& InMouseEvent, UDragDropOperation*& OutOperation) override;
 	virtual bool NativeOnDrop(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
+<<<<<<< HEAD
 	virtual bool NativeOnDragOver(const FGeometry& InGeometry, const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 	virtual void NativeOnDragLeave(const FDragDropEvent& InDragDropEvent, UDragDropOperation* InOperation) override;
 
 	virtual bool CanAcceptDrop(UDragDropOperation* InOperation) const;
+=======
+>>>>>>> origin/main
 
 	UPROPERTY(BlueprintReadOnly, Category = "PD|Inventory")
 	FPDInventorySlot SlotData;
@@ -147,6 +156,12 @@ private:
 	void ClearTooltip();
 	void ApplyTooltipTextToWidget(UUserWidget* TooltipWidget, const FText& DisplayName, const FText& Description) const;
 	UPDInventorySlotWidget* CreateDragVisualWidget() const;
+<<<<<<< HEAD
+=======
+
+	FText CachedTooltipDisplayName;
+	FText CachedTooltipDescription;
+>>>>>>> origin/main
 
 	FText CachedTooltipDisplayName;
 	FText CachedTooltipDescription;

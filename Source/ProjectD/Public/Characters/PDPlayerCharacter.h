@@ -14,12 +14,16 @@ class APDPlayerState;
 class UPDAnimInstance;
 class UPDVisionComponent;
 class UPDInteractionComponent;
+<<<<<<< HEAD
 class UPDInventoryComponent;
 class UPDQuickSlotComponent;
 class UPDEquipmentComponent;
 class UPDSecureContainerComponent;
 class UPDEquipmentModificationComponent;
 class UPDQuestComponent;
+=======
+class UPDQuickSlotComponent;
+>>>>>>> origin/main
 class UCameraComponent;
 class USpringArmComponent;
 
@@ -66,10 +70,14 @@ private:
 	TObjectPtr<UPDInteractionComponent> InteractionComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+<<<<<<< HEAD
 	TObjectPtr<UPDEquipmentModificationComponent> EquipmentModificationComponent;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UPDSecureContainerComponent> SecureContainerComponent;
+=======
+	TObjectPtr<UPDQuickSlotComponent> QuickSlotComponent;
+>>>>>>> origin/main
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category="PD|Stamina")
@@ -177,6 +185,7 @@ public:
 	UFUNCTION(BlueprintPure, Category="PD|Player")
 	FORCEINLINE EWeaponSlot GetCurrentSlot() const { return CurrentSlot; }
 
+<<<<<<< HEAD
 	UFUNCTION(BlueprintPure, Category="PD|Player|Weapon")
 	FORCEINLINE EWeaponType GetReplicatedWeaponType() const { return ReplicatedWeaponType; }
 
@@ -197,6 +206,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="PD|SecureContainer")
 	UPDSecureContainerComponent* GetSecureContainerComponent() const { return SecureContainerComponent; }
+=======
+	UFUNCTION(BlueprintPure, Category="PD|QuickSlot")
+	UPDQuickSlotComponent* GetQuickSlotComponent() const { return QuickSlotComponent; }
+>>>>>>> origin/main
 
 	UFUNCTION(BlueprintCallable, Category="PD|Interaction")
 	void TryInteract();
